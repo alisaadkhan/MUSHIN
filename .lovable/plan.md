@@ -1,92 +1,107 @@
 
-# Phase 3: Campaign Management & Kanban Pipeline Enhancements
 
-## Current State
+# Phase 3: Campaign Management & Kanban Pipeline -- Full Implementation
 
-The campaign system has a solid foundation:
-- Campaign CRUD (create, list, delete) with status management (draft/active/completed/archived)
-- Kanban board with draggable cards and reorderable stages
-- Pipeline card detail dialog (notes, agreed rate, remove)
-- Dashboard stats (total influencers, per-stage breakdown, budget/agreed with progress bar)
-- Stage customization (rename, delete, color picker)
-- Add influencers from lists (bulk and individual)
-- Budget tracking with color-coded progress
+## Overview
 
-## Phase 3 Features
+Implement all 7 features from the Phase 3 plan in sequence. Features 3.1-3.6 require no database changes. Feature 3.7 requires a new `campaign_activity` table.
 
-### 3.1 — Campaign Creation Enhancements
+---
+
+## 3.1 -- Campaign Creation Enhancements
 
 **File: `src/pages/CampaignsPage.tsx`**
 
-Upgrade the create campaign dialog with full-featured fields:
-- Add `budget` input (number, optional)
-- Add `start_date` and `end_date` date pickers (using existing Calendar/Popover components)
-- Show date range on campaign cards in the grid
-- Display budget on campaign cards with a mini progress indicator
+- Add budget `Input` (type=number, optional) to the create campaign dialog
+- Add start date and end date pickers using `Popover` + `Calendar` (shadcn pattern)
+- Pass `budget`, `start_date`, `end_date` to `createCampaign.mutateAsync()` (the mutation already supports these fields)
+- On campaign cards in the grid, show:
+  - Date range (e.g. "Jan 15 - Feb 28") below the description
+  - Budget amount next to the existing influencer count
 
-### 3.2 — Campaign Edit Dialog
+---
+
+## 3.2 -- Campaign Edit Dialog
 
 **File: `src/pages/CampaignDetailPage.tsx`**
 
-Add an "Edit Campaign" button next to the campaign title that opens a dialog to edit:
-- Campaign name
-- Description
-- Budget
-- Start date / End date
-- Uses existing `updateCampaign` mutation from `useCampaigns` hook
+- Add a pencil/edit icon button next to the campaign title
+- Opens a dialog pre-filled with campaign name, description, budget, start_date, end_date
+- "Save" calls `updateCampaign.mutateAsync()` and invalidates the `campaign-detail` query
+- Reuses the same date picker pattern from 3.1
 
-### 3.3 — Card Detail Enhancements
+---
+
+## 3.3 -- Card Detail Enhancements
 
 **File: `src/components/campaigns/CardDetailDialog.tsx`**
 
-Enrich the card detail dialog:
-- Display influencer stats from the cached `data` JSON (followers, engagement rate, avg views) in a mini stats row
-- Add a "Move to Stage" dropdown so users can reassign the card to a different stage without dragging
-- Show creation date and last updated timestamp
-
-### 3.4 — Duplicate Detection
-
-**Files: `src/pages/CampaignDetailPage.tsx`, `src/pages/ListDetailPage.tsx`**
-
-When adding influencers to a campaign (from a list or bulk action):
-- Check existing `pipeline_cards` for matching `username + platform + campaign_id`
-- Skip duplicates and show a toast: "Added X, skipped Y duplicates"
-- No database changes needed — filter client-side before inserting
-
-### 3.5 — Pipeline Filtering & Search
+- Add a stats row at the top showing data from the card's `data` JSON:
+  - Followers count, engagement rate, avg views (if available in the cached data)
+  - Display as small badges/chips with labels
+- Add a "Move to Stage" `Select` dropdown:
+  - Requires passing `stages` and a `onMove` callback as new props
+  - Lists all stages, current stage pre-selected
+  - On change, calls `onMove(cardId, newStageId)`
+- Show `created_at` and `updated_at` timestamps at the bottom as muted text
 
 **File: `src/components/campaigns/KanbanBoard.tsx`**
 
-Add a toolbar above the Kanban board:
-- Search input to filter cards by username/title across all stages
-- Platform filter chips (Instagram, TikTok, YouTube) to show/hide cards by platform
-- Filters are client-side only, applied to the already-fetched cards data
-- Show "X of Y cards" count when filters are active
+- Pass `stages` and a `handleMoveCard` callback to `CardDetailDialog`
+- Update `CardDetailDialog` props interface to include `stages` and `onMove`
 
-### 3.6 — Bulk Stage Move
+---
+
+## 3.4 -- Duplicate Detection
+
+**File: `src/pages/ListDetailPage.tsx`**
+
+- In `handleAddToCampaign`, before inserting, fetch existing `pipeline_cards` for the selected campaign
+- Filter out items where `username + platform` already exists in the campaign's cards
+- Show toast: "Added X, skipped Y duplicates" (or "All X already in pipeline" if all duplicates)
+
+**File: `src/pages/CampaignDetailPage.tsx`**
+
+- Apply same logic in `handleAddFromList`: compare incoming list items against existing cards before inserting
+
+---
+
+## 3.5 -- Pipeline Filtering & Search
 
 **File: `src/components/campaigns/KanbanBoard.tsx`**
 
-Add multi-select capability to the Kanban board:
-- Checkbox on each card (visible on hover or via a "Select Mode" toggle)
-- Floating bulk action bar (similar to ListDetailPage) with:
-  - "Move to Stage" dropdown
-  - "Remove Selected" button
-- Uses existing `moveCard` and `removeCard` mutations in a loop
+- Add a toolbar row above the stage columns with:
+  - Search `Input` (filters cards by username/title across all stages)
+  - Platform filter chips (toggle buttons for Instagram, TikTok, YouTube)
+- Apply filters client-side to the `cardsByStage` callback
+- Show "X of Y influencers" count when filters are active
+- Filters are purely visual -- no database queries
 
-### 3.7 — Campaign Activity Timeline
+---
 
-**New file: `src/components/campaigns/CampaignTimeline.tsx`**
-**Database: Add `campaign_activity` table**
+## 3.6 -- Bulk Stage Move
 
-Log key events for audit/history:
-- Card added, card moved between stages, card removed
-- Stage created, renamed, deleted
-- Campaign status changed
+**File: `src/components/campaigns/KanbanBoard.tsx`**
 
-Display as a vertical timeline on the campaign detail page (collapsible section below the Kanban board).
+- Add a "Select Mode" toggle button in the toolbar (from 3.5)
+- When active, show checkboxes on each `KanbanCard`
+- Track selected card IDs in state
+- Show a floating bulk action bar (similar to `ListDetailPage`) with:
+  - "Move to Stage" `Select` dropdown -- batch calls `moveCard` for each selected card
+  - "Remove Selected" button -- batch calls `removeCard`
+  - Count indicator and "Clear" button
 
-**Database migration:**
+**File: `src/components/campaigns/KanbanCard.tsx`**
+
+- Add optional `selectable`, `selected`, `onSelect` props
+- When `selectable`, render a `Checkbox` on the card
+
+---
+
+## 3.7 -- Campaign Activity Timeline
+
+### Database Migration
+
 ```sql
 CREATE TABLE public.campaign_activity (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -101,49 +116,65 @@ ALTER TABLE public.campaign_activity ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Members can view campaign activity"
   ON public.campaign_activity FOR SELECT
-  USING (is_workspace_member((SELECT workspace_id FROM campaigns WHERE id = campaign_id)));
+  USING (is_workspace_member(
+    (SELECT workspace_id FROM campaigns WHERE id = campaign_id)
+  ));
 
 CREATE POLICY "Members can log campaign activity"
   ON public.campaign_activity FOR INSERT
-  WITH CHECK (is_workspace_member((SELECT workspace_id FROM campaigns WHERE id = campaign_id)));
+  WITH CHECK (is_workspace_member(
+    (SELECT workspace_id FROM campaigns WHERE id = campaign_id)
+  ));
 
-CREATE INDEX idx_campaign_activity_campaign ON public.campaign_activity(campaign_id, created_at DESC);
+CREATE INDEX idx_campaign_activity_campaign
+  ON public.campaign_activity(campaign_id, created_at DESC);
 ```
 
----
-
-## Implementation Order
-
-| Priority | Feature | Complexity | New Files | DB Changes |
-|----------|---------|------------|-----------|------------|
-| 1 | 3.1 Campaign creation enhancements | Low | None | None |
-| 2 | 3.2 Campaign edit dialog | Low | None | None |
-| 3 | 3.3 Card detail enhancements | Medium | None | None |
-| 4 | 3.4 Duplicate detection | Low | None | None |
-| 5 | 3.5 Pipeline filtering & search | Medium | None | None |
-| 6 | 3.6 Bulk stage move | Medium | None | None |
-| 7 | 3.7 Campaign activity timeline | High | 1 component + 1 hook | 1 table |
-
-### Files to Create
+### New Files
 
 | File | Purpose |
 |------|---------|
-| `src/components/campaigns/CampaignTimeline.tsx` | Activity timeline UI component |
-| `src/hooks/useCampaignActivity.ts` | Hook for querying/logging campaign activity |
+| `src/hooks/useCampaignActivity.ts` | Hook with `useQuery` to fetch activity and `useMutation` to log new entries |
+| `src/components/campaigns/CampaignTimeline.tsx` | Collapsible timeline UI showing activity entries with icons per action type |
 
-### Files to Modify
+### Activity Logging Integration
 
-| File | Features |
-|------|----------|
-| `src/pages/CampaignsPage.tsx` | 3.1 — Budget + date fields in create dialog, richer campaign cards |
-| `src/pages/CampaignDetailPage.tsx` | 3.2 — Edit dialog; 3.4 — Duplicate detection; 3.7 — Timeline section |
-| `src/pages/ListDetailPage.tsx` | 3.4 — Duplicate detection in "Add to Campaign" |
-| `src/components/campaigns/CardDetailDialog.tsx` | 3.3 — Stats display, move-to-stage dropdown, timestamps |
-| `src/components/campaigns/KanbanBoard.tsx` | 3.5 — Filter toolbar; 3.6 — Multi-select & bulk actions |
-| `src/hooks/usePipelineCards.ts` | 3.6 — Bulk move mutation |
+Log events from existing mutation callbacks:
+- **KanbanBoard.tsx**: Log card moved, stage created/renamed/deleted, color changed
+- **CampaignDetailPage.tsx**: Log status changed, influencers added from list
+- **CardDetailDialog.tsx**: Log card notes/rate updated, card removed
 
-### Dependencies
+Each log entry includes: `{ action: "card_moved", details: { username, from_stage, to_stage } }`
 
-- Features 3.1–3.6 require no database changes and can be implemented immediately
-- Feature 3.7 requires a migration first, then code implementation
-- Features 3.5 and 3.6 both modify KanbanBoard.tsx — implement 3.5 first since 3.6 builds on the toolbar area
+### Timeline UI
+
+- Rendered as a collapsible section below the Kanban board on `CampaignDetailPage.tsx`
+- Vertical timeline with colored dots per action type
+- Shows action description, relative timestamp (e.g. "2 hours ago")
+- "Show more" pagination (load 20 at a time)
+
+---
+
+## Files Summary
+
+| File | Features | Action |
+|------|----------|--------|
+| `src/pages/CampaignsPage.tsx` | 3.1 | Modify |
+| `src/pages/CampaignDetailPage.tsx` | 3.2, 3.4, 3.7 | Modify |
+| `src/components/campaigns/CardDetailDialog.tsx` | 3.3 | Modify |
+| `src/components/campaigns/KanbanBoard.tsx` | 3.3, 3.5, 3.6, 3.7 | Modify |
+| `src/components/campaigns/KanbanCard.tsx` | 3.6 | Modify |
+| `src/pages/ListDetailPage.tsx` | 3.4 | Modify |
+| `src/hooks/useCampaignActivity.ts` | 3.7 | Create |
+| `src/components/campaigns/CampaignTimeline.tsx` | 3.7 | Create |
+
+## Implementation Order
+
+1. **3.1** Campaign creation enhancements (budget + dates in create dialog and cards)
+2. **3.2** Campaign edit dialog on detail page
+3. **3.3** Card detail enhancements (stats, move-to-stage, timestamps)
+4. **3.4** Duplicate detection in both add-to-campaign flows
+5. **3.5** Pipeline filtering and search toolbar
+6. **3.6** Bulk stage move with multi-select on Kanban
+7. **3.7** Database migration, then activity logging hook/component/integration
+
