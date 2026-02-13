@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
-import { motion } from "framer-motion";
-import { ArrowLeft, Trash2, ExternalLink, Instagram, Youtube, SlidersHorizontal, Search, Edit2, Check, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowLeft, Trash2, ExternalLink, Instagram, Youtube, SlidersHorizontal, Search, Edit2, Check, X, Download, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,10 +36,12 @@ const platformIcons: Record<string, any> = {
 
 export default function ListDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { data: items, isLoading, removeItem, updateNotes } = useListItems(id);
+  const { data: items, isLoading, removeItem, removeItems, updateNotes } = useListItems(id);
   const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
   const [editingNotes, setEditingNotes] = useState<string | null>(null);
   const [notesValue, setNotesValue] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkDelete, setShowBulkDelete] = useState(false);
   const { toast } = useToast();
 
   const { data: list } = useQuery({
@@ -55,15 +58,74 @@ export default function ListDetailPage() {
     enabled: !!id,
   });
 
+  const allSelected = useMemo(
+    () => !!items?.length && selectedIds.size === items.length,
+    [items, selectedIds]
+  );
+
+  const toggleSelect = (itemId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(items?.map((i) => i.id) || []));
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteItemId) return;
     try {
       await removeItem.mutateAsync(deleteItemId);
+      setSelectedIds((prev) => { const next = new Set(prev); next.delete(deleteItemId); return next; });
       toast({ title: "Removed from list" });
     } catch {
       toast({ title: "Failed to remove", variant: "destructive" });
     }
     setDeleteItemId(null);
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      await removeItems.mutateAsync(Array.from(selectedIds));
+      toast({ title: `Removed ${selectedIds.size} influencer${selectedIds.size !== 1 ? "s" : ""}` });
+      setSelectedIds(new Set());
+    } catch {
+      toast({ title: "Failed to remove", variant: "destructive" });
+    }
+    setShowBulkDelete(false);
+  };
+
+  const handleExportCSV = () => {
+    if (!items) return;
+    const toExport = selectedIds.size > 0 ? items.filter((i) => selectedIds.has(i.id)) : items;
+    const headers = ["Username", "Platform", "Notes", "Profile Link", "Date Added"];
+    const rows = toExport.map((item) => {
+      const d = item.data as any;
+      return [
+        item.username,
+        item.platform,
+        (item.notes || "").replace(/"/g, '""'),
+        d?.link || "",
+        new Date(item.created_at).toLocaleDateString(),
+      ];
+    });
+    const csv = [headers, ...rows].map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${list?.name || "list"}-export.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: `Exported ${toExport.length} influencer${toExport.length !== 1 ? "s" : ""}` });
   };
 
   const handleSaveNotes = async (itemId: string) => {
@@ -78,18 +140,32 @@ export default function ListDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Link to="/lists">
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{list?.name || "List"}</h1>
-          <p className="text-muted-foreground mt-1">
-            {items?.length ?? 0} influencer{(items?.length ?? 0) !== 1 ? "s" : ""}
-          </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Link to="/lists">
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">{list?.name || "List"}</h1>
+            <p className="text-muted-foreground mt-1">
+              {items?.length ?? 0} influencer{(items?.length ?? 0) !== 1 ? "s" : ""}
+            </p>
+          </div>
         </div>
+        {items && items.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={toggleSelectAll}>
+              <CheckSquare className="h-3.5 w-3.5" />
+              {allSelected ? "Deselect All" : "Select All"}
+            </Button>
+            <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={handleExportCSV}>
+              <Download className="h-3.5 w-3.5" />
+              Export CSV
+            </Button>
+          </div>
+        )}
       </div>
 
       {isLoading && (
@@ -107,6 +183,7 @@ export default function ListDetailPage() {
           {items.map((item, i) => {
             const itemData = item.data as any;
             const PlatformIcon = platformIcons[item.platform] || Search;
+            const isSelected = selectedIds.has(item.id);
             return (
               <motion.div
                 key={item.id}
@@ -114,10 +191,15 @@ export default function ListDetailPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.03 }}
               >
-                <Card className="glass-card">
+                <Card className={`glass-card transition-colors ${isSelected ? "border-primary/50 bg-primary/5" : ""}`}>
                   <CardContent className="p-5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleSelect(item.id)}
+                          className="mt-0.5"
+                        />
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
                           <PlatformIcon className="h-5 w-5 text-muted-foreground" />
                         </div>
@@ -201,6 +283,36 @@ export default function ListDetailPage() {
         </Card>
       )}
 
+      {/* Floating bulk action bar */}
+      <AnimatePresence>
+        {selectedIds.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
+          >
+            <Card className="shadow-lg border-primary/20">
+              <CardContent className="flex items-center gap-3 p-3">
+                <span className="text-sm font-medium px-2">{selectedIds.size} selected</span>
+                <Button variant="destructive" size="sm" className="text-xs gap-1.5" onClick={() => setShowBulkDelete(true)}>
+                  <Trash2 className="h-3 w-3" />
+                  Remove Selected
+                </Button>
+                <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={handleExportCSV}>
+                  <Download className="h-3 w-3" />
+                  Export CSV
+                </Button>
+                <Button variant="ghost" size="sm" className="text-xs" onClick={() => setSelectedIds(new Set())}>
+                  Clear
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Single delete dialog */}
       <AlertDialog open={!!deleteItemId} onOpenChange={() => setDeleteItemId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -211,6 +323,22 @@ export default function ListDetailPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk delete dialog */}
+      <AlertDialog open={showBulkDelete} onOpenChange={setShowBulkDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {selectedIds.size} influencer{selectedIds.size !== 1 ? "s" : ""}</AlertDialogTitle>
+            <AlertDialogDescription>Are you sure you want to remove the selected influencers from this list?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Remove {selectedIds.size}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

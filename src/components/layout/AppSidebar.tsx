@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   Search,
   Users,
+  Megaphone,
   Bookmark,
   History,
   Settings,
@@ -16,6 +17,7 @@ const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/" },
   { label: "Discover", icon: Search, path: "/search" },
   { label: "Lists", icon: Users, path: "/lists" },
+  { label: "Campaigns", icon: Megaphone, path: "/campaigns" },
   { label: "Saved Searches", icon: Bookmark, path: "/saved-searches" },
   { label: "History", icon: History, path: "/history" },
   { label: "Settings", icon: Settings, path: "/settings" },
@@ -46,7 +48,8 @@ export function AppSidebar() {
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path ||
-            (item.path === "/lists" && location.pathname.startsWith("/lists"));
+            (item.path === "/lists" && location.pathname.startsWith("/lists")) ||
+            (item.path === "/campaigns" && location.pathname.startsWith("/campaigns"));
           return (
             <Link
               key={item.path}
