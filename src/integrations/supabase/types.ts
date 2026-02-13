@@ -131,6 +131,44 @@ export type Database = {
           },
         ]
       }
+      email_templates: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          name: string
+          subject: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          name: string
+          subject: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          name?: string
+          subject?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_templates_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       enrichment_jobs: {
         Row: {
           attempts: number
@@ -289,6 +327,8 @@ export type Database = {
           campaign_id: string
           card_id: string
           contacted_at: string
+          email_subject: string | null
+          email_to: string | null
           id: string
           method: string
           notes: string | null
@@ -300,6 +340,8 @@ export type Database = {
           campaign_id: string
           card_id: string
           contacted_at?: string
+          email_subject?: string | null
+          email_to?: string | null
           id?: string
           method?: string
           notes?: string | null
@@ -311,6 +353,8 @@ export type Database = {
           campaign_id?: string
           card_id?: string
           contacted_at?: string
+          email_subject?: string | null
+          email_to?: string | null
           id?: string
           method?: string
           notes?: string | null

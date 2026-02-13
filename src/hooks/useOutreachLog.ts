@@ -11,6 +11,8 @@ export interface OutreachEntry {
   status: string;
   contacted_at: string;
   notes: string | null;
+  email_to: string | null;
+  email_subject: string | null;
 }
 
 export function useOutreachLog(campaignId: string | undefined) {

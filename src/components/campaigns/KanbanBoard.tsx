@@ -33,6 +33,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Toggle } from "@/components/ui/toggle";
 import { KanbanCard } from "./KanbanCard";
 import { CardDetailDialog } from "./CardDetailDialog";
+import { SendEmailDialog } from "./SendEmailDialog";
 import { usePipelineStages, usePipelineCards } from "@/hooks/usePipelineCards";
 import { useCampaignActivity } from "@/hooks/useCampaignActivity";
 import { useOutreachLog } from "@/hooks/useOutreachLog";
@@ -52,14 +53,17 @@ const PLATFORM_FILTERS = [
 
 interface KanbanBoardProps {
   campaignId: string;
+  campaignName?: string;
+  workspaceSettings?: any;
 }
 
-export function KanbanBoard({ campaignId }: KanbanBoardProps) {
+export function KanbanBoard({ campaignId, campaignName, workspaceSettings }: KanbanBoardProps) {
   const { data: stages, addStage, updateStage, deleteStage, reorderStages } = usePipelineStages(campaignId);
   const { data: cards, moveCard, updateCard, removeCard } = usePipelineCards(campaignId);
   const { logActivity } = useCampaignActivity(campaignId);
   const { outreachEntries, logOutreach, isContacted } = useOutreachLog(campaignId);
   const [editingCard, setEditingCard] = useState<any>(null);
+  const [emailCard, setEmailCard] = useState<any>(null);
   const [dragCardId, setDragCardId] = useState<string | null>(null);
   const [dragStageId, setDragStageId] = useState<string | null>(null);
   const [renamingStageId, setRenamingStageId] = useState<string | null>(null);
@@ -436,6 +440,7 @@ export function KanbanBoard({ campaignId }: KanbanBoardProps) {
                         selected={selectedCardIds.has(card.id)}
                         onSelect={toggleCardSelect}
                         contacted={isContacted(card.id)}
+                        onSendEmail={() => setEmailCard(card)}
                       />
                     ))}
                   </div>
@@ -531,7 +536,23 @@ export function KanbanBoard({ campaignId }: KanbanBoardProps) {
         stages={stages}
         onMove={handleMoveCard}
         outreachEntries={outreachEntries}
+        campaignId={campaignId}
+        campaignName={campaignName}
+        defaultFromName={workspaceSettings?.default_from_name}
+        defaultReplyTo={workspaceSettings?.default_reply_to}
       />
+
+      {emailCard && (
+        <SendEmailDialog
+          open={!!emailCard}
+          onOpenChange={(open) => !open && setEmailCard(null)}
+          card={emailCard}
+          campaignId={campaignId}
+          campaignName={campaignName}
+          defaultFromName={workspaceSettings?.default_from_name}
+          defaultReplyTo={workspaceSettings?.default_reply_to}
+        />
+      )}
 
       <AlertDialog open={!!deleteConfirmStageId} onOpenChange={(open) => !open && setDeleteConfirmStageId(null)}>
         <AlertDialogContent>
