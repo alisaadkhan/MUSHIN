@@ -1,4 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Users, DollarSign, TrendingDown, TrendingUp } from "lucide-react";
 
 interface Stage {
@@ -71,17 +72,35 @@ export function CampaignStats({ stages, cards, campaign }: CampaignStatsProps) {
 
       {/* Budget & Agreed */}
       <Card>
-        <CardContent className="p-4 flex items-center gap-3">
-          <div className="h-9 w-9 rounded-md bg-primary/10 flex items-center justify-center">
-            <DollarSign className="h-4 w-4 text-primary" />
+        <CardContent className="p-4 space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-md bg-primary/10 flex items-center justify-center">
+              <DollarSign className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Budget / Agreed</p>
+              <p className="text-xl font-bold">
+                ${budget.toLocaleString()}
+                <span className="text-sm font-normal text-muted-foreground"> / ${totalAgreed.toLocaleString()}</span>
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Budget / Agreed</p>
-            <p className="text-xl font-bold">
-              ${budget.toLocaleString()}
-              <span className="text-sm font-normal text-muted-foreground"> / ${totalAgreed.toLocaleString()}</span>
-            </p>
-          </div>
+          {budget > 0 && (() => {
+            const pct = Math.min((totalAgreed / budget) * 100, 100);
+            const colorClass = totalAgreed > budget
+              ? "[&>div]:bg-destructive"
+              : pct >= 80
+                ? "[&>div]:bg-amber-500"
+                : "";
+            return (
+              <div className="space-y-1">
+                <Progress value={pct} className={`h-2 ${colorClass}`} />
+                <p className="text-[10px] text-muted-foreground text-right">
+                  {Math.round((totalAgreed / budget) * 100)}% used
+                </p>
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 

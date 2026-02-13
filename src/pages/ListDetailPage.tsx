@@ -1,12 +1,27 @@
 import { useState, useMemo } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Trash2, ExternalLink, Instagram, Youtube, SlidersHorizontal, Search, Edit2, Check, X, Download, CheckSquare } from "lucide-react";
+import { ArrowLeft, Trash2, ExternalLink, Instagram, Youtube, SlidersHorizontal, Search, Edit2, Check, X, Download, CheckSquare, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,6 +33,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useListItems } from "@/hooks/useInfluencerLists";
+import { useCampaigns } from "@/hooks/useCampaigns";
+import { usePipelineStages, usePipelineCards } from "@/hooks/usePipelineCards";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -42,7 +59,15 @@ export default function ListDetailPage() {
   const [notesValue, setNotesValue] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDelete, setShowBulkDelete] = useState(false);
+  const [showAddToCampaign, setShowAddToCampaign] = useState(false);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>("");
+  const [addingToCampaign, setAddingToCampaign] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
+
+  const { data: campaigns } = useCampaigns();
+  const { data: stages } = usePipelineStages(selectedCampaignId || undefined);
+  const { addCard } = usePipelineCards(selectedCampaignId || undefined);
 
   const { data: list } = useQuery({
     queryKey: ["list-detail", id],
@@ -126,6 +151,35 @@ export default function ListDetailPage() {
     a.click();
     URL.revokeObjectURL(url);
     toast({ title: `Exported ${toExport.length} influencer${toExport.length !== 1 ? "s" : ""}` });
+  };
+
+  const handleAddToCampaign = async () => {
+    if (!selectedCampaignId || !items || !stages?.length) return;
+    setAddingToCampaign(true);
+    const firstStage = stages[0];
+    const selected = items.filter((i) => selectedIds.has(i.id));
+    let added = 0;
+    for (const item of selected) {
+      try {
+        await addCard.mutateAsync({
+          stage_id: firstStage.id,
+          campaign_id: selectedCampaignId,
+          username: item.username,
+          platform: item.platform,
+          data: item.data,
+          notes: item.notes || undefined,
+        });
+        added++;
+      } catch {
+        // skip duplicates
+      }
+    }
+    setAddingToCampaign(false);
+    setShowAddToCampaign(false);
+    setSelectedCampaignId("");
+    toast({
+      title: `Added ${added} influencer${added !== 1 ? "s" : ""} to campaign`,
+    });
   };
 
   const handleSaveNotes = async (itemId: string) => {
@@ -303,6 +357,10 @@ export default function ListDetailPage() {
                   <Download className="h-3 w-3" />
                   Export CSV
                 </Button>
+                <Button variant="secondary" size="sm" className="text-xs gap-1.5" onClick={() => setShowAddToCampaign(true)}>
+                  <Send className="h-3 w-3" />
+                  Add to Campaign
+                </Button>
                 <Button variant="ghost" size="sm" className="text-xs" onClick={() => setSelectedIds(new Set())}>
                   Clear
                 </Button>
@@ -343,6 +401,49 @@ export default function ListDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Add to Campaign dialog */}
+      <Dialog open={showAddToCampaign} onOpenChange={setShowAddToCampaign}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add to Campaign</DialogTitle>
+            <DialogDescription>
+              Add {selectedIds.size} selected influencer{selectedIds.size !== 1 ? "s" : ""} to a campaign pipeline.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a campaign" />
+              </SelectTrigger>
+              <SelectContent>
+                {campaigns?.map((c: any) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedCampaignId && stages && stages.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Influencers will be added to the <strong>{stages[0].name}</strong> stage.
+              </p>
+            )}
+            {selectedCampaignId && stages && stages.length === 0 && (
+              <p className="text-xs text-destructive">
+                This campaign has no stages. Add a stage first.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowAddToCampaign(false)}>Cancel</Button>
+            <Button
+              onClick={handleAddToCampaign}
+              disabled={!selectedCampaignId || !stages?.length || addingToCampaign}
+            >
+              {addingToCampaign ? "Adding…" : `Add ${selectedIds.size}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
