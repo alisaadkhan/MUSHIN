@@ -18,7 +18,8 @@ export function FinalCTA({ ctaPath }: Props) {
       <motion.div
         initial="hidden" whileInView="visible" viewport={{ once: true }}
         variants={{ visible: { transition: { staggerChildren: 0.12 } } }}
-        className="max-w-3xl mx-auto text-center space-y-6 aurora-gradient rounded-3xl p-12 md:p-16"
+        className="max-w-3xl mx-auto text-center space-y-6 aurora-gradient rounded-3xl p-12 md:p-16 border"
+        style={{ borderColor: "hsl(var(--aurora-violet) / 0.3)", boxShadow: "0 0 60px -15px hsl(var(--aurora-violet) / 0.25)" }}
       >
         <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-bold tracking-tight">
           Join 2,000+ Teams Finding{" "}

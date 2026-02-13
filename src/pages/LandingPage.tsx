@@ -3,13 +3,13 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Zap, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import enterpriseBg from "@/assets/enterprise-bg.jpg";
 
 import { Hero } from "@/components/marketing/Hero";
 import { OutcomeMetrics } from "@/components/marketing/OutcomeMetrics";
 import { ProblemSolution } from "@/components/marketing/ProblemSolution";
 import { HowItWorks } from "@/components/marketing/HowItWorks";
 import { Features } from "@/components/marketing/Features";
-import { Testimonials } from "@/components/marketing/Testimonials";
 import { PricingPreview } from "@/components/marketing/PricingPreview";
 import { FAQ } from "@/components/marketing/FAQ";
 import { FinalCTA } from "@/components/marketing/FinalCTA";
@@ -27,11 +27,12 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      {/* Aurora blobs */}
+      {/* Enterprise background image + aurora accents */}
       <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        <div className="absolute -top-60 -right-60 h-[700px] w-[700px] rounded-full opacity-20 blur-[140px] animate-aurora-float" style={{ background: "hsl(var(--aurora-violet))" }} />
-        <div className="absolute -bottom-60 -left-60 h-[600px] w-[600px] rounded-full opacity-15 blur-[140px] animate-aurora-float" style={{ background: "hsl(var(--aurora-teal))", animationDelay: "-5s" }} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[400px] w-[400px] rounded-full opacity-10 blur-[120px]" style={{ background: "hsl(var(--aurora-violet))" }} />
+        <img src={enterpriseBg} alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[hsl(240_10%_4%/0.92)] via-[hsl(240_10%_4%/0.82)] to-[hsl(240_10%_4%/0.95)]" />
+        <div className="absolute -top-60 -right-60 h-[700px] w-[700px] rounded-full opacity-10 blur-[140px] animate-aurora-float" style={{ background: "hsl(var(--aurora-violet))" }} />
+        <div className="absolute -bottom-60 -left-60 h-[600px] w-[600px] rounded-full opacity-8 blur-[140px] animate-aurora-float" style={{ background: "hsl(var(--aurora-teal))", animationDelay: "-5s" }} />
       </div>
 
       {/* Nav */}
@@ -69,7 +70,6 @@ export default function LandingPage() {
       <ProblemSolution />
       <HowItWorks />
       <Features />
-      <Testimonials />
       <PricingPreview ctaPath={ctaPath} />
       <FAQ />
       <FinalCTA ctaPath={ctaPath} />
