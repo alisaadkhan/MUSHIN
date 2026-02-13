@@ -87,15 +87,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Build Serper query
-    const siteMap: Record<string, string> = {
-      instagram: "site:instagram.com",
-      tiktok: "site:tiktok.com",
-      youtube: "site:youtube.com",
-    };
-    const sitePart = siteMap[platform] || "";
+    // Build Serper query (no site: operator - Serper rejects it; domain filtering done server-side)
+    const platformTerm = platform || "";
     const locationPart = location === "All Pakistan" ? "Pakistan" : (location || "Pakistan");
-    const serperQuery = `"${query}" ${sitePart} ${locationPart}`.trim();
+    const serperQuery = `${query} ${platformTerm} ${locationPart} influencer`.trim();
+    console.log("Serper query:", serperQuery);
 
     // Call Serper
     const SERPER_API_KEY = Deno.env.get("SERPER_API_KEY");
@@ -112,7 +108,7 @@ Deno.serve(async (req) => {
         "X-API-KEY": SERPER_API_KEY,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ q: serperQuery, num: 30, gl: "pk", hl: "en" }),
+      body: JSON.stringify({ q: serperQuery, num: 50, gl: "pk", hl: "en" }),
     });
 
     if (!serperRes.ok) {
