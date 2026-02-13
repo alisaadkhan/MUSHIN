@@ -1,70 +1,46 @@
-# Soft Ranking for City-Specific Searches
 
-## Problem
+# Fix: "Add to List" Crashes App (White Screen)
 
-When a user picks a specific city like "Karachi", the query includes that city name, but Google snippets rarely mention it -- so most results get deprioritized and the user sees very few hits.
+## Root Cause
 
-## Changes (Server-side only)
-
-### File: `supabase/functions/search-influencers/index.ts`
-
-**A. Always use "Pakistan" in the Serper query, regardless of city selection**
-
-The selected city will only influence result ranking, not the query itself:
+When an influencer is added to a list, the success toast at line 152 of `SearchPage.tsx` renders a `<Link>` component from `react-router-dom`. Toasts render via a portal outside the React Router tree, so `<Link>` cannot access the router context and throws:
 
 ```text
-// Current:
-const locationPart = location === "All Pakistan" ? "Pakistan" : (location || "Pakistan");
-
-// New:
-const locationPart = "Pakistan";  // Always broad query; city used for ranking only
+Cannot destructure property 'basename' of 'React2.useContext(...)' as it is null
 ```
 
-**B. Increase `num` from 50 to 100**
+This crashes the entire app with a white screen.
 
-Larger candidate pool before filtering/ranking.
+## Fix
 
-**C. Replace two-tier filtering with three-tier soft ranking**
+Replace the `<Link>` in the toast description with a plain `<a>` tag or just plain text. Since we want the user to navigate to the list, we can use a regular anchor tag or `window.location`.
 
-After platform domain filtering, classify results into:
+### File: `src/pages/SearchPage.tsx` (line ~150-155)
 
-- **Tier 1**: Title/snippet contains the selected city name (e.g., "Karachi")
-- **Tier 2**: Title/snippet contains any Pakistan keyword ("pakistan", "lahore", "punjab", etc.) but not the selected city
-- **Tier 3**: No location indicators at all
-
-Combine as `[...tier1, ...tier2, ...tier3].slice(0, 20)`.
-
-When location is "All Pakistan", Tier 1 and Tier 2 merge (any Pakistan keyword = top tier).
-
-**D. No changes to**: credit deduction, caching, search history logging, platform domain filtering, username extraction, or deduplication.
-
-## Technical Detail
-
-```text
-// Determine the selected city (null if "All Pakistan")
-const selectedCity = (location && location !== "All Pakistan") ? location.toLowerCase() : null;
-
-// After platform domain filtering, rank into tiers
-const tier1 = [];  // matches selected city
-const tier2 = [];  // matches any Pakistan keyword but not selected city
-const tier3 = [];  // no location match
-
-for (const item of platformFiltered) {
-  const text = ((item.title || "") + " " + (item.snippet || "")).toLowerCase();
-  if (selectedCity && text.includes(selectedCity)) {
-    tier1.push(item);
-  } else if (PAKISTAN_KEYWORDS.some(kw => text.includes(kw))) {
-    tier2.push(item);
-  } else {
-    tier3.push(item);
-  }
-}
-
-const finalResults = [...tier1, ...tier2, ...tier3].slice(0, 20);
+**Before:**
+```tsx
+description: (
+  <span>
+    Added to <Link to={`/lists/${listId}`} className="underline font-medium">{listName}</Link>
+  </span>
+),
 ```
 
-When `selectedCity` is null (All Pakistan), nothing goes to tier1 and all Pakistan-keyword matches land in tier2 -- same behavior as today.  
-**City name as part of a larger word** – unlikely for Pakistani cities (e.g., "Karachi" is distinct).
+**After:**
+```tsx
+description: (
+  <span>
+    Added to <a href={`/lists/${listId}`} className="underline font-medium">{listName}</a>
+  </span>
+),
+```
 
-- **Case‑insensitive matching** – the code already uses `.toLowerCase()`, so it's fine.
-- **Performance** – filtering 100 items is trivial; no issue.
+Using a plain `<a>` tag avoids the Router context dependency while still giving the user a clickable link to their list. This will cause a full page navigation rather than a client-side route, but since it's a toast link (rarely clicked), this is perfectly acceptable.
+
+## After Fix: Re-test
+
+After applying this one-line fix, the full flow should work:
+1. Search for "gaming" on Instagram/Karachi
+2. Add result to a new list -- toast appears without crash
+3. Save search -- works
+4. Verify Lists, Saved Searches, History, and Dashboard pages all show live data
