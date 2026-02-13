@@ -41,7 +41,7 @@ export default function Onboarding() {
       // Update profile
       const { error: profileErr } = await supabase
         .from("profiles")
-        .update({ full_name: fullName.trim(), onboarding_completed: true })
+        .update({ full_name: fullName.trim(), onboarding_completed: true, consent_given_at: new Date().toISOString() })
         .eq("id", profile!.id);
 
       if (profileErr) throw profileErr;

@@ -38,6 +38,8 @@ import { usePipelineStages, usePipelineCards } from "@/hooks/usePipelineCards";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
+import { fireWebhook } from "@/lib/integrations";
 
 const platformColors: Record<string, string> = {
   instagram: "bg-pink-500/10 text-pink-500 border-pink-500/20",
@@ -63,6 +65,7 @@ export default function ListDetailPage() {
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>("");
   const [addingToCampaign, setAddingToCampaign] = useState(false);
   const { toast } = useToast();
+  const { workspace } = useAuth();
   const navigate = useNavigate();
 
   const { data: campaigns } = useCampaigns();
@@ -126,6 +129,30 @@ export default function ListDetailPage() {
       toast({ title: "Failed to remove", variant: "destructive" });
     }
     setShowBulkDelete(false);
+  };
+
+  const handleExportToSheets = async () => {
+    if (!items || !workspace?.workspace_id) return;
+    const { data: ws } = await supabase
+      .from("workspaces")
+      .select("settings")
+      .eq("id", workspace.workspace_id)
+      .single();
+    const sheetsUrl = (ws?.settings as any)?.google_sheets_webhook_url;
+    if (!sheetsUrl) {
+      toast({ title: "No Google Sheets webhook configured", description: "Go to Settings > Integrations to set it up.", variant: "destructive" });
+      return;
+    }
+    const toExport = selectedIds.size > 0 ? items.filter((i) => selectedIds.has(i.id)) : items;
+    await fireWebhook(sheetsUrl, {
+      event: "list_export",
+      timestamp: new Date().toISOString(),
+      data: {
+        list_name: list?.name,
+        influencers: toExport.map((i) => ({ username: i.username, platform: i.platform, notes: i.notes })),
+      },
+    });
+    toast({ title: "Exported to Google Sheets" });
   };
 
   const handleExportCSV = () => {
@@ -234,6 +261,10 @@ export default function ListDetailPage() {
             <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={handleExportCSV}>
               <Download className="h-3.5 w-3.5" />
               Export CSV
+            </Button>
+            <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={handleExportToSheets}>
+              <Download className="h-3.5 w-3.5" />
+              Export to Sheets
             </Button>
           </div>
         )}
