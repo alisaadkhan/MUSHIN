@@ -1,160 +1,131 @@
 
+# Batches 2-5: Free Tier Blur, Feature Gating, Bulk Actions, Email Tracking & CSV Export
 
-# Premium Landing Page Rebuild for InfluenceIQ
-
-This plan replaces the current monolithic `LandingPage.tsx` with a modular, component-based marketing homepage that matches the Stripe/Linear/Vercel caliber described.
-
----
-
-## Step 0: Revert Dashboard Changes
-
-Before implementing, you need to restore `src/pages/Index.tsx` to its previous state (before the "Gold Standard Dashboard" rewrite). Use the **Restore** button in chat history on the message before that change.
+Now that Batch 1 (Landing Page and Routing) is complete, this plan covers the remaining four batches to finalize production readiness.
 
 ---
 
-## What Changes
+## Batch 2: Free Tier Blur on Search Results
 
-The existing `LandingPage.tsx` is a single 313-line file with all sections inline. This rebuild:
+Modify `src/pages/SearchPage.tsx` to add a paywall overlay for free-plan users.
 
-1. Breaks it into 9 modular components under `src/components/marketing/`
-2. Adds a true animated count-up counter (not just a fade)
-3. Adds inline SVG hero visual (abstract network/node graphic)
-4. Adds inline SVG feature icons (6 geometric illustrations)
-5. Expands the footer to 4 columns with social icons
-6. Adds the noise texture via the existing `AuroraBackground` component (already has it)
-7. Adds a "How It Works" nav link and scroll targets
-8. Polishes hover states with `will-change-transform` for 60fps
-
-No new dependencies are needed. Everything uses existing framer-motion, lucide-react, and Tailwind.
+**Changes:**
+- After results render, check `workspaceCredits?.plan`
+- If `plan === 'free'`, wrap each result card's content area with a blur layer (`filter: blur(4px)`, `pointer-events: none`) and overlay a glass panel with a Lock icon and "Upgrade to Unlock" button linking to `/billing`
+- Add a dismissible top banner: "You're on the Free plan. Upgrade to see full influencer profiles."
+- Free users can still trigger searches (consuming credits) but cannot read detailed card content
 
 ---
 
-## New Files
+## Batch 3: Feature Gating and Credit Deduction
 
-| File | Purpose |
-|------|---------|
-| `src/components/marketing/Hero.tsx` | Full-viewport hero with headline, CTAs, abstract SVG visual |
-| `src/components/marketing/TrustSignals.tsx` | Logo cloud + animated count-up stat cards |
-| `src/components/marketing/ProblemSolution.tsx` | Two-column problem vs. solution layout |
-| `src/components/marketing/HowItWorks.tsx` | 3-step glass cards with step numbers |
-| `src/components/marketing/Features.tsx` | 6-card grid with inline SVG icons |
-| `src/components/marketing/PricingPreview.tsx` | 3 pricing cards from PLANS constant |
-| `src/components/marketing/SecurityCompliance.tsx` | 4-item trust row (GDPR, Stripe, SOC2, Transparency) |
-| `src/components/marketing/FinalCTA.tsx` | Gradient banner with CTA button |
-| `src/components/marketing/MarketingFooter.tsx` | 4-column footer with social icons |
+### Frontend Gating
 
-## Modified Files
+Wire `usePlanLimits` into four components:
 
-| File | Change |
-|------|--------|
-| `src/pages/LandingPage.tsx` | Rewrite to import and compose the 9 marketing components. Keeps nav bar, aurora background, and auth-aware CTA logic. Drops all inline section code. |
+1. **`CampaignsPage.tsx`** -- Import `usePlanLimits`; disable "New Campaign" button and show upgrade toast when `canCreateCampaign()` is false
+2. **`SendEmailDialog.tsx`** -- Check `canSendEmail()` before `handleSend`; show upgrade toast if exhausted
+3. **`CardDetailDialog.tsx`** -- Check `canUseAI()` before AI Summary and Fraud Check buttons; disable and show tooltip
+4. **`AIInsightsPanel.tsx`** -- Check `canUseAI()` before generating recommendations; show upgrade toast
 
----
+### Backend Credit Deduction
 
-## Component Details
+**`send-outreach-email` edge function:**
+- Create a service-role Supabase client
+- Before sending, query `workspaces` for the user's `email_sends_remaining`
+- If 0, return HTTP 402 with clear message
+- After successful Resend send, atomically decrement `email_sends_remaining` by 1
 
-### Hero.tsx
-- Full viewport height (`min-h-screen`) with flex centering
-- Headline: "Find **Real Influencers**. Instantly." with `text-5xl md:text-7xl font-extrabold tracking-tight`
-- Aurora-text gradient on "Real Influencers"
-- Sub-headline in `text-muted-foreground`
-- Two CTAs: primary "Start Free" (`btn-shine`) and outline "See How It Works" (smooth scroll)
-- Right side (desktop) or below (mobile): inline SVG abstract network graphic -- interconnected nodes with indigo/teal gradient strokes, animated with framer-motion float
-- All entrance animations: staggered fade-up (0.6s)
-
-### TrustSignals.tsx
-- "Trusted by agencies & brands worldwide" label
-- 6 placeholder brand wordmarks rendered as styled `<span>` elements at `opacity-40` (Velocity, Growth Co, Stellar, Nova, Apex, ScaleUp)
-- 3 glass-card stat counters with **actual count-up animation** using `useInView` + `useMotionValue` + `useTransform` from framer-motion:
-  - 10,000+ live searches
-  - 99% fraud detection accuracy
-  - 90% lower cost
-- Numbers in `data-mono` (JetBrains Mono)
-
-### ProblemSolution.tsx
-- Section heading: "The Old Way vs. The InfluenceIQ Way"
-- Two-column grid (stacks on mobile)
-- Left column: 3 problem cards with red X icon and `border-destructive/20`
-- Right column: 3 solution cards with green CheckCircle2 and `border-aurora-teal/30`
-- Each card animates on scroll
-
-### HowItWorks.tsx
-- 3 glass cards side-by-side (`md:grid-cols-3`)
-- Each has: step number in `data-mono`, icon in `aurora-gradient` circle, title, description
-- Cards use `glass-card-hover` class for scale + border glow on hover
-- Icons: Search, ShieldCheck, Mail from lucide-react
-
-### Features.tsx
-- Section heading: "Everything You Need to Win"
-- 6-card grid (`sm:grid-cols-2 lg:grid-cols-3`)
-- Each card has an inline SVG icon (simple geometric line-art, ~20 lines of SVG each):
-  - Live Search: magnifying glass + globe paths
-  - Fraud Detection: shield + check paths
-  - Email Extraction: envelope + at-sign paths
-  - Campaign Management: kanban columns paths
-  - Outreach Automation: mail + rocket paths
-  - Analytics: chart line paths
-- SVGs use `stroke="currentColor"` with indigo accent class
-- Cards use `glass-card-hover` with staggered entrance animation
-
-### PricingPreview.tsx
-- 3 cards from `PLANS` constant (Free, Pro $29/mo, Business $79/mo)
-- Pro card has `ring-2 ring-primary` and "Most Popular" badge
-- Each card lists: search credits, enrichment credits, campaigns, emails, AI insights, team members
-- Prices in `data-mono` font
-- CTA buttons: outline for Free/Business, `btn-shine` for Pro
-- Hover: `will-change-transform` scale 1.02 + shadow increase
-
-### SecurityCompliance.tsx
-- 4 items in a row (was 3, adding SOC2-ready)
-- Icons: Lock (GDPR), CreditCard (Stripe), Shield (SOC2), Eye (Transparency)
-- Minimal glass cards
-
-### FinalCTA.tsx
-- Full-width `aurora-gradient` rounded section
-- Headline: "Stop Guessing. Start Partnering with Real Creators."
-- Large `btn-shine` CTA button
-- Subtle framer-motion entrance
-
-### MarketingFooter.tsx
-- 4 columns: Brand (logo + tagline), Product (Features, Pricing, How It Works), Company (About, Blog, Careers), Legal (Privacy, Terms, Cookie Policy)
-- Social icons row: Twitter, Linkedin, Github from lucide-react
-- Copyright line
-- Glass border styling
+**`ai-insights` edge function:**
+- Create a service-role Supabase client
+- Before calling AI gateway, query `workspaces` for `ai_credits_remaining`
+- If 0, return HTTP 402
+- After successful AI response, decrement `ai_credits_remaining` by 1
 
 ---
 
-## LandingPage.tsx (Rewritten)
+## Batch 4: Bulk Email and Batch Fraud Check
 
-The page becomes a thin shell:
+### Bulk Email Dialog
 
-```text
-- Force dark mode on mount
-- Render fixed aurora background blobs
-- Render fixed nav bar (unchanged)
-- Compose: Hero, TrustSignals, ProblemSolution, HowItWorks, Features, PricingPreview, SecurityCompliance, FinalCTA, MarketingFooter
-- Pass ctaPath and ctaLabel as props where needed
+Create `src/components/campaigns/BulkEmailDialog.tsx`:
+- Template selector using `useEmailTemplates`
+- Email address input per card (or skip cards without email)
+- Sends emails sequentially via `send-outreach-email` with per-card variable substitution
+- Progress counter and summary toast ("Sent 5/8 emails")
+
+### KanbanBoard Integration
+
+Modify `src/components/campaigns/KanbanBoard.tsx`:
+- In the bulk action bar (when `selectMode` is active), add a "Send Email" button that opens `BulkEmailDialog`
+- In each stage's dropdown menu, add a "Fraud Check Stage" option
+- Clicking it runs `runFraudCheck` from `useAIInsights` for each card in the stage sequentially
+- Updates card data via `updateCard` with results stored under `data.ai_fraud_check`
+- Shows progress toast and final summary
+
+---
+
+## Batch 5: Email Tracking and CSV Export
+
+### Database Migration
+
+Add two columns to `outreach_log`:
+
+```sql
+ALTER TABLE public.outreach_log ADD COLUMN IF NOT EXISTS opened_at TIMESTAMPTZ;
+ALTER TABLE public.outreach_log ADD COLUMN IF NOT EXISTS clicked_at TIMESTAMPTZ;
 ```
 
+### Email Webhook Edge Function
+
+Create `supabase/functions/email-webhook/index.ts`:
+- Public endpoint (`verify_jwt = false`) receiving Resend webhook POST events
+- Parses event type (`email.opened`, `email.clicked`)
+- Matches the `email_id` or `to` address against `outreach_log` records
+- Updates `opened_at` or `clicked_at` timestamps using service-role client
+- Returns 200 OK
+
+Register in `supabase/config.toml`:
+```toml
+[functions.email-webhook]
+verify_jwt = false
+```
+
+### CardDetailDialog Enhancement
+
+Modify outreach history section in `CardDetailDialog.tsx`:
+- Display open/click status badges (green "Opened" badge if `opened_at` exists, blue "Clicked" badge if `clicked_at` exists) next to each outreach entry
+
+### Campaign Comparison CSV Export
+
+Modify `src/pages/CampaignComparePage.tsx`:
+- Add an "Export CSV" button
+- Generates CSV from the comparison table data (campaign names, total cards, per-stage counts)
+- Triggers download via `Blob` + `URL.createObjectURL`
+
 ---
 
-## Performance Specifications
+## Files Summary
 
-- All hover effects use `will-change-transform` (GPU-composited)
-- Animated counters use framer-motion `animate` (no setInterval)
-- All sections use `whileInView` with `viewport={{ once: true }}` to animate only once
-- Inline SVGs have explicit `width`/`height` attributes (no CLS)
-- No external image loading -- all graphics are inline SVG
-- Animation durations: entrance 0.4-0.6s, hover 0.2s, counters 1.5s
+| Action | File |
+|--------|------|
+| Modify | `src/pages/SearchPage.tsx` (blur overlay) |
+| Modify | `src/pages/CampaignsPage.tsx` (campaign limit gate) |
+| Modify | `src/components/campaigns/SendEmailDialog.tsx` (email credit gate) |
+| Modify | `src/components/campaigns/CardDetailDialog.tsx` (AI gates + open/click badges) |
+| Modify | `src/components/campaigns/AIInsightsPanel.tsx` (AI credit gate) |
+| Modify | `supabase/functions/send-outreach-email/index.ts` (credit deduction) |
+| Modify | `supabase/functions/ai-insights/index.ts` (credit deduction) |
+| Create | `src/components/campaigns/BulkEmailDialog.tsx` |
+| Modify | `src/components/campaigns/KanbanBoard.tsx` (bulk email + batch fraud) |
+| Create | `supabase/functions/email-webhook/index.ts` |
+| Modify | `supabase/config.toml` (register email-webhook) |
+| Modify | `src/pages/CampaignComparePage.tsx` (CSV export) |
+| Migration | Add `opened_at`, `clicked_at` to `outreach_log` |
 
----
+## Implementation Order
 
-## No Image Files Needed
-
-Instead of generating external image assets, all visuals are implemented as:
-- **Inline SVGs** for the hero graphic and feature icons (zero network requests, zero CLS)
-- **CSS-only** brand wordmarks (styled text spans)
-- **Existing noise texture** already in `AuroraBackground` component (inline SVG data URI)
-
-This eliminates the need for `/public/images/` files entirely and ensures optimal performance.
-
+1. Batch 2 -- Search page blur (small, self-contained)
+2. Batch 3 -- Feature gating frontend + edge function credit deduction
+3. Batch 4 -- Bulk email dialog + batch fraud in Kanban
+4. Batch 5 -- Database migration, email-webhook function, open/click badges, CSV export
