@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.check-subscription]
 verify_jwt = false
+
+[functions.sync-hubspot]
+verify_jwt = false
+
+[functions.delete-account]
+verify_jwt = false

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { notifyIntegrations } from "@/lib/integrations";
 
 export function useCampaigns() {
   const { workspace } = useAuth();
@@ -39,6 +40,14 @@ export function useCampaigns() {
     mutationFn: async ({ id, ...values }: { id: string; name?: string; description?: string; status?: "draft" | "active" | "completed" | "archived"; budget?: number; start_date?: string; end_date?: string }) => {
       const { error } = await supabase.from("campaigns").update(values).eq("id", id);
       if (error) throw error;
+
+      // Fire webhook on status change
+      if (values.status && workspace) {
+        notifyIntegrations(workspace.workspace_id, "campaign_status_changed", {
+          campaign_id: id,
+          new_status: values.status,
+        });
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["campaigns"] }),
   });

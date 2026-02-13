@@ -8,22 +8,21 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { EmailTemplateManager } from "@/components/campaigns/EmailTemplateManager";
+import { IntegrationsTab } from "@/components/settings/IntegrationsTab";
+import { DataManagement } from "@/components/settings/DataManagement";
 
 export default function Settings() {
   const { user, profile, workspace, updatePassword, refreshProfile } = useAuth();
   const { toast } = useToast();
 
-  // Profile tab state
   const [fullName, setFullName] = useState(profile?.full_name || "");
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || "");
   const [profileSaving, setProfileSaving] = useState(false);
 
-  // Security tab state
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordSaving, setPasswordSaving] = useState(false);
 
-  // Outreach tab state
   const [defaultFromName, setDefaultFromName] = useState("");
   const [defaultReplyTo, setDefaultReplyTo] = useState("");
   const [outreachSaving, setOutreachSaving] = useState(false);
@@ -50,17 +49,12 @@ export default function Settings() {
       toast({ title: "Invalid URL", description: "Avatar URL must start with http:// or https://", variant: "destructive" });
       return;
     }
-
     setProfileSaving(true);
     try {
       const { error } = await supabase
         .from("profiles")
-        .update({
-          full_name: fullName.trim() || null,
-          avatar_url: avatarUrl.trim() || null,
-        })
+        .update({ full_name: fullName.trim() || null, avatar_url: avatarUrl.trim() || null })
         .eq("id", user!.id);
-
       if (error) throw error;
       await refreshProfile();
       toast({ title: "Profile updated" });
@@ -80,7 +74,6 @@ export default function Settings() {
       toast({ title: "Mismatch", description: "Passwords do not match.", variant: "destructive" });
       return;
     }
-
     setPasswordSaving(true);
     try {
       const { error } = await updatePassword(newPassword);
@@ -105,7 +98,6 @@ export default function Settings() {
         .select("settings")
         .eq("id", workspace.workspace_id)
         .single();
-
       const existingSettings = (current?.settings as any) || {};
       const { error } = await supabase
         .from("workspaces")
@@ -117,7 +109,6 @@ export default function Settings() {
           },
         })
         .eq("id", workspace.workspace_id);
-
       if (error) throw error;
       toast({ title: "Outreach settings saved" });
     } catch {
@@ -136,27 +127,19 @@ export default function Settings() {
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="outreach">Outreach</TabsTrigger>
+          <TabsTrigger value="integrations">Integrations</TabsTrigger>
+          <TabsTrigger value="data">Data & Privacy</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="mt-6">
           <div className="glass-card p-6 space-y-6">
             <div className="space-y-2">
               <Label htmlFor="settingsName">Full name</Label>
-              <Input
-                id="settingsName"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Your full name"
-              />
+              <Input id="settingsName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Your full name" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="settingsAvatar">Avatar URL</Label>
-              <Input
-                id="settingsAvatar"
-                value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
-                placeholder="https://example.com/avatar.jpg"
-              />
+              <Input id="settingsAvatar" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="https://example.com/avatar.jpg" />
             </div>
             <div className="space-y-2">
               <Label>Email</Label>
@@ -173,23 +156,11 @@ export default function Settings() {
           <div className="glass-card p-6 space-y-6">
             <div className="space-y-2">
               <Label htmlFor="newPassword">New password</Label>
-              <Input
-                id="newPassword"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="At least 6 characters"
-              />
+              <Input id="newPassword" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="At least 6 characters" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm password</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Repeat password"
-              />
+              <Input id="confirmPassword" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repeat password" />
             </div>
             <Button onClick={handlePasswordUpdate} disabled={passwordSaving}>
               {passwordSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -203,32 +174,28 @@ export default function Settings() {
             <h3 className="text-sm font-semibold">Email Defaults</h3>
             <div className="space-y-2">
               <Label htmlFor="fromName">Default sender name</Label>
-              <Input
-                id="fromName"
-                value={defaultFromName}
-                onChange={(e) => setDefaultFromName(e.target.value)}
-                placeholder="Your Name or Company"
-              />
+              <Input id="fromName" value={defaultFromName} onChange={(e) => setDefaultFromName(e.target.value)} placeholder="Your Name or Company" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="replyTo">Default reply-to email</Label>
-              <Input
-                id="replyTo"
-                type="email"
-                value={defaultReplyTo}
-                onChange={(e) => setDefaultReplyTo(e.target.value)}
-                placeholder="you@company.com"
-              />
+              <Input id="replyTo" type="email" value={defaultReplyTo} onChange={(e) => setDefaultReplyTo(e.target.value)} placeholder="you@company.com" />
             </div>
             <Button onClick={handleOutreachSave} disabled={outreachSaving}>
               {outreachSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save
             </Button>
           </div>
-
           <div className="glass-card p-6">
             <EmailTemplateManager />
           </div>
+        </TabsContent>
+
+        <TabsContent value="integrations" className="mt-6">
+          <IntegrationsTab />
+        </TabsContent>
+
+        <TabsContent value="data" className="mt-6">
+          <DataManagement />
         </TabsContent>
       </Tabs>
     </div>

@@ -22,6 +22,8 @@ import { useEmailTemplates, substituteVariables } from "@/hooks/useEmailTemplate
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
+import { notifyIntegrations } from "@/lib/integrations";
 
 interface SendEmailDialogProps {
   open: boolean;
@@ -49,6 +51,7 @@ export function SendEmailDialog({
 }: SendEmailDialogProps) {
   const { templates } = useEmailTemplates();
   const { toast } = useToast();
+  const { workspace } = useAuth();
   const queryClient = useQueryClient();
 
   const [to, setTo] = useState("");
@@ -105,6 +108,17 @@ export function SendEmailDialog({
       if (data?.error) throw new Error(data.error);
       toast({ title: "Email sent!" });
       queryClient.invalidateQueries({ queryKey: ["outreach-log", campaignId] });
+
+      // Fire integration webhooks
+      if (workspace?.workspace_id) {
+        notifyIntegrations(workspace.workspace_id, "outreach_email_sent", {
+          username: card.username,
+          platform: card.platform,
+          email_to: to,
+          campaign_id: campaignId,
+        });
+      }
+
       onOpenChange(false);
     } catch (err: any) {
       toast({ title: "Failed to send", description: err.message, variant: "destructive" });
