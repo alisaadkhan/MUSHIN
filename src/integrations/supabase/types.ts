@@ -14,16 +14,402 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      credits_usage: {
+        Row: {
+          action_type: string
+          amount: number
+          created_at: string
+          id: string
+          reference_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          action_type: string
+          amount: number
+          created_at?: string
+          id?: string
+          reference_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          action_type?: string
+          amount?: number
+          created_at?: string
+          id?: string
+          reference_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credits_usage_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      enrichment_jobs: {
+        Row: {
+          attempts: number
+          created_at: string
+          failure_reason: string | null
+          id: string
+          idempotency_key: string
+          platform: string
+          status: Database["public"]["Enums"]["enrichment_status"]
+          updated_at: string
+          username: string
+          workspace_id: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          idempotency_key: string
+          platform: string
+          status?: Database["public"]["Enums"]["enrichment_status"]
+          updated_at?: string
+          username: string
+          workspace_id: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          idempotency_key?: string
+          platform?: string
+          status?: Database["public"]["Enums"]["enrichment_status"]
+          updated_at?: string
+          username?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrichment_jobs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      influencer_lists: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "influencer_lists_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      influencers_cache: {
+        Row: {
+          city_extracted: string | null
+          created_at: string
+          data: Json
+          enriched_at: string | null
+          id: string
+          platform: string
+          ttl_expires_at: string | null
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          city_extracted?: string | null
+          created_at?: string
+          data?: Json
+          enriched_at?: string | null
+          id?: string
+          platform: string
+          ttl_expires_at?: string | null
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          city_extracted?: string | null
+          created_at?: string
+          data?: Json
+          enriched_at?: string | null
+          id?: string
+          platform?: string
+          ttl_expires_at?: string | null
+          updated_at?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      list_items: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          list_id: string
+          notes: string | null
+          platform: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          id?: string
+          list_id: string
+          notes?: string | null
+          platform: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          list_id?: string
+          notes?: string | null
+          platform?: string
+          username?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "list_items_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "influencer_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          onboarding_completed: boolean
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id: string
+          onboarding_completed?: boolean
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          onboarding_completed?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      saved_searches: {
+        Row: {
+          created_at: string
+          filters: Json
+          id: string
+          name: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          name: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          name?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_searches_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      search_history: {
+        Row: {
+          created_at: string
+          filters: Json
+          id: string
+          location: string | null
+          platform: string
+          query: string
+          result_count: number
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          location?: string | null
+          platform: string
+          query: string
+          result_count?: number
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          location?: string | null
+          platform?: string
+          query?: string
+          result_count?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "search_history_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      workspace_members: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["workspace_role"]
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["workspace_role"]
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["workspace_role"]
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_members_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspaces: {
+        Row: {
+          created_at: string
+          credits_reset_at: string
+          enrichment_credits_remaining: number
+          id: string
+          name: string
+          owner_id: string
+          search_credits_remaining: number
+          settings: Json
+        }
+        Insert: {
+          created_at?: string
+          credits_reset_at?: string
+          enrichment_credits_remaining?: number
+          id?: string
+          name: string
+          owner_id: string
+          search_credits_remaining?: number
+          settings?: Json
+        }
+        Update: {
+          created_at?: string
+          credits_reset_at?: string
+          enrichment_credits_remaining?: number
+          id?: string
+          name?: string
+          owner_id?: string
+          search_credits_remaining?: number
+          settings?: Json
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_workspace_id: { Args: never; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_workspace_member: { Args: { _workspace_id: string }; Returns: boolean }
+      is_workspace_owner: { Args: { _workspace_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
+      enrichment_status:
+        | "pending"
+        | "processing"
+        | "completed"
+        | "failed"
+        | "dead_letter"
+      workspace_role: "owner" | "admin" | "member"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +536,16 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+      enrichment_status: [
+        "pending",
+        "processing",
+        "completed",
+        "failed",
+        "dead_letter",
+      ],
+      workspace_role: ["owner", "admin", "member"],
+    },
   },
 } as const
