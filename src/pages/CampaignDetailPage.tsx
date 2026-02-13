@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { KanbanBoard } from "@/components/campaigns/KanbanBoard";
+import { CampaignStats } from "@/components/campaigns/CampaignStats";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useInfluencerLists, useListItems } from "@/hooks/useInfluencerLists";
@@ -57,7 +58,7 @@ export default function CampaignDetailPage() {
   const { data: lists } = useInfluencerLists();
   const { data: listItems } = useListItems(selectedListId || undefined);
   const { data: stages } = usePipelineStages(id);
-  const { addCard } = usePipelineCards(id);
+  const { data: cards, addCard } = usePipelineCards(id);
 
   const handleAddFromList = async () => {
     if (!listItems || !stages || stages.length === 0 || !id) return;
@@ -128,6 +129,10 @@ export default function CampaignDetailPage() {
           Add from List
         </Button>
       </div>
+
+      {id && campaign && stages && cards && (
+        <CampaignStats stages={stages} cards={cards} campaign={campaign} />
+      )}
 
       {id && <KanbanBoard campaignId={id} />}
 
