@@ -326,12 +326,14 @@ export type Database = {
         Row: {
           campaign_id: string
           card_id: string
+          clicked_at: string | null
           contacted_at: string
           email_subject: string | null
           email_to: string | null
           id: string
           method: string
           notes: string | null
+          opened_at: string | null
           platform: string
           status: string
           unsubscribed: boolean | null
@@ -340,12 +342,14 @@ export type Database = {
         Insert: {
           campaign_id: string
           card_id: string
+          clicked_at?: string | null
           contacted_at?: string
           email_subject?: string | null
           email_to?: string | null
           id?: string
           method?: string
           notes?: string | null
+          opened_at?: string | null
           platform: string
           status?: string
           unsubscribed?: boolean | null
@@ -354,12 +358,14 @@ export type Database = {
         Update: {
           campaign_id?: string
           card_id?: string
+          clicked_at?: string | null
           contacted_at?: string
           email_subject?: string | null
           email_to?: string | null
           id?: string
           method?: string
           notes?: string | null
+          opened_at?: string | null
           platform?: string
           status?: string
           unsubscribed?: boolean | null

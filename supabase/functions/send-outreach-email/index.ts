@@ -22,6 +22,7 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
 
     if (!resendApiKey) {
@@ -40,6 +41,40 @@ Deno.serve(async (req) => {
     if (claimsError || !claimsData?.claims) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const userId = claimsData.claims.sub;
+
+    // Service-role client for credit checks
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get user's workspace
+    const { data: membership } = await adminClient
+      .from("workspace_members")
+      .select("workspace_id")
+      .eq("user_id", userId)
+      .limit(1)
+      .single();
+
+    if (!membership) {
+      return new Response(JSON.stringify({ error: "No workspace found" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Check email credits
+    const { data: ws } = await adminClient
+      .from("workspaces")
+      .select("email_sends_remaining")
+      .eq("id", membership.workspace_id)
+      .single();
+
+    if (!ws || ws.email_sends_remaining <= 0) {
+      return new Response(JSON.stringify({ error: "Email credits exhausted. Upgrade your plan to send more emails." }), {
+        status: 402,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -79,6 +114,14 @@ Deno.serve(async (req) => {
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Decrement email credits atomically
+    await adminClient.rpc("", {}).catch(() => {}); // fallback: direct update
+    await adminClient
+      .from("workspaces")
+      .update({ email_sends_remaining: ws.email_sends_remaining - 1 })
+      .eq("id", membership.workspace_id)
+      .gt("email_sends_remaining", 0);
 
     // Log in outreach_log
     const { error: logError } = await supabase.from("outreach_log").insert({

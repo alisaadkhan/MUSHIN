@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Users, MoreHorizontal, Trash2, Pencil, GripVertical, Palette, Search, Instagram, Youtube, SlidersHorizontal, CheckSquare, ArrowRight, X } from "lucide-react";
+import { Plus, Users, MoreHorizontal, Trash2, Pencil, GripVertical, Palette, Search, Instagram, Youtube, SlidersHorizontal, CheckSquare, ArrowRight, X, Mail, ShieldCheck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -34,9 +34,11 @@ import { Toggle } from "@/components/ui/toggle";
 import { KanbanCard } from "./KanbanCard";
 import { CardDetailDialog } from "./CardDetailDialog";
 import { SendEmailDialog } from "./SendEmailDialog";
+import { BulkEmailDialog } from "./BulkEmailDialog";
 import { usePipelineStages, usePipelineCards } from "@/hooks/usePipelineCards";
 import { useCampaignActivity } from "@/hooks/useCampaignActivity";
 import { useOutreachLog } from "@/hooks/useOutreachLog";
+import { useAIInsights } from "@/hooks/useAIInsights";
 import { useToast } from "@/hooks/use-toast";
 
 const STAGE_COLORS = [
@@ -62,8 +64,12 @@ export function KanbanBoard({ campaignId, campaignName, workspaceSettings }: Kan
   const { data: cards, moveCard, updateCard, removeCard } = usePipelineCards(campaignId);
   const { logActivity } = useCampaignActivity(campaignId);
   const { outreachEntries, logOutreach, isContacted } = useOutreachLog(campaignId);
+  const { runFraudCheck, fraudLoading } = useAIInsights();
   const [editingCard, setEditingCard] = useState<any>(null);
   const [emailCard, setEmailCard] = useState<any>(null);
+  const [bulkEmailOpen, setBulkEmailOpen] = useState(false);
+  const [fraudCheckingStageId, setFraudCheckingStageId] = useState<string | null>(null);
+  const [fraudProgress, setFraudProgress] = useState({ done: 0, total: 0 });
   const [dragCardId, setDragCardId] = useState<string | null>(null);
   const [dragStageId, setDragStageId] = useState<string | null>(null);
   const [renamingStageId, setRenamingStageId] = useState<string | null>(null);
@@ -294,6 +300,43 @@ export function KanbanBoard({ campaignId, campaignName, workspaceSettings }: Kan
     setSelectedCardIds(new Set());
   };
 
+  const handleBatchFraudCheck = async (stageId: string) => {
+    const stageCards = cards?.filter((c) => c.stage_id === stageId) || [];
+    if (stageCards.length === 0) {
+      toast({ title: "No cards in this stage" });
+      return;
+    }
+    setFraudCheckingStageId(stageId);
+    setFraudProgress({ done: 0, total: stageCards.length });
+    let checked = 0;
+
+    for (const card of stageCards) {
+      const d = card.data as any;
+      const result = await runFraudCheck({
+        username: card.username,
+        platform: card.platform,
+        followers: d?.followers || d?.subscriber_count,
+        engagement: d?.engagement_rate,
+        avgViews: d?.avg_views || d?.average_views,
+        ...d,
+      });
+      if (result) {
+        try {
+          await updateCard.mutateAsync({
+            id: card.id,
+            data: { ...d, ai_fraud_check: result },
+          });
+        } catch { /* skip */ }
+      }
+      checked++;
+      setFraudProgress({ done: checked, total: stageCards.length });
+    }
+
+    const stageName = stages?.find((s) => s.id === stageId)?.name;
+    toast({ title: `Fraud check complete: ${checked}/${stageCards.length} in ${stageName}` });
+    setFraudCheckingStageId(null);
+  };
+
   if (!stages) return null;
 
   return (
@@ -415,6 +458,13 @@ export function KanbanBoard({ campaignId, campaignName, workspaceSettings }: Kan
                             Change Color
                           </DropdownMenuItem>
                           <DropdownMenuItem
+                            onClick={() => handleBatchFraudCheck(stage.id)}
+                            disabled={!!fraudCheckingStageId}
+                          >
+                            {fraudCheckingStageId === stage.id ? <Loader2 className="h-3 w-3 mr-2 animate-spin" /> : <ShieldCheck className="h-3 w-3 mr-2" />}
+                            Fraud Check Stage
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
                             className="text-destructive"
                             onClick={() => setDeleteConfirmStageId(stage.id)}
                           >
@@ -514,6 +564,10 @@ export function KanbanBoard({ campaignId, campaignName, workspaceSettings }: Kan
                   <ArrowRight className="h-3 w-3" />
                   Move
                 </Button>
+                <Button variant="secondary" size="sm" className="text-xs gap-1" onClick={() => setBulkEmailOpen(true)}>
+                  <Mail className="h-3 w-3" />
+                  Send Email
+                </Button>
                 <Button variant="destructive" size="sm" className="text-xs gap-1" onClick={handleBulkRemove}>
                   <Trash2 className="h-3 w-3" />
                   Remove
@@ -553,6 +607,16 @@ export function KanbanBoard({ campaignId, campaignName, workspaceSettings }: Kan
           defaultReplyTo={workspaceSettings?.default_reply_to}
         />
       )}
+
+      <BulkEmailDialog
+        open={bulkEmailOpen}
+        onOpenChange={setBulkEmailOpen}
+        cards={(cards?.filter((c) => selectedCardIds.has(c.id)) || []).map((c) => ({ id: c.id, username: c.username, platform: c.platform, data: c.data }))}
+        campaignId={campaignId}
+        campaignName={campaignName}
+        defaultFromName={workspaceSettings?.default_from_name}
+        defaultReplyTo={workspaceSettings?.default_reply_to}
+      />
 
       <AlertDialog open={!!deleteConfirmStageId} onOpenChange={(open) => !open && setDeleteConfirmStageId(null)}>
         <AlertDialogContent>

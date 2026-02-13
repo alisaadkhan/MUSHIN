@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { notifyIntegrations } from "@/lib/integrations";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
 
 interface SendEmailDialogProps {
   open: boolean;
@@ -53,6 +54,7 @@ export function SendEmailDialog({
   const { toast } = useToast();
   const { workspace } = useAuth();
   const queryClient = useQueryClient();
+  const { canSendEmail, emailsRemaining } = usePlanLimits();
 
   const [to, setTo] = useState("");
   const [subject, setSubject] = useState("");
@@ -85,6 +87,10 @@ export function SendEmailDialog({
   };
 
   const handleSend = async () => {
+    if (!canSendEmail()) {
+      toast({ title: "Email credits exhausted", description: "Upgrade your plan to send more emails.", variant: "destructive" });
+      return;
+    }
     if (!to || !subject || !body) {
       toast({ title: "Missing fields", description: "Fill in recipient, subject, and body.", variant: "destructive" });
       return;

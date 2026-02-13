@@ -107,7 +107,7 @@ export function usePipelineCards(campaignId: string | undefined) {
   });
 
   const updateCard = useMutation({
-    mutationFn: async ({ id, ...values }: { id: string; notes?: string; agreed_rate?: number }) => {
+    mutationFn: async ({ id, ...values }: { id: string; notes?: string; agreed_rate?: number; data?: any }) => {
       const { error } = await supabase.from("pipeline_cards").update(values).eq("id", id);
       if (error) throw error;
     },

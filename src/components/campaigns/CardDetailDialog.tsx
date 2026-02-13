@@ -23,6 +23,8 @@ import {
 import { SendEmailDialog } from "./SendEmailDialog";
 import { FraudCheckBadge } from "./FraudCheckBadge";
 import { useAIInsights, type FraudCheckResult } from "@/hooks/useAIInsights";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { OutreachEntry } from "@/hooks/useOutreachLog";
 const platformIcons: Record<string, any> = {
   instagram: Instagram,
@@ -68,6 +70,7 @@ export function CardDetailDialog({ card, open, onOpenChange, onSave, onRemove, s
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [fraudResult, setFraudResult] = useState<FraudCheckResult | null>(null);
   const { generateSummary, summaryLoading, runFraudCheck, fraudLoading } = useAIInsights();
+  const { canUseAI, aiRemaining } = usePlanLimits();
 
   useEffect(() => {
     if (card) {
@@ -146,32 +149,48 @@ export function CardDetailDialog({ card, open, onOpenChange, onSave, onRemove, s
               <Sparkles className="h-3.5 w-3.5 text-primary" />
               <span className="text-xs font-semibold">AI Insights</span>
               <div className="flex gap-1 ml-auto">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-6 text-[10px] gap-1"
-                  onClick={async () => {
-                    const s = await generateSummary({ username: card.username, platform: card.platform, followers, engagement, avgViews, ...d });
-                    if (s) setAiSummary(s);
-                  }}
-                  disabled={summaryLoading}
-                >
-                  {summaryLoading ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Sparkles className="h-2.5 w-2.5" />}
-                  Summary
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-6 text-[10px] gap-1"
-                  onClick={async () => {
-                    const r = await runFraudCheck({ username: card.username, platform: card.platform, followers, engagement, avgViews, ...d });
-                    if (r) setFraudResult(r);
-                  }}
-                  disabled={fraudLoading}
-                >
-                  {fraudLoading ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <ShieldCheck className="h-2.5 w-2.5" />}
-                  Fraud Check
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-6 text-[10px] gap-1"
+                          onClick={async () => {
+                            const s = await generateSummary({ username: card.username, platform: card.platform, followers, engagement, avgViews, ...d });
+                            if (s) setAiSummary(s);
+                          }}
+                          disabled={summaryLoading || !canUseAI()}
+                        >
+                          {summaryLoading ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Sparkles className="h-2.5 w-2.5" />}
+                          Summary
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {!canUseAI() && <TooltipContent><p>AI credits exhausted ({aiRemaining} remaining). Upgrade to continue.</p></TooltipContent>}
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-6 text-[10px] gap-1"
+                          onClick={async () => {
+                            const r = await runFraudCheck({ username: card.username, platform: card.platform, followers, engagement, avgViews, ...d });
+                            if (r) setFraudResult(r);
+                          }}
+                          disabled={fraudLoading || !canUseAI()}
+                        >
+                          {fraudLoading ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <ShieldCheck className="h-2.5 w-2.5" />}
+                          Fraud Check
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {!canUseAI() && <TooltipContent><p>AI credits exhausted. Upgrade to continue.</p></TooltipContent>}
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </div>
             {aiSummary && <p className="text-xs text-muted-foreground">{aiSummary}</p>}
@@ -225,10 +244,12 @@ export function CardDetailDialog({ card, open, onOpenChange, onSave, onRemove, s
             {cardOutreach.length > 0 && (
               <div className="space-y-1.5">
                 {cardOutreach.map((entry) => (
-                  <div key={entry.id} className="flex items-center gap-2 text-[11px] text-muted-foreground bg-muted/30 rounded px-2 py-1.5">
+                  <div key={entry.id} className="flex items-center gap-2 text-[11px] text-muted-foreground bg-muted/30 rounded px-2 py-1.5 flex-wrap">
                     <Badge variant="outline" className="text-[9px] bg-green-500/10 text-green-500 border-green-500/20">{entry.method}</Badge>
                     <span>{new Date(entry.contacted_at).toLocaleDateString()}</span>
                     {entry.email_to && <span className="truncate text-primary">→ {entry.email_to}</span>}
+                    {(entry as any).opened_at && <Badge variant="outline" className="text-[9px] bg-green-500/10 text-green-500 border-green-500/20">Opened</Badge>}
+                    {(entry as any).clicked_at && <Badge variant="outline" className="text-[9px] bg-blue-500/10 text-blue-500 border-blue-500/20">Clicked</Badge>}
                     {entry.notes && <span className="truncate">— {entry.notes}</span>}
                   </div>
                 ))}

@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAIInsights, type Recommendation } from "@/hooks/useAIInsights";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
+import { useToast } from "@/hooks/use-toast";
 
 const categoryIcons: Record<string, any> = {
   outreach: Target,
@@ -33,10 +35,16 @@ interface AIInsightsPanelProps {
 
 export function AIInsightsPanel({ campaignContext }: AIInsightsPanelProps) {
   const { getCampaignRecommendations, recommendLoading } = useAIInsights();
+  const { canUseAI } = usePlanLimits();
+  const { toast } = useToast();
   const [recommendations, setRecommendations] = useState<Recommendation[] | null>(null);
   const [isOpen, setIsOpen] = useState(false);
 
   const handleGenerate = async () => {
+    if (!canUseAI()) {
+      toast({ title: "AI credits exhausted", description: "Upgrade your plan to use AI insights.", variant: "destructive" });
+      return;
+    }
     const result = await getCampaignRecommendations(campaignContext);
     if (result) setRecommendations(result);
   };

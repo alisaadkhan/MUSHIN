@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, BarChart3 } from "lucide-react";
+import { ArrowLeft, BarChart3, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +52,29 @@ export default function CampaignComparePage() {
   const allStageNames = Array.from(
     new Set(comparisonData?.flatMap((d) => d.stages.map((s) => s.name)) || [])
   );
+
+  const exportCSV = useCallback(() => {
+    if (!comparisonData || selectedCampaigns.length === 0) return;
+    const headers = ["Metric", ...selectedCampaigns.map((c) => c.name)];
+    const rows: string[][] = [headers];
+    rows.push(["Total Influencers", ...comparisonData.map((d) => String(d.cards.length))]);
+    rows.push(["Budget", ...selectedCampaigns.map((c) => c.budget ? `$${Number(c.budget).toLocaleString()}` : "—")]);
+    rows.push(["Spent (Agreed Rates)", ...comparisonData.map((d) => `$${d.cards.reduce((s, c) => s + (Number(c.agreed_rate) || 0), 0).toLocaleString()}`)]);
+    allStageNames.forEach((sn) => {
+      rows.push([sn, ...comparisonData.map((d) => {
+        const stage = d.stages.find((s) => s.name === sn);
+        return String(stage ? d.cards.filter((c) => c.stage_id === stage.id).length : 0);
+      })]);
+    });
+    const csv = rows.map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "campaign-comparison.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [comparisonData, selectedCampaigns, allStageNames]);
 
   const chartData = allStageNames.map((stageName) => {
     const row: any = { stage: stageName };
@@ -108,7 +131,15 @@ export default function CampaignComparePage() {
         <>
           {/* Comparison Table */}
           <Card className="glass-card overflow-auto">
-            <CardHeader><CardTitle className="text-sm flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Metrics Comparison</CardTitle></CardHeader>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Metrics Comparison</CardTitle>
+                <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={exportCSV}>
+                  <Download className="h-3 w-3" />
+                  Export CSV
+                </Button>
+              </div>
+            </CardHeader>
             <CardContent>
               <table className="w-full text-sm">
                 <thead>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Search, SlidersHorizontal, Instagram, Youtube, ExternalLink, Loader2, Plus, Bookmark, AlertCircle } from "lucide-react";
+import { Search, SlidersHorizontal, Instagram, Youtube, ExternalLink, Loader2, Plus, Bookmark, AlertCircle, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +37,7 @@ import { useSearchParams, Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { format } from "date-fns";
+import { useNavigate } from "react-router-dom";
 
 const PAKISTAN_CITIES = [
   "All Pakistan", "Karachi", "Lahore", "Islamabad",
@@ -76,8 +77,11 @@ export default function SearchPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: workspaceCredits } = useWorkspaceCredits();
+  const navigate = useNavigate();
 
   const creditsExhausted = workspaceCredits?.search_credits_remaining === 0;
+  const isFreePlan = workspaceCredits?.plan === "free";
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   // Lists
   const { data: lists, createList } = useInfluencerLists();
@@ -295,6 +299,20 @@ export default function SearchPage() {
         </div>
       )}
 
+      {/* Free plan banner */}
+      {isFreePlan && searched && results.length > 0 && !bannerDismissed && (
+        <Alert className="border-primary/30 bg-primary/5">
+          <Lock className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>You're on the Free plan. Upgrade to see full influencer profiles.</span>
+            <div className="flex items-center gap-2 ml-4">
+              <Button size="sm" variant="default" className="h-7 text-xs" onClick={() => navigate("/billing")}>Upgrade</Button>
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setBannerDismissed(true)}>Dismiss</Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Results */}
       {!loading && searched && results.length > 0 && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}>
@@ -313,8 +331,8 @@ export default function SearchPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04 }}
               >
-                <Card className="glass-card hover:border-primary/30 transition-colors">
-                  <CardContent className="p-5">
+                <Card className="glass-card hover:border-primary/30 transition-colors relative">
+                  <CardContent className={`p-5 ${isFreePlan ? "blur-sm pointer-events-none select-none" : ""}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
@@ -365,6 +383,15 @@ export default function SearchPage() {
                       </DropdownMenu>
                     </div>
                   </CardContent>
+                  {isFreePlan && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-[2px] rounded-lg">
+                      <Lock className="h-6 w-6 text-muted-foreground mb-2" />
+                      <p className="text-sm font-medium mb-2">Upgrade to Unlock</p>
+                      <Button size="sm" className="text-xs" onClick={() => navigate("/billing")}>
+                        View Plans
+                      </Button>
+                    </div>
+                  )}
                 </Card>
               </motion.div>
             ))}
