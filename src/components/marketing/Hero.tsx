@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { motion, type Variants } from "framer-motion";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ShieldCheck, TrendingUp, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const fadeUp: Variants = {
@@ -12,37 +12,71 @@ const fadeUp: Variants = {
   }),
 };
 
-function NetworkGraphic() {
+const MOCK_ROWS = [
+  { name: "Sarah Mitchell", platform: "Instagram", followers: "1.2M", engagement: "4.8%", score: 97 },
+  { name: "Jake Rivera", platform: "TikTok", followers: "890K", engagement: "6.1%", score: 94 },
+  { name: "Priya Sharma", platform: "YouTube", followers: "2.1M", engagement: "3.9%", score: 91 },
+  { name: "Alex Chen", platform: "Instagram", followers: "540K", engagement: "5.3%", score: 88 },
+];
+
+function DashboardPreview() {
   return (
-    <motion.svg
-      viewBox="0 0 400 400"
-      className="w-full max-w-sm mx-auto opacity-70"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 0.6 }}
-      transition={{ duration: 1, delay: 0.5 }}
-      aria-hidden
+    <motion.div
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.8, delay: 0.4 }}
+      className="glass-card rounded-xl overflow-hidden shadow-2xl"
+      style={{ boxShadow: "0 25px 60px -15px hsl(var(--aurora-violet) / 0.3)" }}
     >
-      <defs>
-        <linearGradient id="node-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="hsl(var(--aurora-violet))" />
-          <stop offset="100%" stopColor="hsl(var(--aurora-teal))" />
-        </linearGradient>
-      </defs>
-      {[
-        [200, 80, 100, 200], [200, 80, 300, 200], [100, 200, 200, 320],
-        [300, 200, 200, 320], [100, 200, 300, 200], [200, 80, 200, 320],
-        [60, 140, 100, 200], [340, 140, 300, 200], [60, 280, 200, 320], [340, 280, 200, 320],
-      ].map(([x1, y1, x2, y2], i) => (
-        <motion.line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="url(#node-grad)" strokeWidth="1" strokeOpacity="0.25"
-          initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.2, delay: 0.6 + i * 0.08 }} />
-      ))}
-      {[[200, 80, 8], [100, 200, 6], [300, 200, 6], [200, 320, 8], [60, 140, 4], [340, 140, 4], [60, 280, 4], [340, 280, 4]].map(([cx, cy, r], i) => (
-        <motion.circle key={i} cx={cx} cy={cy} r={r} fill="url(#node-grad)"
-          initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 0.8 }} transition={{ duration: 0.4, delay: 0.8 + i * 0.1 }} />
-      ))}
-      <motion.circle cx="200" cy="200" r="12" fill="url(#node-grad)"
-        animate={{ scale: [1, 1.3, 1], opacity: [0.6, 1, 0.6] }} transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }} />
-    </motion.svg>
+      {/* Title bar */}
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b" style={{ borderColor: "hsl(var(--glass-border))" }}>
+        <div className="flex gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-full bg-destructive/60" />
+          <div className="w-2.5 h-2.5 rounded-full" style={{ background: "hsl(45 93% 47% / 0.6)" }} />
+          <div className="w-2.5 h-2.5 rounded-full bg-accent/60" />
+        </div>
+        <span className="text-[10px] text-muted-foreground ml-2 data-mono">InfluenceIQ Dashboard</span>
+      </div>
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-3 gap-2 p-3">
+        {[
+          { icon: Search, label: "Searches Today", value: "2,847", color: "primary" },
+          { icon: ShieldCheck, label: "Avg Fraud Score", value: "94.2%", color: "accent" },
+          { icon: TrendingUp, label: "Avg Engagement", value: "4.7%", color: "primary" },
+        ].map((stat) => (
+          <div key={stat.label} className="aurora-gradient rounded-lg p-2.5 space-y-1">
+            <div className="flex items-center gap-1.5">
+              <stat.icon className="h-3 w-3 text-muted-foreground" />
+              <span className="text-[9px] text-muted-foreground truncate">{stat.label}</span>
+            </div>
+            <p className="data-mono text-sm font-bold text-foreground">{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Mini table */}
+      <div className="px-3 pb-3">
+        <div className="rounded-lg overflow-hidden border" style={{ borderColor: "hsl(var(--glass-border))" }}>
+          <div className="grid grid-cols-[1fr_70px_60px_50px_44px] gap-1 px-2.5 py-1.5 text-[9px] text-muted-foreground uppercase tracking-wider border-b" style={{ borderColor: "hsl(var(--glass-border))", background: "hsl(var(--glass-bg))" }}>
+            <span>Creator</span>
+            <span>Platform</span>
+            <span>Followers</span>
+            <span>Eng.</span>
+            <span>Score</span>
+          </div>
+          {MOCK_ROWS.map((row) => (
+            <div key={row.name} className="grid grid-cols-[1fr_70px_60px_50px_44px] gap-1 px-2.5 py-1.5 text-[10px] border-b last:border-b-0 items-center" style={{ borderColor: "hsl(var(--glass-border))" }}>
+              <span className="text-foreground font-medium truncate">{row.name}</span>
+              <span className="text-muted-foreground">{row.platform}</span>
+              <span className="data-mono text-muted-foreground">{row.followers}</span>
+              <span className="data-mono text-accent">{row.engagement}</span>
+              <span className="data-mono text-xs font-semibold text-accent">{row.score}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
@@ -101,7 +135,7 @@ export function Hero({ ctaPath, ctaLabel }: HeroProps) {
         </motion.div>
 
         <div className="hidden md:block">
-          <NetworkGraphic />
+          <DashboardPreview />
         </div>
       </div>
     </section>

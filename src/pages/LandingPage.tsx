@@ -8,8 +8,10 @@ import enterpriseBg from "@/assets/enterprise-bg.jpg";
 import { Hero } from "@/components/marketing/Hero";
 import { OutcomeMetrics } from "@/components/marketing/OutcomeMetrics";
 import { ProblemSolution } from "@/components/marketing/ProblemSolution";
+import { Differentiation } from "@/components/marketing/Differentiation";
 import { HowItWorks } from "@/components/marketing/HowItWorks";
 import { Features } from "@/components/marketing/Features";
+import { ProductDemo } from "@/components/marketing/ProductDemo";
 import { PricingPreview } from "@/components/marketing/PricingPreview";
 import { FAQ } from "@/components/marketing/FAQ";
 import { FinalCTA } from "@/components/marketing/FinalCTA";
@@ -68,10 +70,11 @@ export default function LandingPage() {
       <Hero ctaPath={ctaPath} ctaLabel={ctaLabel} />
       <OutcomeMetrics />
       <ProblemSolution />
+      <Differentiation />
       <HowItWorks />
       <Features />
+      <ProductDemo />
       <PricingPreview ctaPath={ctaPath} />
-      <FAQ />
       <FinalCTA ctaPath={ctaPath} />
       <MarketingFooter />
     </div>
