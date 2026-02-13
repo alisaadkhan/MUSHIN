@@ -21,7 +21,9 @@ interface AuthContextType {
   profile: Profile | null;
   workspace: Workspace | null;
   loading: boolean;
+  profileError: boolean;
   needsEmailVerification: boolean;
+  refreshProfile: () => Promise<void>;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
@@ -39,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileError, setProfileError] = useState(false);
 
   const needsEmailVerification = !!user && !user.email_confirmed_at;
 
@@ -54,10 +57,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else if (workspaceRes.data && !Array.isArray(workspaceRes.data)) {
         setWorkspace(workspaceRes.data as unknown as Workspace);
       }
+      setProfileError(false);
     } catch {
-      // Profile/workspace fetch failed – app still works
+      setProfileError(true);
     }
   }, []);
+
+  const refreshProfile = useCallback(async () => {
+    if (user) {
+      setProfileError(false);
+      await fetchProfileAndWorkspace(user.id);
+    }
+  }, [user, fetchProfileAndWorkspace]);
 
   useEffect(() => {
     // Set up listener BEFORE getSession
@@ -141,7 +152,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         workspace,
         loading,
+        profileError,
         needsEmailVerification,
+        refreshProfile,
         signUp,
         signIn,
         signInWithGoogle,
