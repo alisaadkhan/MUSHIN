@@ -10,8 +10,10 @@ import {
   History,
   Settings,
   Zap,
+  CreditCard,
 } from "lucide-react";
 import { useWorkspaceCredits } from "@/hooks/useWorkspaceCredits";
+import { useSubscription } from "@/hooks/useSubscription";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/" },
@@ -21,15 +23,17 @@ const navItems = [
   { label: "Saved Searches", icon: Bookmark, path: "/saved-searches" },
   { label: "History", icon: History, path: "/history" },
   { label: "Settings", icon: Settings, path: "/settings" },
+  { label: "Billing", icon: CreditCard, path: "/billing" },
 ];
 
 export function AppSidebar() {
   const location = useLocation();
   const { data: credits } = useWorkspaceCredits();
+  const { planConfig, plan } = useSubscription();
 
-  const searchUsed = 50 - (credits?.search_credits_remaining ?? 50);
-  const totalCredits = credits?.search_credits_remaining ?? 50;
-  const pct = ((totalCredits) / 50) * 100;
+  const totalCredits = credits?.search_credits_remaining ?? planConfig.search_credits;
+  const maxCredits = planConfig.search_credits;
+  const pct = (totalCredits / maxCredits) * 100;
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-border bg-sidebar">
@@ -72,13 +76,13 @@ export function AppSidebar() {
       <div className="border-t border-border p-4 space-y-3">
         <div className="glass-card rounded-lg p-3">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-            <span>Credits</span>
-            <span className="data-mono">{totalCredits} / 50</span>
+            <span>{planConfig.name} Plan</span>
+            <span className="data-mono">{totalCredits} / {maxCredits}</span>
           </div>
           <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
             <div
               className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all"
-              style={{ width: `${pct}%` }}
+              style={{ width: `${Math.min(pct, 100)}%` }}
             />
           </div>
         </div>

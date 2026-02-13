@@ -1,0 +1,41 @@
+export const PLANS = {
+  free: {
+    name: "Free",
+    price: 0,
+    search_credits: 50,
+    enrichment_credits: 10,
+    campaigns: 3,
+    email_sends: 20,
+    ai_credits: 5,
+    team_members: 1,
+    priority_support: false,
+  },
+  pro: {
+    name: "Pro",
+    price: 29,
+    price_id: "price_1T0PsPDuoE2xHHDKCp789YjT",
+    product_id: "prod_TyMbQ3mEvnVxKK",
+    search_credits: 500,
+    enrichment_credits: 100,
+    campaigns: Infinity,
+    email_sends: 500,
+    ai_credits: 100,
+    team_members: 3,
+    priority_support: false,
+  },
+  business: {
+    name: "Business",
+    price: 79,
+    price_id: "price_1T0PsbDuoE2xHHDK3QSI8RTe",
+    product_id: "prod_TyMbNwl6IF6Jis",
+    search_credits: 2000,
+    enrichment_credits: 500,
+    campaigns: Infinity,
+    email_sends: 2000,
+    ai_credits: Infinity,
+    team_members: 10,
+    priority_support: true,
+  },
+} as const;
+
+export type PlanKey = keyof typeof PLANS;

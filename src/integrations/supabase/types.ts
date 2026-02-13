@@ -571,6 +571,56 @@ export type Database = {
           },
         ]
       }
+      subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean | null
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          plan: string
+          status: string
+          stripe_customer_id: string
+          stripe_subscription_id: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan?: string
+          status?: string
+          stripe_customer_id: string
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan?: string
+          status?: string
+          stripe_customer_id?: string
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -623,32 +673,41 @@ export type Database = {
       }
       workspaces: {
         Row: {
+          ai_credits_remaining: number
           created_at: string
           credits_reset_at: string
+          email_sends_remaining: number
           enrichment_credits_remaining: number
           id: string
           name: string
           owner_id: string
+          plan: string
           search_credits_remaining: number
           settings: Json
         }
         Insert: {
+          ai_credits_remaining?: number
           created_at?: string
           credits_reset_at?: string
+          email_sends_remaining?: number
           enrichment_credits_remaining?: number
           id?: string
           name: string
           owner_id: string
+          plan?: string
           search_credits_remaining?: number
           settings?: Json
         }
         Update: {
+          ai_credits_remaining?: number
           created_at?: string
           credits_reset_at?: string
+          email_sends_remaining?: number
           enrichment_credits_remaining?: number
           id?: string
           name?: string
           owner_id?: string
+          plan?: string
           search_credits_remaining?: number
           settings?: Json
         }
