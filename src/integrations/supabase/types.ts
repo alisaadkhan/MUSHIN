@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      campaigns: {
+        Row: {
+          budget: number | null
+          created_at: string
+          description: string | null
+          end_date: string | null
+          id: string
+          name: string
+          start_date: string | null
+          status: Database["public"]["Enums"]["campaign_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          budget?: number | null
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          name: string
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          budget?: number | null
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          name?: string
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credits_usage: {
         Row: {
           action_type: string
@@ -198,6 +245,98 @@ export type Database = {
             columns: ["list_id"]
             isOneToOne: false
             referencedRelation: "influencer_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipeline_cards: {
+        Row: {
+          agreed_rate: number | null
+          campaign_id: string
+          created_at: string
+          data: Json
+          id: string
+          notes: string | null
+          platform: string
+          position: number
+          stage_id: string
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          agreed_rate?: number | null
+          campaign_id: string
+          created_at?: string
+          data?: Json
+          id?: string
+          notes?: string | null
+          platform: string
+          position?: number
+          stage_id: string
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          agreed_rate?: number | null
+          campaign_id?: string
+          created_at?: string
+          data?: Json
+          id?: string
+          notes?: string | null
+          platform?: string
+          position?: number
+          stage_id?: string
+          updated_at?: string
+          username?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_cards_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_cards_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipeline_stages: {
+        Row: {
+          campaign_id: string
+          color: string
+          created_at: string
+          id: string
+          name: string
+          position: number
+        }
+        Insert: {
+          campaign_id: string
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+          position?: number
+        }
+        Update: {
+          campaign_id?: string
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_stages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
             referencedColumns: ["id"]
           },
         ]
@@ -410,6 +549,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      campaign_status: "draft" | "active" | "completed" | "archived"
       enrichment_status:
         | "pending"
         | "processing"
@@ -545,6 +685,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      campaign_status: ["draft", "active", "completed", "archived"],
       enrichment_status: [
         "pending",
         "processing",
