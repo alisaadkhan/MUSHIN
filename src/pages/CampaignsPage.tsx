@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, Megaphone, Trash2, Users } from "lucide-react";
+import { Plus, Megaphone, Trash2, Users, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +29,8 @@ import {
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 const statusColors: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
@@ -39,17 +44,33 @@ export default function CampaignsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [budget, setBudget] = useState("");
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const resetForm = () => {
+    setName("");
+    setDescription("");
+    setBudget("");
+    setStartDate(undefined);
+    setEndDate(undefined);
+  };
 
   const handleCreate = async () => {
     if (!name.trim()) return;
     try {
-      await createCampaign.mutateAsync({ name: name.trim(), description: description.trim() || undefined });
+      await createCampaign.mutateAsync({
+        name: name.trim(),
+        description: description.trim() || undefined,
+        budget: budget ? Number(budget) : undefined,
+        start_date: startDate ? format(startDate, "yyyy-MM-dd") : undefined,
+        end_date: endDate ? format(endDate, "yyyy-MM-dd") : undefined,
+      });
       toast({ title: "Campaign created" });
       setShowCreate(false);
-      setName("");
-      setDescription("");
+      resetForm();
     } catch {
       toast({ title: "Failed to create", variant: "destructive" });
     }
@@ -123,6 +144,14 @@ export default function CampaignsPage() {
                     {c.description && (
                       <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{c.description}</p>
                     )}
+                    {(c.start_date || c.end_date) && (
+                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                        <CalendarIcon className="h-3 w-3" />
+                        {c.start_date ? format(new Date(c.start_date), "MMM d") : "—"}
+                        {" – "}
+                        {c.end_date ? format(new Date(c.end_date), "MMM d") : "—"}
+                      </p>
+                    )}
                     <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Users className="h-3 w-3" />
@@ -150,15 +179,55 @@ export default function CampaignsPage() {
         </Card>
       )}
 
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <Dialog open={showCreate} onOpenChange={(open) => { if (!open) resetForm(); setShowCreate(open); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Create Campaign</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <Input placeholder="Campaign name" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleCreate()} />
-            <Textarea placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+            <div>
+              <Label className="text-xs">Name</Label>
+              <Input placeholder="Campaign name" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleCreate()} />
+            </div>
+            <div>
+              <Label className="text-xs">Description</Label>
+              <Textarea placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+            </div>
+            <div>
+              <Label className="text-xs">Budget ($)</Label>
+              <Input type="number" placeholder="e.g. 10000" value={budget} onChange={(e) => setBudget(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Start Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal h-10", !startDate && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {startDate ? format(startDate, "MMM d, yyyy") : "Pick date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus className="p-3 pointer-events-auto" />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div>
+                <Label className="text-xs">End Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal h-10", !endDate && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {endDate ? format(endDate, "MMM d, yyyy") : "Pick date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus className="p-3 pointer-events-auto" />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setShowCreate(false); resetForm(); }}>Cancel</Button>
             <Button onClick={handleCreate} disabled={!name.trim()}>Create</Button>
           </DialogFooter>
         </DialogContent>

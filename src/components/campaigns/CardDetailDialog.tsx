@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Instagram, Youtube, SlidersHorizontal, Search, ExternalLink, Trash2 } from "lucide-react";
+import { Instagram, Youtube, SlidersHorizontal, Search, ExternalLink, Trash2, Users, Eye, TrendingUp, Clock } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,12 +13,25 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const platformIcons: Record<string, any> = {
   instagram: Instagram,
   tiktok: SlidersHorizontal,
   youtube: Youtube,
 };
+
+interface Stage {
+  id: string;
+  name: string;
+  color: string;
+}
 
 interface CardDetailDialogProps {
   card: {
@@ -27,14 +41,19 @@ interface CardDetailDialogProps {
     data: any;
     notes: string | null;
     agreed_rate: number | null;
+    stage_id?: string;
+    created_at?: string;
+    updated_at?: string;
   } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (id: string, values: { notes?: string; agreed_rate?: number }) => void;
   onRemove: (id: string) => void;
+  stages?: Stage[];
+  onMove?: (cardId: string, stageId: string) => void;
 }
 
-export function CardDetailDialog({ card, open, onOpenChange, onSave, onRemove }: CardDetailDialogProps) {
+export function CardDetailDialog({ card, open, onOpenChange, onSave, onRemove, stages, onMove }: CardDetailDialogProps) {
   const [notes, setNotes] = useState("");
   const [rate, setRate] = useState("");
 
@@ -49,6 +68,10 @@ export function CardDetailDialog({ card, open, onOpenChange, onSave, onRemove }:
 
   const PlatformIcon = platformIcons[card.platform] || Search;
   const d = card.data as any;
+
+  const followers = d?.followers || d?.subscriber_count;
+  const engagement = d?.engagement_rate;
+  const avgViews = d?.avg_views || d?.average_views;
 
   const handleSave = () => {
     onSave(card.id, {
@@ -77,6 +100,56 @@ export function CardDetailDialog({ card, open, onOpenChange, onSave, onRemove }:
               </a>
             )}
           </div>
+
+          {/* Stats row */}
+          {(followers || engagement || avgViews) && (
+            <div className="flex flex-wrap gap-2">
+              {followers && (
+                <Badge variant="secondary" className="text-xs gap-1">
+                  <Users className="h-3 w-3" />
+                  {Number(followers).toLocaleString()} followers
+                </Badge>
+              )}
+              {engagement && (
+                <Badge variant="secondary" className="text-xs gap-1">
+                  <TrendingUp className="h-3 w-3" />
+                  {Number(engagement).toFixed(2)}% engagement
+                </Badge>
+              )}
+              {avgViews && (
+                <Badge variant="secondary" className="text-xs gap-1">
+                  <Eye className="h-3 w-3" />
+                  {Number(avgViews).toLocaleString()} avg views
+                </Badge>
+              )}
+            </div>
+          )}
+
+          {/* Move to stage */}
+          {stages && stages.length > 0 && onMove && card.stage_id && (
+            <div>
+              <Label className="text-xs">Stage</Label>
+              <Select
+                value={card.stage_id}
+                onValueChange={(stageId) => onMove(card.id, stageId)}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {stages.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      <span className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
+                        {s.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div>
             <Label className="text-xs">Notes</Label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Campaign notes…" rows={3} />
@@ -85,6 +158,17 @@ export function CardDetailDialog({ card, open, onOpenChange, onSave, onRemove }:
             <Label className="text-xs">Agreed Rate ($)</Label>
             <Input type="number" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="e.g. 500" />
           </div>
+
+          {/* Timestamps */}
+          {(card.created_at || card.updated_at) && (
+            <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              {card.created_at && <span>Added {formatDistanceToNow(new Date(card.created_at), { addSuffix: true })}</span>}
+              {card.updated_at && card.updated_at !== card.created_at && (
+                <span>· Updated {formatDistanceToNow(new Date(card.updated_at), { addSuffix: true })}</span>
+              )}
+            </div>
+          )}
         </div>
         <DialogFooter className="flex justify-between">
           <Button variant="ghost" size="sm" className="text-destructive gap-1.5" onClick={() => { onRemove(card.id); onOpenChange(false); }}>

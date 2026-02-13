@@ -2,6 +2,7 @@ import { Instagram, Youtube, SlidersHorizontal, Search, ExternalLink, GripVertic
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const platformColors: Record<string, string> = {
   instagram: "bg-pink-500/10 text-pink-500 border-pink-500/20",
@@ -27,22 +28,39 @@ interface KanbanCardProps {
   onEdit: () => void;
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent) => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onSelect?: (id: string) => void;
 }
 
-export function KanbanCard({ card, onEdit, draggable, onDragStart }: KanbanCardProps) {
+export function KanbanCard({ card, onEdit, draggable, onDragStart, selectable, selected, onSelect }: KanbanCardProps) {
   const PlatformIcon = platformIcons[card.platform] || Search;
   const d = card.data as any;
 
   return (
     <Card
-      className="glass-card cursor-pointer hover:border-primary/30 transition-colors"
-      draggable={draggable}
+      className={`glass-card cursor-pointer hover:border-primary/30 transition-colors ${selected ? "border-primary/50 bg-primary/5" : ""}`}
+      draggable={draggable && !selectable}
       onDragStart={onDragStart}
-      onClick={onEdit}
+      onClick={() => {
+        if (selectable && onSelect) {
+          onSelect(card.id);
+        } else {
+          onEdit();
+        }
+      }}
     >
       <CardContent className="p-3">
         <div className="flex items-start gap-2">
-          {draggable && <GripVertical className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0 cursor-grab" />}
+          {selectable && (
+            <Checkbox
+              checked={selected}
+              onCheckedChange={() => onSelect?.(card.id)}
+              className="mt-0.5"
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
+          {draggable && !selectable && <GripVertical className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0 cursor-grab" />}
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-medium truncate">{d?.title || card.username}</p>

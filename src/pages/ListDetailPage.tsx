@@ -158,8 +158,24 @@ export default function ListDetailPage() {
     setAddingToCampaign(true);
     const firstStage = stages[0];
     const selected = items.filter((i) => selectedIds.has(i.id));
+
+    // 3.4 Duplicate detection
+    const { data: existingCards } = await supabase
+      .from("pipeline_cards")
+      .select("username, platform")
+      .eq("campaign_id", selectedCampaignId);
+    const existingSet = new Set(
+      (existingCards || []).map((c) => `${c.username}::${c.platform}`)
+    );
+
     let added = 0;
+    let skipped = 0;
     for (const item of selected) {
+      const key = `${item.username}::${item.platform}`;
+      if (existingSet.has(key)) {
+        skipped++;
+        continue;
+      }
       try {
         await addCard.mutateAsync({
           stage_id: firstStage.id,
@@ -170,16 +186,17 @@ export default function ListDetailPage() {
           notes: item.notes || undefined,
         });
         added++;
+        existingSet.add(key);
       } catch {
-        // skip duplicates
+        // skip errors
       }
     }
     setAddingToCampaign(false);
     setShowAddToCampaign(false);
     setSelectedCampaignId("");
-    toast({
-      title: `Added ${added} influencer${added !== 1 ? "s" : ""} to campaign`,
-    });
+    const parts = [`Added ${added} influencer${added !== 1 ? "s" : ""}`];
+    if (skipped > 0) parts.push(`skipped ${skipped} duplicate${skipped !== 1 ? "s" : ""}`);
+    toast({ title: parts.join(", ") });
   };
 
   const handleSaveNotes = async (itemId: string) => {
