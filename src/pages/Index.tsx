@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate } from "react-router-dom";
 import { useWorkspaceCredits } from "@/hooks/useWorkspaceCredits";
+import { useSubscription } from "@/hooks/useSubscription";
 import { useSearchHistory } from "@/hooks/useSearchHistory";
 import { useInfluencerLists } from "@/hooks/useInfluencerLists";
 import { useSavedSearches } from "@/hooks/useSavedSearches";
@@ -23,6 +24,7 @@ const item = {
 
 export default function Index() {
   const { data: credits } = useWorkspaceCredits();
+  const { planConfig } = useSubscription();
   const { data: history } = useSearchHistory(5);
   const { data: lists } = useInfluencerLists();
   const { data: savedSearches } = useSavedSearches();
@@ -31,10 +33,12 @@ export default function Index() {
   const searchesThisMonth = history?.length ?? 0;
   const listsCount = lists?.length ?? 0;
   const savedSearchCount = savedSearches?.length ?? 0;
-  const searchCredits = credits?.search_credits_remaining ?? 50;
-  const enrichCredits = credits?.enrichment_credits_remaining ?? 10;
-  const searchPct = ((50 - searchCredits) / 50) * 100;
-  const enrichPct = ((10 - enrichCredits) / 10) * 100;
+  const searchCredits = credits?.search_credits_remaining ?? planConfig.search_credits;
+  const enrichCredits = credits?.enrichment_credits_remaining ?? planConfig.enrichment_credits;
+  const searchMax = planConfig.search_credits;
+  const enrichMax = planConfig.enrichment_credits;
+  const searchPct = ((searchMax - searchCredits) / searchMax) * 100;
+  const enrichPct = ((enrichMax - enrichCredits) / enrichMax) * 100;
 
   const stats = [
     { label: "Searches This Month", value: String(searchesThisMonth), icon: Search },
@@ -96,14 +100,14 @@ export default function Index() {
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-muted-foreground">Searches</span>
-                    <span className="data-mono">{50 - searchCredits} / 50</span>
+                    <span className="data-mono">{searchMax - searchCredits} / {searchMax}</span>
                   </div>
                   <Progress value={searchPct} className="h-2" />
                 </div>
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-muted-foreground">Enrichments</span>
-                    <span className="data-mono">{10 - enrichCredits} / 10</span>
+                    <span className="data-mono">{enrichMax - enrichCredits} / {enrichMax}</span>
                   </div>
                   <Progress value={enrichPct} className="h-2" />
                 </div>

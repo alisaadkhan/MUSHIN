@@ -11,11 +11,18 @@ export function useWorkspaceCredits() {
       if (!workspace) throw new Error("No workspace");
       const { data, error } = await supabase
         .from("workspaces")
-        .select("search_credits_remaining, enrichment_credits_remaining, credits_reset_at")
+        .select("search_credits_remaining, enrichment_credits_remaining, credits_reset_at, plan, email_sends_remaining, ai_credits_remaining")
         .eq("id", workspace.workspace_id)
         .single();
       if (error) throw error;
-      return data;
+      return data as {
+        search_credits_remaining: number;
+        enrichment_credits_remaining: number;
+        credits_reset_at: string;
+        plan: string;
+        email_sends_remaining: number;
+        ai_credits_remaining: number;
+      };
     },
     enabled: !!workspace,
   });
