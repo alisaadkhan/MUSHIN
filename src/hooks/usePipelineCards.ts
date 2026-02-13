@@ -53,7 +53,19 @@ export function usePipelineStages(campaignId: string | undefined) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["pipeline-stages", campaignId] }),
   });
 
-  return { ...stagesQuery, addStage, updateStage, deleteStage };
+  const reorderStages = useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      const updates = orderedIds.map((id, index) =>
+        supabase.from("pipeline_stages").update({ position: index }).eq("id", id)
+      );
+      const results = await Promise.all(updates);
+      const err = results.find((r) => r.error);
+      if (err?.error) throw err.error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["pipeline-stages", campaignId] }),
+  });
+
+  return { ...stagesQuery, addStage, updateStage, deleteStage, reorderStages };
 }
 
 export function usePipelineCards(campaignId: string | undefined) {

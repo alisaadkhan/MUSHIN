@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
-import { Plus, Users, MoreHorizontal, Trash2, Pencil } from "lucide-react";
+import { Plus, Users, MoreHorizontal, Trash2, Pencil, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -30,10 +30,11 @@ interface KanbanBoardProps {
 }
 
 export function KanbanBoard({ campaignId }: KanbanBoardProps) {
-  const { data: stages, addStage, updateStage, deleteStage } = usePipelineStages(campaignId);
+  const { data: stages, addStage, updateStage, deleteStage, reorderStages } = usePipelineStages(campaignId);
   const { data: cards, moveCard, updateCard, removeCard } = usePipelineCards(campaignId);
   const [editingCard, setEditingCard] = useState<any>(null);
   const [dragCardId, setDragCardId] = useState<string | null>(null);
+  const [dragStageId, setDragStageId] = useState<string | null>(null);
   const [renamingStageId, setRenamingStageId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deleteConfirmStageId, setDeleteConfirmStageId] = useState<string | null>(null);
@@ -49,6 +50,28 @@ export function KanbanBoard({ campaignId }: KanbanBoardProps) {
 
   const handleDrop = async (stageId: string, e: React.DragEvent) => {
     e.preventDefault();
+    const type = e.dataTransfer.getData("drag-type");
+    if (type === "stage") {
+      // Stage reorder
+      if (!dragStageId || !stages) return;
+      const fromIdx = stages.findIndex((s) => s.id === dragStageId);
+      const toIdx = stages.findIndex((s) => s.id === stageId);
+      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) {
+        setDragStageId(null);
+        return;
+      }
+      const reordered = [...stages];
+      const [moved] = reordered.splice(fromIdx, 1);
+      reordered.splice(toIdx, 0, moved);
+      try {
+        await reorderStages.mutateAsync(reordered.map((s) => s.id));
+      } catch {
+        toast({ title: "Failed to reorder stages", variant: "destructive" });
+      }
+      setDragStageId(null);
+      return;
+    }
+    // Card drop
     if (!dragCardId) return;
     const stageCards = cardsByStage(stageId);
     try {
@@ -141,7 +164,18 @@ export function KanbanBoard({ campaignId }: KanbanBoardProps) {
                   onDrop={(e) => handleDrop(stage.id, e)}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className="flex items-center gap-1 min-w-0 flex-1">
+                      <div
+                        className="cursor-grab active:cursor-grabbing p-0.5 text-muted-foreground hover:text-foreground"
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("drag-type", "stage");
+                          setDragStageId(stage.id);
+                        }}
+                        onDragEnd={() => setDragStageId(null)}
+                      >
+                        <GripVertical className="h-3.5 w-3.5" />
+                      </div>
                       <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: stage.color }} />
                       {renamingStageId === stage.id ? (
                         <Input
@@ -197,7 +231,10 @@ export function KanbanBoard({ campaignId }: KanbanBoardProps) {
                         card={card}
                         onEdit={() => setEditingCard(card)}
                         draggable
-                        onDragStart={() => setDragCardId(card.id)}
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("drag-type", "card");
+                          setDragCardId(card.id);
+                        }}
                       />
                     ))}
                   </div>
