@@ -18,10 +18,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { KanbanBoard } from "@/components/campaigns/KanbanBoard";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useInfluencerLists, useListItems } from "@/hooks/useInfluencerLists";
 import { usePipelineStages, usePipelineCards } from "@/hooks/usePipelineCards";
+import { useCampaigns } from "@/hooks/useCampaigns";
 import { useToast } from "@/hooks/use-toast";
 
 const statusColors: Record<string, string> = {
@@ -34,6 +35,8 @@ const statusColors: Record<string, string> = {
 export default function CampaignDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { updateCampaign } = useCampaigns();
   const [showAddFromList, setShowAddFromList] = useState(false);
   const [selectedListId, setSelectedListId] = useState<string>("");
 
@@ -92,9 +95,27 @@ export default function CampaignDetailPage() {
             <div className="flex items-center gap-2">
               <h1 className="text-3xl font-bold tracking-tight">{campaign?.name || "Campaign"}</h1>
               {campaign?.status && (
-                <Badge variant="outline" className={`text-[10px] ${statusColors[campaign.status] || ""}`}>
-                  {campaign.status}
-                </Badge>
+                <Select
+                  value={campaign.status}
+                  onValueChange={async (value: "draft" | "active" | "completed" | "archived") => {
+                    try {
+                      await updateCampaign.mutateAsync({ id: id!, status: value });
+                      queryClient.invalidateQueries({ queryKey: ["campaign-detail", id] });
+                      toast({ title: `Status changed to ${value}` });
+                    } catch {
+                      toast({ title: "Failed to update status", variant: "destructive" });
+                    }
+                  }}
+                >
+                  <SelectTrigger className={`h-7 w-auto gap-1 text-[10px] font-medium border ${statusColors[campaign.status] || ""}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(["draft", "active", "completed", "archived"] as const).map((s) => (
+                      <SelectItem key={s} value={s} className="text-xs capitalize">{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
             </div>
             {campaign?.description && (

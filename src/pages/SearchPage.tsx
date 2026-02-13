@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Search, SlidersHorizontal, Instagram, Youtube, ExternalLink, Loader2, Plus, Bookmark } from "lucide-react";
+import { Search, SlidersHorizontal, Instagram, Youtube, ExternalLink, Loader2, Plus, Bookmark, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,8 +32,11 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useInfluencerLists } from "@/hooks/useInfluencerLists";
 import { useSavedSearches } from "@/hooks/useSavedSearches";
+import { useWorkspaceCredits } from "@/hooks/useWorkspaceCredits";
 import { useSearchParams, Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { format } from "date-fns";
 
 const PAKISTAN_CITIES = [
   "All Pakistan", "Karachi", "Lahore", "Islamabad",
@@ -72,6 +75,9 @@ export default function SearchPage() {
   const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: workspaceCredits } = useWorkspaceCredits();
+
+  const creditsExhausted = workspaceCredits?.search_credits_remaining === 0;
 
   // Lists
   const { data: lists, createList } = useInfluencerLists();
@@ -196,11 +202,21 @@ export default function SearchPage() {
           <p className="text-muted-foreground mt-1">Search for influencers across platforms</p>
         </div>
         {creditsRemaining !== null && (
-          <Badge variant="outline" className="text-xs gap-1.5 py-1 px-3">
+          <Badge variant="outline" className={`text-xs gap-1.5 py-1 px-3 ${creditsExhausted ? "border-destructive text-destructive" : ""}`}>
             {creditsRemaining} credits left
           </Badge>
         )}
       </div>
+
+      {creditsExhausted && workspaceCredits?.credits_reset_at && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            You've used all your search credits. Credits reset on{" "}
+            <span className="font-semibold">{format(new Date(workspaceCredits.credits_reset_at), "MMMM d, yyyy")}</span>.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Search Form */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
@@ -249,7 +265,7 @@ export default function SearchPage() {
               </div>
             </div>
             <div className="mt-4 flex justify-end">
-              <Button className="btn-shine gap-2" disabled={!query.trim() || loading} onClick={handleSearch}>
+              <Button className="btn-shine gap-2" disabled={!query.trim() || loading || creditsExhausted} onClick={handleSearch}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                 {loading ? "Searching…" : "Search Influencers"}
               </Button>
