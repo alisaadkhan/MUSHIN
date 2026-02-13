@@ -16,7 +16,7 @@ function NetworkGraphic() {
   return (
     <motion.svg
       viewBox="0 0 400 400"
-      className="w-full max-w-sm mx-auto opacity-60"
+      className="w-full max-w-sm mx-auto opacity-70"
       initial={{ opacity: 0 }}
       animate={{ opacity: 0.6 }}
       transition={{ duration: 1, delay: 0.5 }}
@@ -60,6 +60,8 @@ interface HeroProps {
 export function Hero({ ctaPath, ctaLabel }: HeroProps) {
   return (
     <section className="relative pt-40 pb-24 px-6 md:px-12 lg:px-24">
+      {/* Radial spotlight */}
+      <div className="absolute top-20 left-1/4 w-[600px] h-[600px] rounded-full opacity-15 blur-[100px] pointer-events-none" style={{ background: "radial-gradient(circle, hsl(var(--aurora-violet)), transparent 70%)" }} />
       <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-12 items-center">
         <motion.div initial="hidden" animate="visible" className="space-y-8">
           <motion.h1 custom={0} variants={fadeUp}
