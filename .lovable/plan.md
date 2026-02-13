@@ -1,66 +1,91 @@
 
 
-# Landing Page Polish: Remove Testimonials, Fix Bugs, Add Enterprise Background
+# Enterprise Landing Page Enhancement
 
-## Issues Found
+The current page covers ~80% of the prompt requirements. This plan adds the missing sections and replaces the abstract hero graphic with a product UI mockup to match the "show real product" requirement.
 
-1. **Console Warning** -- `TwitterIcon` and `LinkedInIcon` in `MarketingFooter.tsx` trigger "Function components cannot be given refs" warnings. The SVG components need to render inline rather than being passed as children to anchor tags that attempt ref forwarding.
+---
 
-2. **Testimonials Section** -- The entire "What Marketing Leaders Say" section with the 3 testimonial cards must be removed as requested.
+## What's Missing
 
-3. **Generic Background** -- The current aurora blob background is functional but generic. Replace with a stylish, AI-generated hero background image that conveys enterprise authority, plus refined gradient overlays.
+1. **Hero right side**: Abstract network SVG needs to become a product UI preview (dashboard mockup)
+2. **Product Demonstration section**: Dashboard preview with key metric highlights and workflow visualization
+3. **Differentiation section**: Concrete "why us vs. alternatives" positioning
+
+## What Already Works Well
+
+- Hero headline, CTA, and inline proof metrics
+- OutcomeMetrics (data-backed authority)
+- ProblemSolution (before/after framing)
+- HowItWorks (3-step flow)
+- Features/Capabilities (outcome-driven)
+- Pricing with annual toggle
+- FAQ (objection handling)
+- FinalCTA and Footer with trust bar
 
 ---
 
 ## Changes
 
-### 1. Remove Testimonials
+### 1. Hero -- Replace Abstract SVG with Dashboard Mockup
 
-**Delete:** `src/components/marketing/Testimonials.tsx`
+**File:** `src/components/marketing/Hero.tsx`
 
-**Modify:** `src/pages/LandingPage.tsx`
-- Remove the `Testimonials` import
-- Remove `<Testimonials />` from the JSX
+Replace the `NetworkGraphic` SVG with a CSS-only dashboard mockup component (`DashboardPreview`). This is a styled div that looks like a mini version of the actual product UI:
 
-### 2. Fix MarketingFooter Ref Warning
+- A glass card with a mock header bar (3 dots + "InfluenceIQ Dashboard" label)
+- 3 mini stat cards in a row (searches, fraud score, engagement)
+- A simplified 4-row data table showing influencer names, platforms, and status pills
+- All built with Tailwind -- zero images, zero CLS
 
-**Modify:** `src/components/marketing/MarketingFooter.tsx`
-- Change `TwitterIcon` and `LinkedInIcon` from standalone function components to inline JSX within the anchor tags, eliminating the ref warning entirely
+This communicates "real product" without needing screenshots.
 
-### 3. Enterprise Background Image
+### 2. New: Product Demonstration Section
 
-**Modify:** `src/pages/LandingPage.tsx`
-- Replace the plain aurora blob background with a high-quality AI-generated background image (dark abstract mesh/grid pattern with subtle indigo-violet lighting)
-- The image will be generated using the Lovable AI image generation API (google/gemini-2.5-flash-image) and uploaded to file storage
-- Layer the image as a fixed `background-image` with `cover` sizing, overlaid with a dark gradient (`bg-gradient-to-b from-[#0F1115]/95 via-[#0F1115]/85 to-[#0F1115]/95`) to maintain text readability while adding depth
-- Keep the aurora blobs as subtle accents on top of the image for the signature glow effect, but reduce their opacity
+**File:** `src/components/marketing/ProductDemo.tsx` (NEW)
 
-**Modify:** `src/index.css`
-- Add a new utility class `.enterprise-bg` that handles the background image layering with proper `background-size: cover`, `background-position: center`, and `background-attachment: fixed`
+Placed between Features and Pricing. Contains:
 
-### 4. Visual Polish Pass
+- Section heading: "See How It Works in Practice"
+- A larger version of the dashboard mockup showing:
+  - Left panel: Search input + filter chips (Platform, Location, Niche)
+  - Right panel: Results grid with influencer cards showing avatar placeholder, name, follower count, engagement %, fraud score badge
+  - Bottom bar: 3 workflow steps highlighted (Search, Analyze, Outreach)
+- All CSS-only, no images
+- Subtle framer-motion entrance animation
 
-**Modify:** `src/components/marketing/Hero.tsx`
-- Add a subtle radial gradient spotlight behind the headline area for more visual depth
-- Increase the network graphic opacity slightly since the new background will add more visual interest
+### 3. New: Differentiation Section
 
-**Modify:** `src/components/marketing/FinalCTA.tsx`
-- Enhance the gradient card with a slightly more prominent aurora glow border
+**File:** `src/components/marketing/Differentiation.tsx` (NEW)
 
----
+Placed between ProblemSolution and HowItWorks. Contains:
 
-## Section Order After Changes
+- Heading: "Why Teams Choose InfluenceIQ Over Legacy Platforms"
+- 4 differentiation cards in a 2x2 grid:
+  - "Live Data, Not Stale Databases" -- Google-powered real-time discovery vs. monthly-updated databases
+  - "Pay Per Search, Not Per Year" -- Credit-based pricing vs. $30K+ annual contracts
+  - "AI Fraud Detection Built In" -- Every profile scored automatically vs. manual vetting
+  - "One Workspace, Not Five Tools" -- Search, outreach, pipeline, analytics in one place vs. stitching together Grin + Hunter + Trello
+- Each card has a bold metric or data point as emphasis
+- Glass card styling with aurora-gradient icon backgrounds
 
+### 4. Updated Section Order in LandingPage.tsx
+
+**File:** `src/pages/LandingPage.tsx`
+
+New order:
 1. Nav
-2. Hero
+2. Hero (with dashboard mockup)
 3. OutcomeMetrics
-4. ProblemSolution (Before/After)
-5. HowItWorks (3 Steps)
-6. Features (Capabilities)
-7. Pricing (with toggle)
-8. FAQ (accordion)
-9. FinalCTA
-10. Footer (with trust bar)
+4. ProblemSolution
+5. **Differentiation** (NEW)
+6. HowItWorks
+7. Features
+8. **ProductDemo** (NEW)
+9. Pricing
+10. FAQ
+11. FinalCTA
+12. Footer
 
 ---
 
@@ -68,20 +93,17 @@
 
 | Action | File |
 |--------|------|
-| Delete | `src/components/marketing/Testimonials.tsx` |
-| Modify | `src/pages/LandingPage.tsx` (remove Testimonials, add background image layer) |
-| Modify | `src/components/marketing/MarketingFooter.tsx` (fix ref warnings) |
-| Modify | `src/components/marketing/Hero.tsx` (radial spotlight) |
-| Modify | `src/components/marketing/FinalCTA.tsx` (enhanced glow) |
-| Modify | `src/index.css` (enterprise-bg utility) |
+| Modify | `src/components/marketing/Hero.tsx` -- Replace NetworkGraphic with DashboardPreview |
+| Create | `src/components/marketing/ProductDemo.tsx` -- Dashboard preview + workflow visualization |
+| Create | `src/components/marketing/Differentiation.tsx` -- 4-card competitive positioning |
+| Modify | `src/pages/LandingPage.tsx` -- Add new imports and insert sections in correct order |
 
 ---
 
 ## Technical Notes
 
-- The background image will be generated via the AI image API and stored in Lovable file storage as a public asset -- this adds one network request but the image will be cached by the browser
-- A CSS gradient overlay on top of the image ensures text contrast regardless of image content
-- The `background-attachment: fixed` creates a parallax-like effect as users scroll
-- No new dependencies required
-- The ref warning fix is a straightforward inline SVG change with zero visual impact
-
+- No new dependencies -- everything uses existing framer-motion, lucide-react, and Tailwind
+- Dashboard mockup is pure CSS/JSX (glass cards, colored dots, text spans) -- no external images or screenshots
+- All new sections use `whileInView` with `viewport={{ once: true }}` for performance
+- Hover effects use `will-change-transform` for 60fps
+- New components follow the exact same animation pattern (fadeUp variants, stagger) as existing sections
