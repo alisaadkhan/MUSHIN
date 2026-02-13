@@ -1,180 +1,134 @@
 
 
-# Phase 3: Campaign Management & Kanban Pipeline -- Full Implementation
+# Outreach Tracking, Campaign Comparison & Analytics Verification
 
-## Overview
+## 1. Outreach Tracking on "Contacted" Stage
 
-Implement all 7 features from the Phase 3 plan in sequence. Features 3.1-3.6 require no database changes. Feature 3.7 requires a new `campaign_activity` table.
-
----
-
-## 3.1 -- Campaign Creation Enhancements
-
-**File: `src/pages/CampaignsPage.tsx`**
-
-- Add budget `Input` (type=number, optional) to the create campaign dialog
-- Add start date and end date pickers using `Popover` + `Calendar` (shadcn pattern)
-- Pass `budget`, `start_date`, `end_date` to `createCampaign.mutateAsync()` (the mutation already supports these fields)
-- On campaign cards in the grid, show:
-  - Date range (e.g. "Jan 15 - Feb 28") below the description
-  - Budget amount next to the existing influencer count
-
----
-
-## 3.2 -- Campaign Edit Dialog
-
-**File: `src/pages/CampaignDetailPage.tsx`**
-
-- Add a pencil/edit icon button next to the campaign title
-- Opens a dialog pre-filled with campaign name, description, budget, start_date, end_date
-- "Save" calls `updateCampaign.mutateAsync()` and invalidates the `campaign-detail` query
-- Reuses the same date picker pattern from 3.1
-
----
-
-## 3.3 -- Card Detail Enhancements
-
-**File: `src/components/campaigns/CardDetailDialog.tsx`**
-
-- Add a stats row at the top showing data from the card's `data` JSON:
-  - Followers count, engagement rate, avg views (if available in the cached data)
-  - Display as small badges/chips with labels
-- Add a "Move to Stage" `Select` dropdown:
-  - Requires passing `stages` and a `onMove` callback as new props
-  - Lists all stages, current stage pre-selected
-  - On change, calls `onMove(cardId, newStageId)`
-- Show `created_at` and `updated_at` timestamps at the bottom as muted text
-
-**File: `src/components/campaigns/KanbanBoard.tsx`**
-
-- Pass `stages` and a `handleMoveCard` callback to `CardDetailDialog`
-- Update `CardDetailDialog` props interface to include `stages` and `onMove`
-
----
-
-## 3.4 -- Duplicate Detection
-
-**File: `src/pages/ListDetailPage.tsx`**
-
-- In `handleAddToCampaign`, before inserting, fetch existing `pipeline_cards` for the selected campaign
-- Filter out items where `username + platform` already exists in the campaign's cards
-- Show toast: "Added X, skipped Y duplicates" (or "All X already in pipeline" if all duplicates)
-
-**File: `src/pages/CampaignDetailPage.tsx`**
-
-- Apply same logic in `handleAddFromList`: compare incoming list items against existing cards before inserting
-
----
-
-## 3.5 -- Pipeline Filtering & Search
-
-**File: `src/components/campaigns/KanbanBoard.tsx`**
-
-- Add a toolbar row above the stage columns with:
-  - Search `Input` (filters cards by username/title across all stages)
-  - Platform filter chips (toggle buttons for Instagram, TikTok, YouTube)
-- Apply filters client-side to the `cardsByStage` callback
-- Show "X of Y influencers" count when filters are active
-- Filters are purely visual -- no database queries
-
----
-
-## 3.6 -- Bulk Stage Move
-
-**File: `src/components/campaigns/KanbanBoard.tsx`**
-
-- Add a "Select Mode" toggle button in the toolbar (from 3.5)
-- When active, show checkboxes on each `KanbanCard`
-- Track selected card IDs in state
-- Show a floating bulk action bar (similar to `ListDetailPage`) with:
-  - "Move to Stage" `Select` dropdown -- batch calls `moveCard` for each selected card
-  - "Remove Selected" button -- batch calls `removeCard`
-  - Count indicator and "Clear" button
-
-**File: `src/components/campaigns/KanbanCard.tsx`**
-
-- Add optional `selectable`, `selected`, `onSelect` props
-- When `selectable`, render a `Checkbox` on the card
-
----
-
-## 3.7 -- Campaign Activity Timeline
+Track when influencers move to the "Contacted" stage and display outreach status on cards.
 
 ### Database Migration
 
+Create an `outreach_log` table to record contact events:
+
 ```sql
-CREATE TABLE public.campaign_activity (
+CREATE TABLE public.outreach_log (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   campaign_id UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL,
-  action TEXT NOT NULL,
-  details JSONB NOT NULL DEFAULT '{}',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  card_id UUID NOT NULL REFERENCES pipeline_cards(id) ON DELETE CASCADE,
+  username TEXT NOT NULL,
+  platform TEXT NOT NULL,
+  method TEXT NOT NULL DEFAULT 'manual',
+  status TEXT NOT NULL DEFAULT 'contacted',
+  contacted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  notes TEXT
 );
 
-ALTER TABLE public.campaign_activity ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.outreach_log ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Members can view campaign activity"
-  ON public.campaign_activity FOR SELECT
+CREATE POLICY "Members can view outreach logs"
+  ON public.outreach_log FOR SELECT
   USING (is_workspace_member(
     (SELECT workspace_id FROM campaigns WHERE id = campaign_id)
   ));
 
-CREATE POLICY "Members can log campaign activity"
-  ON public.campaign_activity FOR INSERT
+CREATE POLICY "Members can create outreach logs"
+  ON public.outreach_log FOR INSERT
   WITH CHECK (is_workspace_member(
     (SELECT workspace_id FROM campaigns WHERE id = campaign_id)
   ));
 
-CREATE INDEX idx_campaign_activity_campaign
-  ON public.campaign_activity(campaign_id, created_at DESC);
+CREATE POLICY "Members can update outreach logs"
+  ON public.outreach_log FOR UPDATE
+  USING (is_workspace_member(
+    (SELECT workspace_id FROM campaigns WHERE id = campaign_id)
+  ));
+
+CREATE INDEX idx_outreach_log_campaign ON public.outreach_log(campaign_id);
+CREATE INDEX idx_outreach_log_card ON public.outreach_log(card_id);
 ```
 
-### New Files
+### New Hook: `src/hooks/useOutreachLog.ts`
 
-| File | Purpose |
-|------|---------|
-| `src/hooks/useCampaignActivity.ts` | Hook with `useQuery` to fetch activity and `useMutation` to log new entries |
-| `src/components/campaigns/CampaignTimeline.tsx` | Collapsible timeline UI showing activity entries with icons per action type |
+- `useOutreachLog(campaignId)` -- fetches outreach entries for the campaign
+- `logOutreach` mutation -- inserts a new outreach record
+- Auto-triggered when a card moves to a stage named "Contacted" (case-insensitive match)
 
-### Activity Logging Integration
+### Integration in `KanbanBoard.tsx`
 
-Log events from existing mutation callbacks:
-- **KanbanBoard.tsx**: Log card moved, stage created/renamed/deleted, color changed
-- **CampaignDetailPage.tsx**: Log status changed, influencers added from list
-- **CardDetailDialog.tsx**: Log card notes/rate updated, card removed
+- In `handleDrop` and `handleMoveCard`, after moving a card to a stage whose name matches "contacted" (case-insensitive), automatically call `logOutreach.mutate(...)` with the card's details
+- Also log a `campaign_activity` entry for "influencer_contacted"
 
-Each log entry includes: `{ action: "card_moved", details: { username, from_stage, to_stage } }`
+### Outreach Badge on `KanbanCard.tsx`
 
-### Timeline UI
+- Accept an optional `outreachStatus` prop
+- When present, show a small "Contacted" badge with a mail icon on the card
+- Pass outreach data from the board to cards by matching `card.id` against outreach log entries
 
-- Rendered as a collapsible section below the Kanban board on `CampaignDetailPage.tsx`
-- Vertical timeline with colored dots per action type
-- Shows action description, relative timestamp (e.g. "2 hours ago")
-- "Show more" pagination (load 20 at a time)
+### Outreach Details in `CardDetailDialog.tsx`
+
+- Show an "Outreach" section listing contact events for this card (date, method, notes)
+- Allow adding a note to the latest outreach entry
+
+---
+
+## 2. Campaign Comparison View
+
+A new page to compare metrics across multiple campaigns side by side.
+
+### New Route & Page
+
+- Route: `/campaigns/compare`
+- File: `src/pages/CampaignComparePage.tsx`
+- Add route in `App.tsx` (before the `:id` route so it matches first)
+
+### Page Design
+
+- Multi-select dropdown at the top to pick 2-4 campaigns to compare
+- Fetches campaigns, their stages, and cards in parallel
+- Displays a comparison table with rows for:
+  - Total influencers
+  - Budget / spent / remaining
+  - Influencers per stage (aligned by stage name across campaigns)
+  - Conversion rate (first stage to last stage)
+- Below the table, a grouped bar chart (Recharts) comparing influencer counts per stage across campaigns
+- A "Compare" button on the `CampaignsPage.tsx` header links to this page
+
+### Data Fetching
+
+- Use `useCampaigns()` for the campaign list
+- For each selected campaign, fetch stages and cards using existing hooks or direct queries
+- All client-side -- no new database tables needed
+
+---
+
+## 3. Analytics Verification
+
+- Navigate to a campaign detail page in the browser and visually verify charts render
+- Check console for any Recharts errors
+- This is a manual testing step performed after implementing features 1 and 2
 
 ---
 
 ## Files Summary
 
-| File | Features | Action |
-|------|----------|--------|
-| `src/pages/CampaignsPage.tsx` | 3.1 | Modify |
-| `src/pages/CampaignDetailPage.tsx` | 3.2, 3.4, 3.7 | Modify |
-| `src/components/campaigns/CardDetailDialog.tsx` | 3.3 | Modify |
-| `src/components/campaigns/KanbanBoard.tsx` | 3.3, 3.5, 3.6, 3.7 | Modify |
-| `src/components/campaigns/KanbanCard.tsx` | 3.6 | Modify |
-| `src/pages/ListDetailPage.tsx` | 3.4 | Modify |
-| `src/hooks/useCampaignActivity.ts` | 3.7 | Create |
-| `src/components/campaigns/CampaignTimeline.tsx` | 3.7 | Create |
+| File | Action |
+|------|--------|
+| `src/hooks/useOutreachLog.ts` | Create |
+| `src/components/campaigns/KanbanBoard.tsx` | Modify (auto-log outreach on contacted) |
+| `src/components/campaigns/KanbanCard.tsx` | Modify (outreach badge) |
+| `src/components/campaigns/CardDetailDialog.tsx` | Modify (outreach section) |
+| `src/pages/CampaignComparePage.tsx` | Create |
+| `src/pages/CampaignsPage.tsx` | Modify (add Compare button) |
+| `src/App.tsx` | Modify (add compare route) |
+| Database migration | Create `outreach_log` table |
 
 ## Implementation Order
 
-1. **3.1** Campaign creation enhancements (budget + dates in create dialog and cards)
-2. **3.2** Campaign edit dialog on detail page
-3. **3.3** Card detail enhancements (stats, move-to-stage, timestamps)
-4. **3.4** Duplicate detection in both add-to-campaign flows
-5. **3.5** Pipeline filtering and search toolbar
-6. **3.6** Bulk stage move with multi-select on Kanban
-7. **3.7** Database migration, then activity logging hook/component/integration
+1. Database migration for `outreach_log`
+2. Create `useOutreachLog` hook
+3. Integrate auto-logging in KanbanBoard when cards reach "Contacted"
+4. Add outreach badge to KanbanCard and outreach section to CardDetailDialog
+5. Create CampaignComparePage with comparison table and charts
+6. Add route and navigation link
+7. Browser-test analytics charts on an existing campaign
 
