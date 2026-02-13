@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
 
     // Build Serper query (no site: operator - Serper rejects it; domain filtering done server-side)
     const platformTerm = platform || "";
-    const locationPart = location === "All Pakistan" ? "Pakistan" : (location || "Pakistan");
+    const locationPart = "Pakistan";  // Always broad query; city used for ranking only
     const serperQuery = `${query} ${platformTerm} ${locationPart} influencer`.trim();
     console.log("Serper query:", serperQuery);
 
@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
         "X-API-KEY": SERPER_API_KEY,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ q: serperQuery, num: 50, gl: "pk", hl: "en" }),
+      body: JSON.stringify({ q: serperQuery, num: 100, gl: "pk", hl: "en" }),
     });
 
     if (!serperRes.ok) {
@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
       ? organic.filter((item: any) => item.link?.includes(expectedDomain))
       : organic;
 
-    // Soft filter: prioritize Pakistan-related results
+    // Three-tier soft ranking
     const PAKISTAN_KEYWORDS = [
       "pakistan", "karachi", "lahore", "islamabad", "rawalpindi", "faisalabad",
       "multan", "peshawar", "quetta", "sialkot", "gujranwala",
@@ -143,17 +143,22 @@ Deno.serve(async (req) => {
       "punjab", "sindh", "balochistan", "kpk", "khyber",
     ];
 
-    const withLocation: any[] = [];
-    const withoutLocation: any[] = [];
+    const selectedCity = (location && location !== "All Pakistan") ? location.toLowerCase() : null;
+
+    const tier1: any[] = [];
+    const tier2: any[] = [];
+    const tier3: any[] = [];
     for (const item of platformFiltered) {
       const text = ((item.title || "") + " " + (item.snippet || "")).toLowerCase();
-      if (PAKISTAN_KEYWORDS.some((kw) => text.includes(kw))) {
-        withLocation.push(item);
+      if (selectedCity && text.includes(selectedCity)) {
+        tier1.push(item);
+      } else if (PAKISTAN_KEYWORDS.some((kw) => text.includes(kw))) {
+        tier2.push(item);
       } else {
-        withoutLocation.push(item);
+        tier3.push(item);
       }
     }
-    const finalResults = [...withLocation, ...withoutLocation].slice(0, 20);
+    const finalResults = [...tier1, ...tier2, ...tier3].slice(0, 20);
 
     // Parse results
     const results = finalResults
