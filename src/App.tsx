@@ -10,6 +10,8 @@ import Index from "./pages/Index";
 import SearchPage from "./pages/SearchPage";
 import Auth from "./pages/Auth";
 import UpdatePassword from "./pages/UpdatePassword";
+import Onboarding from "./pages/Onboarding";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +41,18 @@ const App = () => (
               <ProtectedRoute>
                 <AppLayout>
                   <SearchPage />
+                </AppLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/onboarding" element={
+              <ProtectedRoute>
+                <Onboarding />
+              </ProtectedRoute>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <Settings />
                 </AppLayout>
               </ProtectedRoute>
             } />
