@@ -5,12 +5,13 @@ import { Zap, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 import { Hero } from "@/components/marketing/Hero";
-import { TrustSignals } from "@/components/marketing/TrustSignals";
+import { OutcomeMetrics } from "@/components/marketing/OutcomeMetrics";
 import { ProblemSolution } from "@/components/marketing/ProblemSolution";
 import { HowItWorks } from "@/components/marketing/HowItWorks";
 import { Features } from "@/components/marketing/Features";
+import { Testimonials } from "@/components/marketing/Testimonials";
 import { PricingPreview } from "@/components/marketing/PricingPreview";
-import { SecurityCompliance } from "@/components/marketing/SecurityCompliance";
+import { FAQ } from "@/components/marketing/FAQ";
 import { FinalCTA } from "@/components/marketing/FinalCTA";
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
 
@@ -22,11 +23,7 @@ export default function LandingPage() {
   }, []);
 
   const ctaPath = user ? "/dashboard" : "/auth";
-  const ctaLabel = user ? "Go to Dashboard" : "Start Free";
-
-  const scrollToFeatures = () => {
-    document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" });
-  };
+  const ctaLabel = user ? "Go to Dashboard" : "Start Free Trial";
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -49,24 +46,32 @@ export default function LandingPage() {
             </span>
           </Link>
           <div className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
-            <button onClick={scrollToFeatures} className="hover:text-foreground transition-colors">Features</button>
+            <a href="#features" className="hover:text-foreground transition-colors">Features</a>
             <a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a>
-            <button onClick={() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-foreground transition-colors">How It Works</button>
+            <a href="#faq" className="hover:text-foreground transition-colors">FAQ</a>
           </div>
-          <Link to={ctaPath}>
-            <Button size="sm" className="btn-shine">{ctaLabel} <ArrowRight className="ml-1 h-3 w-3" /></Button>
-          </Link>
+          <div className="flex items-center gap-4">
+            {!user && (
+              <Link to="/auth" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:block">
+                Log In
+              </Link>
+            )}
+            <Link to={ctaPath}>
+              <Button size="sm" className="btn-shine">{ctaLabel} <ArrowRight className="ml-1 h-3 w-3" /></Button>
+            </Link>
+          </div>
         </div>
       </nav>
 
       {/* Sections */}
-      <Hero ctaPath={ctaPath} ctaLabel={ctaLabel} onScrollToFeatures={scrollToFeatures} />
-      <TrustSignals />
+      <Hero ctaPath={ctaPath} ctaLabel={ctaLabel} />
+      <OutcomeMetrics />
       <ProblemSolution />
       <HowItWorks />
       <Features />
+      <Testimonials />
       <PricingPreview ctaPath={ctaPath} />
-      <SecurityCompliance />
+      <FAQ />
       <FinalCTA ctaPath={ctaPath} />
       <MarketingFooter />
     </div>
