@@ -1,91 +1,79 @@
 
 
-# Enterprise Landing Page Enhancement
+# Comprehensive System Audit & Landing Page Enhancement
 
-The current page covers ~80% of the prompt requirements. This plan adds the missing sections and replaces the abstract hero graphic with a product UI mockup to match the "show real product" requirement.
+## Audit Findings
+
+### Landing Page Issues
+
+| # | Issue | Severity |
+|---|-------|----------|
+| 1 | **SEO metadata is generic** -- `index.html` has title "Lovable App", description "Lovable Generated Project", and OG image pointing to lovable.dev | High |
+| 2 | **No smooth scroll for anchor links** -- Clicking #features, #pricing, #faq in nav jumps instantly with no offset for the fixed 64px header | Medium |
+| 3 | **Missing FAQ section from nav** -- FAQ anchor link works but scrolls behind the fixed nav | Medium |
+| 4 | **Landing page background is flat** -- The enterprise-bg.jpg loads but the heavy gradient overlay makes it nearly invisible. No animated background effect exists | Medium |
+| 5 | **Hero CTA says "Go to Dashboard" for logged-in users** instead of "Start Free Trial" -- fine for returning users but "Go to Dashboard" also appears in the nav, creating duplication | Low |
+| 6 | **Mobile: nav has no hamburger menu** -- On 390px, "Features/Pricing/FAQ" links are hidden with `hidden md:flex` but there's no mobile menu toggle | Medium |
+| 7 | **Pricing section annual label** -- Both monthly and annual show "/mo" (`{annual ? "mo" : "mo"}`) -- annual should show "billed annually" or "/yr" more clearly | Low |
+| 8 | **Footer links (About, Blog, Careers, Privacy Policy, Terms of Service, Cookie Policy) are dead** -- they render as plain `<span>` elements with no href | Low |
+
+### Authentication & Backend (Verified Working)
+- Auth flow with email/password and Google OAuth is properly implemented
+- Email verification flow exists with resend capability
+- Password reset flow targets `/update-password` correctly
+- Workspace isolation via RLS policies is comprehensive
+- Role-based access uses separate `user_roles` table (correct pattern)
+- Session management with `onAuthStateChange` set up before `getSession`
+
+### Billing (Verified Working)
+- Stripe integration has STRIPE_SECRET_KEY configured
+- `check-subscription` syncs plan to workspace correctly
+- `create-checkout` handles existing/new customers
+- `customer-portal` for subscription management exists
+- PLAN_TIERS mapping matches plans.ts product IDs
+- RESEND_API_KEY is already configured in secrets
+
+### Console
+- No application errors. Only benign `postMessage` origin mismatches from the Lovable preview iframe (not production-relevant)
 
 ---
 
-## What's Missing
+## Changes to Implement
 
-1. **Hero right side**: Abstract network SVG needs to become a product UI preview (dashboard mockup)
-2. **Product Demonstration section**: Dashboard preview with key metric highlights and workflow visualization
-3. **Differentiation section**: Concrete "why us vs. alternatives" positioning
+### 1. Fix SEO Metadata in `index.html`
+- Title: "InfluenceIQ - The Influencer Discovery Platform That Pays for Itself"
+- Description: "Find verified creators, detect fraud, and run outreach campaigns from one workspace. Used by 2,000+ marketing teams."
+- OG image: keep current (no custom OG image available)
+- Remove "Lovable" references from author/twitter tags
 
-## What Already Works Well
+### 2. Add Animated Background Effect to Landing Page
+Replace the static enterprise-bg.jpg with a CSS-only animated gradient mesh. This will:
+- Use a `@keyframes` animation on 2-3 gradient layers that slowly shift position
+- Run on `background-position` (GPU-composited, no layout thrash)
+- Be extremely subtle (5-8% opacity) to maintain readability
+- Create a living, premium feel without particles or JS overhead
 
-- Hero headline, CTA, and inline proof metrics
-- OutcomeMetrics (data-backed authority)
-- ProblemSolution (before/after framing)
-- HowItWorks (3-step flow)
-- Features/Capabilities (outcome-driven)
-- Pricing with annual toggle
-- FAQ (objection handling)
-- FinalCTA and Footer with trust bar
+**File:** `src/index.css` -- Add `.animated-mesh-bg` utility with keyframe animation
+**File:** `src/pages/LandingPage.tsx` -- Replace the `<img>` background with the CSS animated mesh
 
----
-
-## Changes
-
-### 1. Hero -- Replace Abstract SVG with Dashboard Mockup
-
-**File:** `src/components/marketing/Hero.tsx`
-
-Replace the `NetworkGraphic` SVG with a CSS-only dashboard mockup component (`DashboardPreview`). This is a styled div that looks like a mini version of the actual product UI:
-
-- A glass card with a mock header bar (3 dots + "InfluenceIQ Dashboard" label)
-- 3 mini stat cards in a row (searches, fraud score, engagement)
-- A simplified 4-row data table showing influencer names, platforms, and status pills
-- All built with Tailwind -- zero images, zero CLS
-
-This communicates "real product" without needing screenshots.
-
-### 2. New: Product Demonstration Section
-
-**File:** `src/components/marketing/ProductDemo.tsx` (NEW)
-
-Placed between Features and Pricing. Contains:
-
-- Section heading: "See How It Works in Practice"
-- A larger version of the dashboard mockup showing:
-  - Left panel: Search input + filter chips (Platform, Location, Niche)
-  - Right panel: Results grid with influencer cards showing avatar placeholder, name, follower count, engagement %, fraud score badge
-  - Bottom bar: 3 workflow steps highlighted (Search, Analyze, Outreach)
-- All CSS-only, no images
-- Subtle framer-motion entrance animation
-
-### 3. New: Differentiation Section
-
-**File:** `src/components/marketing/Differentiation.tsx` (NEW)
-
-Placed between ProblemSolution and HowItWorks. Contains:
-
-- Heading: "Why Teams Choose InfluenceIQ Over Legacy Platforms"
-- 4 differentiation cards in a 2x2 grid:
-  - "Live Data, Not Stale Databases" -- Google-powered real-time discovery vs. monthly-updated databases
-  - "Pay Per Search, Not Per Year" -- Credit-based pricing vs. $30K+ annual contracts
-  - "AI Fraud Detection Built In" -- Every profile scored automatically vs. manual vetting
-  - "One Workspace, Not Five Tools" -- Search, outreach, pipeline, analytics in one place vs. stitching together Grin + Hunter + Trello
-- Each card has a bold metric or data point as emphasis
-- Glass card styling with aurora-gradient icon backgrounds
-
-### 4. Updated Section Order in LandingPage.tsx
-
+### 3. Add Smooth Scroll with Header Offset
 **File:** `src/pages/LandingPage.tsx`
+- Add `scroll-behavior: smooth` and `scroll-padding-top: 80px` to the root container
+- Convert anchor links to use `scrollIntoView` with offset
 
-New order:
-1. Nav
-2. Hero (with dashboard mockup)
-3. OutcomeMetrics
-4. ProblemSolution
-5. **Differentiation** (NEW)
-6. HowItWorks
-7. Features
-8. **ProductDemo** (NEW)
-9. Pricing
-10. FAQ
-11. FinalCTA
-12. Footer
+### 4. Fix Pricing Annual Label
+**File:** `src/components/marketing/PricingPreview.tsx`
+- Change the duplicate `"mo"` to show proper annual context
+
+### 5. Add Mobile Nav Menu
+**File:** `src/pages/LandingPage.tsx`
+- Add a hamburger button visible on small screens
+- Toggle a dropdown with Features, Pricing, FAQ links
+- Uses existing `useState` pattern, no new dependencies
+
+### 6. Fix Footer Dead Links
+**File:** `src/components/marketing/MarketingFooter.tsx`
+- Convert dead `<span>` elements to `<a href="#">` or route links where applicable
 
 ---
 
@@ -93,17 +81,19 @@ New order:
 
 | Action | File |
 |--------|------|
-| Modify | `src/components/marketing/Hero.tsx` -- Replace NetworkGraphic with DashboardPreview |
-| Create | `src/components/marketing/ProductDemo.tsx` -- Dashboard preview + workflow visualization |
-| Create | `src/components/marketing/Differentiation.tsx` -- 4-card competitive positioning |
-| Modify | `src/pages/LandingPage.tsx` -- Add new imports and insert sections in correct order |
+| Modify | `index.html` -- SEO metadata |
+| Modify | `src/index.css` -- Animated mesh background keyframes |
+| Modify | `src/pages/LandingPage.tsx` -- Animated bg, smooth scroll, mobile nav |
+| Modify | `src/components/marketing/PricingPreview.tsx` -- Fix annual label |
+| Modify | `src/components/marketing/MarketingFooter.tsx` -- Fix dead links |
 
 ---
 
 ## Technical Notes
 
-- No new dependencies -- everything uses existing framer-motion, lucide-react, and Tailwind
-- Dashboard mockup is pure CSS/JSX (glass cards, colored dots, text spans) -- no external images or screenshots
-- All new sections use `whileInView` with `viewport={{ once: true }}` for performance
-- Hover effects use `will-change-transform` for 60fps
-- New components follow the exact same animation pattern (fadeUp variants, stagger) as existing sections
+- The animated mesh uses only CSS `@keyframes` on `background-position` and `background-size` -- zero JS, GPU-composited, no repaints
+- Animation duration is 20-30 seconds with `ease-in-out` for imperceptible motion
+- Smooth scroll uses CSS `scroll-padding-top` to account for the fixed 64px nav
+- Mobile menu uses a simple boolean state toggle with Tailwind visibility classes
+- No new dependencies required
+
