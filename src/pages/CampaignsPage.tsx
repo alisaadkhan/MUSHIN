@@ -27,6 +27,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useCampaigns } from "@/hooks/useCampaigns";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -41,6 +42,7 @@ const statusColors: Record<string, string> = {
 
 export default function CampaignsPage() {
   const { data: campaigns, isLoading, createCampaign, deleteCampaign } = useCampaigns();
+  const { canCreateCampaign, campaignLimit } = usePlanLimits();
   const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -101,7 +103,16 @@ export default function CampaignsPage() {
               Compare
             </Button>
           </Link>
-          <Button className="btn-shine gap-2" onClick={() => setShowCreate(true)}>
+          <Button
+            className="btn-shine gap-2"
+            onClick={() => {
+              if (!canCreateCampaign()) {
+                toast({ title: "Campaign limit reached", description: `Your plan allows ${campaignLimit} campaigns. Upgrade to create more.`, variant: "destructive" });
+                return;
+              }
+              setShowCreate(true);
+            }}
+          >
             <Plus className="h-4 w-4" />
             New Campaign
           </Button>

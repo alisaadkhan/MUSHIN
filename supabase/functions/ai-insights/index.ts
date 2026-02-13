@@ -20,11 +20,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
     const token = authHeader.replace("Bearer ", "");
     const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
@@ -34,10 +36,42 @@ Deno.serve(async (req) => {
       });
     }
 
+    const userId = claimsData.claims.sub;
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Service-role client for credit checks
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get user's workspace
+    const { data: membership } = await adminClient
+      .from("workspace_members")
+      .select("workspace_id")
+      .eq("user_id", userId)
+      .limit(1)
+      .single();
+
+    if (!membership) {
+      return new Response(JSON.stringify({ error: "No workspace found" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Check AI credits
+    const { data: ws } = await adminClient
+      .from("workspaces")
+      .select("ai_credits_remaining")
+      .eq("id", membership.workspace_id)
+      .single();
+
+    if (!ws || ws.ai_credits_remaining <= 0) {
+      return new Response(JSON.stringify({ error: "AI credits exhausted. Upgrade your plan to continue using AI features." }), {
+        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -154,7 +188,6 @@ Deno.serve(async (req) => {
     if (type === "summarize") {
       result = { summary: choice?.message?.content || "Unable to generate summary." };
     } else {
-      // fraud-check or recommend — extract tool call
       const toolCall = choice?.message?.tool_calls?.[0];
       if (toolCall?.function?.arguments) {
         try {
@@ -163,10 +196,16 @@ Deno.serve(async (req) => {
           result = { error: "Failed to parse AI response" };
         }
       } else {
-        // Fallback to content
         result = { content: choice?.message?.content || "No response" };
       }
     }
+
+    // Decrement AI credits after successful response
+    await adminClient
+      .from("workspaces")
+      .update({ ai_credits_remaining: ws.ai_credits_remaining - 1 })
+      .eq("id", membership.workspace_id)
+      .gt("ai_credits_remaining", 0);
 
     return new Response(JSON.stringify(result), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
