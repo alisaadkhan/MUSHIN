@@ -1,131 +1,107 @@
 
-# Batches 2-5: Free Tier Blur, Feature Gating, Bulk Actions, Email Tracking & CSV Export
 
-Now that Batch 1 (Landing Page and Routing) is complete, this plan covers the remaining four batches to finalize production readiness.
+# Gold Standard SaaS Dashboard -- "Discover" Page
 
----
-
-## Batch 2: Free Tier Blur on Search Results
-
-Modify `src/pages/SearchPage.tsx` to add a paywall overlay for free-plan users.
-
-**Changes:**
-- After results render, check `workspaceCredits?.plan`
-- If `plan === 'free'`, wrap each result card's content area with a blur layer (`filter: blur(4px)`, `pointer-events: none`) and overlay a glass panel with a Lock icon and "Upgrade to Unlock" button linking to `/billing`
-- Add a dismissible top banner: "You're on the Free plan. Upgrade to see full influencer profiles."
-- Free users can still trigger searches (consuming credits) but cannot read detailed card content
+Replace the current `/dashboard` page (`src/pages/Index.tsx`) with an ultra-premium, enterprise-grade dashboard featuring a hero search bar and a glassmorphism data grid.
 
 ---
 
-## Batch 3: Feature Gating and Credit Deduction
+## Architecture
 
-### Frontend Gating
-
-Wire `usePlanLimits` into four components:
-
-1. **`CampaignsPage.tsx`** -- Import `usePlanLimits`; disable "New Campaign" button and show upgrade toast when `canCreateCampaign()` is false
-2. **`SendEmailDialog.tsx`** -- Check `canSendEmail()` before `handleSend`; show upgrade toast if exhausted
-3. **`CardDetailDialog.tsx`** -- Check `canUseAI()` before AI Summary and Fraud Check buttons; disable and show tooltip
-4. **`AIInsightsPanel.tsx`** -- Check `canUseAI()` before generating recommendations; show upgrade toast
-
-### Backend Credit Deduction
-
-**`send-outreach-email` edge function:**
-- Create a service-role Supabase client
-- Before sending, query `workspaces` for the user's `email_sends_remaining`
-- If 0, return HTTP 402 with clear message
-- After successful Resend send, atomically decrement `email_sends_remaining` by 1
-
-**`ai-insights` edge function:**
-- Create a service-role Supabase client
-- Before calling AI gateway, query `workspaces` for `ai_credits_remaining`
-- If 0, return HTTP 402
-- After successful AI response, decrement `ai_credits_remaining` by 1
+This is a single-file replacement of `src/pages/Index.tsx`. No new routes or dependencies are needed -- everything uses existing packages (framer-motion, lucide-react, Tailwind).
 
 ---
 
-## Batch 4: Bulk Email and Batch Fraud Check
+## Component Structure
 
-### Bulk Email Dialog
+The page is composed of inline sections (no new component files needed):
 
-Create `src/components/campaigns/BulkEmailDialog.tsx`:
-- Template selector using `useEmailTemplates`
-- Email address input per card (or skip cards without email)
-- Sends emails sequentially via `send-outreach-email` with per-card variable substitution
-- Progress counter and summary toast ("Sent 5/8 emails")
-
-### KanbanBoard Integration
-
-Modify `src/components/campaigns/KanbanBoard.tsx`:
-- In the bulk action bar (when `selectMode` is active), add a "Send Email" button that opens `BulkEmailDialog`
-- In each stage's dropdown menu, add a "Fraud Check Stage" option
-- Clicking it runs `runFraudCheck` from `useAIInsights` for each card in the stage sequentially
-- Updates card data via `updateCard` with results stored under `data.ai_fraud_check`
-- Shows progress toast and final summary
+1. **Header** -- "Discover" title with fade-in, Filter button (outline), Export All button (primary with shimmer via existing `btn-shine` class)
+2. **Hero Search Bar** -- Full-width input with `backdrop-blur-md`, `border-white/5`, focus glow via `ring` + `shadow-[0_0_20px_rgba(99,102,241,0.15)]` transition, inner shadow for depth
+3. **Data Grid** -- Glass card container with a table showing mock influencer data
 
 ---
 
-## Batch 5: Email Tracking and CSV Export
+## Data
 
-### Database Migration
+Use 8 hardcoded mock influencers matching the `Influencer` interface. Avatars use `https://api.dicebear.com/9.x/avataaars/svg?seed=USERNAME` for deterministic, lightweight SVG avatars.
 
-Add two columns to `outreach_log`:
-
-```sql
-ALTER TABLE public.outreach_log ADD COLUMN IF NOT EXISTS opened_at TIMESTAMPTZ;
-ALTER TABLE public.outreach_log ADD COLUMN IF NOT EXISTS clicked_at TIMESTAMPTZ;
+```text
+interface Influencer {
+  id: string;
+  username: string;
+  platform: 'instagram' | 'tiktok' | 'youtube';
+  followers: string;
+  engagement: string;
+  location: string;
+  email: string | null;
+  avatar: string;
+}
 ```
 
-### Email Webhook Edge Function
+---
 
-Create `supabase/functions/email-webhook/index.ts`:
-- Public endpoint (`verify_jwt = false`) receiving Resend webhook POST events
-- Parses event type (`email.opened`, `email.clicked`)
-- Matches the `email_id` or `to` address against `outreach_log` records
-- Updates `opened_at` or `clicked_at` timestamps using service-role client
-- Returns 200 OK
+## Visual Specifications
 
-Register in `supabase/config.toml`:
-```toml
-[functions.email-webhook]
-verify_jwt = false
-```
+### Background
+- The existing `AuroraBackground` component (already rendered by `AppLayout`) provides the aurora glows. No additional background divs needed -- the layout already has `#0a0a0a`-range charcoal via CSS variables.
 
-### CardDetailDialog Enhancement
+### Search Bar
+- Height: `h-14` with `px-5`
+- Background: `bg-white/[0.03]` with `backdrop-blur-md`
+- Border: `border-white/5`, on focus transitions to `border-indigo-500/50`
+- Focus shadow: `shadow-[0_0_20px_rgba(99,102,241,0.15)]`
+- Inner shadow: `shadow-inner` for depth
+- Search icon left-aligned, keyboard shortcut hint right-aligned
 
-Modify outreach history section in `CardDetailDialog.tsx`:
-- Display open/click status badges (green "Opened" badge if `opened_at` exists, blue "Clicked" badge if `clicked_at` exists) next to each outreach entry
+### Data Table
+- Wrapped in a glass card (`backdrop-blur-md bg-white/[0.02] border-white/5`)
+- Fixed row height: `h-[72px]` to prevent CLS
+- Columns: Influencer (avatar + name + location), Platform (colored pill), Audience (icon + number in JetBrains Mono), Engagement (green text, mono), Status (Enriched green pill / Pending amber pill), Actions (View button)
+- Row hover: `hover:bg-white/[0.02]` with `transition-colors duration-150`
+- Hardware-accelerated hover via `will-change-[background-color]` on rows
 
-### Campaign Comparison CSV Export
+### Animations
+- Title: `framer-motion` fade-in (0.3s)
+- Search bar: fade-up (0.3s, 0.1s delay)
+- Table rows: staggered fade-in (0.04s stagger, 0.2s duration each) using `framer-motion` variants
+- Export button: existing `btn-shine` shimmer on hover
 
-Modify `src/pages/CampaignComparePage.tsx`:
-- Add an "Export CSV" button
-- Generates CSV from the comparison table data (campaign names, total cards, per-stage counts)
-- Triggers download via `Blob` + `URL.createObjectURL`
+### Platform Badges
+- Instagram: `bg-pink-500/10 text-pink-400 border-pink-500/20`
+- TikTok: `bg-cyan-500/10 text-cyan-400 border-cyan-500/20`
+- YouTube: `bg-red-500/10 text-red-400 border-red-500/20`
+
+### Status Badges
+- Enriched (email exists): `bg-emerald-500/10 text-emerald-400 border-emerald-500/20`
+- Pending (email null): `bg-amber-500/10 text-amber-400 border-amber-500/20`
 
 ---
 
-## Files Summary
+## Responsive Behavior
 
-| Action | File |
-|--------|------|
-| Modify | `src/pages/SearchPage.tsx` (blur overlay) |
-| Modify | `src/pages/CampaignsPage.tsx` (campaign limit gate) |
-| Modify | `src/components/campaigns/SendEmailDialog.tsx` (email credit gate) |
-| Modify | `src/components/campaigns/CardDetailDialog.tsx` (AI gates + open/click badges) |
-| Modify | `src/components/campaigns/AIInsightsPanel.tsx` (AI credit gate) |
-| Modify | `supabase/functions/send-outreach-email/index.ts` (credit deduction) |
-| Modify | `supabase/functions/ai-insights/index.ts` (credit deduction) |
-| Create | `src/components/campaigns/BulkEmailDialog.tsx` |
-| Modify | `src/components/campaigns/KanbanBoard.tsx` (bulk email + batch fraud) |
-| Create | `supabase/functions/email-webhook/index.ts` |
-| Modify | `supabase/config.toml` (register email-webhook) |
-| Modify | `src/pages/CampaignComparePage.tsx` (CSV export) |
-| Migration | Add `opened_at`, `clicked_at` to `outreach_log` |
+- On mobile (`< md`), the table scrolls horizontally inside `overflow-x-auto`
+- Header buttons stack or shrink gracefully
+- Search bar remains full-width
 
-## Implementation Order
+---
 
-1. Batch 2 -- Search page blur (small, self-contained)
-2. Batch 3 -- Feature gating frontend + edge function credit deduction
-3. Batch 4 -- Bulk email dialog + batch fraud in Kanban
-4. Batch 5 -- Database migration, email-webhook function, open/click badges, CSV export
+## Files
+
+| Action | File | Detail |
+|--------|------|--------|
+| Rewrite | `src/pages/Index.tsx` | Complete replacement with the new dashboard UI |
+
+No other files are modified. The routing (`/dashboard` rendering `Index`) and layout (`AppLayout` with sidebar + aurora background) remain unchanged.
+
+---
+
+## Technical Notes
+
+- Zero new dependencies
+- All hover effects use CSS `transition-colors` (GPU-composited) -- no JS-driven hover state
+- `will-change-[background-color]` on table rows for 60fps hover
+- Staggered row animations use framer-motion `variants` with `staggerChildren: 0.04` and `duration: 0.2`
+- Avatar images are lightweight SVGs from DiceBear (no layout shift due to fixed `h-10 w-10` container)
+- The existing hooks (`useWorkspaceCredits`, `useSearchHistory`, etc.) are removed from this page since it becomes a static showcase; real data integration can be layered back in later if needed
+
