@@ -17,7 +17,7 @@ import { useWorkspaceCredits } from "@/hooks/useWorkspaceCredits";
 import { useSubscription } from "@/hooks/useSubscription";
 
 const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, path: "/" },
+  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
   { label: "Discover", icon: Search, path: "/search" },
   { label: "Lists", icon: Users, path: "/lists" },
   { label: "Campaigns", icon: Megaphone, path: "/campaigns" },

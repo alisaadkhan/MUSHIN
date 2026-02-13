@@ -26,7 +26,7 @@ export default function Auth() {
   // Redirect authenticated users
   useEffect(() => {
     if (!loading && user && !needsEmailVerification) {
-      navigate("/", { replace: true });
+      navigate("/dashboard", { replace: true });
     }
   }, [user, loading, needsEmailVerification, navigate]);
 
