@@ -1,5 +1,5 @@
 import { motion, type Variants } from "framer-motion";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, XCircle } from "lucide-react";
 
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 20 },
@@ -7,55 +7,49 @@ const fadeUp: Variants = {
 };
 const stagger: Variants = { visible: { transition: { staggerChildren: 0.1 } } };
 
-const PROBLEMS = [
-  "Stale influencer databases updated monthly",
-  "Fake followers slip through without detection",
-  "Locked annual contracts with hidden fees",
+const WITHOUT = [
+  "Wasting budget on influencers with fake followers",
+  "Manually searching across platforms for hours",
+  "Locked into expensive annual contracts with legacy tools",
 ];
-const SOLUTIONS = [
-  "Live Google‑powered discovery — always fresh",
-  "Real‑time fraud scoring with AI analysis",
-  "Pay‑as‑you‑go credits — cancel anytime",
+const WITH = [
+  "AI fraud scoring catches fakes before you spend",
+  "Live discovery across Instagram, TikTok, YouTube in seconds",
+  "Pay-as-you-go credits with no commitments",
 ];
 
 export function ProblemSolution() {
   return (
     <section className="relative py-24 px-6 md:px-12 lg:px-24">
       <motion.div
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true }}
+        initial="hidden" whileInView="visible" viewport={{ once: true }}
         variants={stagger}
         className="max-w-6xl mx-auto"
       >
-        <motion.h2
-          variants={fadeUp}
-          className="text-3xl md:text-4xl font-bold text-center mb-16 tracking-tight"
-        >
-          The Old Way vs. <span className="aurora-text">The InfluenceIQ Way</span>
+        <motion.h2 variants={fadeUp}
+          className="text-3xl md:text-4xl font-bold text-center mb-16 tracking-tight">
+          Why Agencies Switch to <span className="aurora-text">InfluenceIQ</span>
         </motion.h2>
+
         <div className="grid md:grid-cols-2 gap-8">
           <motion.div variants={fadeUp} className="space-y-4">
-            {PROBLEMS.map((p) => (
-              <div
-                key={p}
-                className="glass-card p-5 rounded-xl flex items-start gap-3"
-                style={{ borderColor: "hsl(var(--destructive) / 0.2)" }}
-              >
-                <span className="text-destructive mt-0.5 shrink-0">✕</span>
-                <p className="text-muted-foreground">{p}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground mb-2">Without InfluenceIQ</p>
+            {WITHOUT.map((t) => (
+              <div key={t} className="glass-card p-5 rounded-xl flex items-start gap-3"
+                style={{ borderColor: "hsl(var(--destructive) / 0.2)" }}>
+                <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                <p className="text-muted-foreground">{t}</p>
               </div>
             ))}
           </motion.div>
+
           <motion.div variants={fadeUp} className="space-y-4">
-            {SOLUTIONS.map((s) => (
-              <div
-                key={s}
-                className="glass-card p-5 rounded-xl flex items-start gap-3"
-                style={{ borderColor: "hsl(var(--aurora-teal) / 0.3)" }}
-              >
+            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground mb-2">With InfluenceIQ</p>
+            {WITH.map((t) => (
+              <div key={t} className="glass-card p-5 rounded-xl flex items-start gap-3"
+                style={{ borderColor: "hsl(var(--aurora-teal) / 0.3)" }}>
                 <CheckCircle2 className="h-5 w-5 text-accent shrink-0 mt-0.5" />
-                <p className="text-foreground">{s}</p>
+                <p className="text-foreground">{t}</p>
               </div>
             ))}
           </motion.div>

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Zap } from "lucide-react";
+import { Zap, Lock, Shield, CreditCard, Eye } from "lucide-react";
 
 function TwitterIcon() {
   return (
@@ -16,14 +16,30 @@ function LinkedInIcon() {
   );
 }
 
+const TRUST_BAR = [
+  { icon: Lock, label: "GDPR Compliant" },
+  { icon: Shield, label: "SOC2 Ready" },
+  { icon: CreditCard, label: "Stripe Secured" },
+  { icon: Eye, label: "Transparent Billing" },
+];
+
 export function MarketingFooter() {
   const scrollTo = (id: string) =>
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
   return (
     <footer className="border-t py-14 px-6" style={{ borderColor: "hsl(var(--glass-border))" }}>
+      {/* Enterprise trust bar */}
+      <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-center gap-8 mb-10 pb-10 border-b" style={{ borderColor: "hsl(var(--glass-border))" }}>
+        {TRUST_BAR.map(({ icon: Icon, label }) => (
+          <div key={label} className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Icon className="h-4 w-4" />
+            <span>{label}</span>
+          </div>
+        ))}
+      </div>
+
       <div className="max-w-6xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-10 text-sm text-muted-foreground">
-        {/* Brand */}
         <div className="col-span-2 sm:col-span-1 space-y-4">
           <Link to="/" className="flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary">
@@ -33,22 +49,20 @@ export function MarketingFooter() {
               <span className="aurora-text">Influence</span>IQ
             </span>
           </Link>
-          <p className="text-xs leading-relaxed">Live influencer discovery for modern agencies.</p>
+          <p className="text-xs leading-relaxed">The influencer discovery platform that pays for itself.</p>
           <div className="flex items-center gap-3">
             <a href="#" aria-label="Twitter" className="hover:text-foreground transition-colors"><TwitterIcon /></a>
             <a href="#" aria-label="LinkedIn" className="hover:text-foreground transition-colors"><LinkedInIcon /></a>
           </div>
         </div>
 
-        {/* Product */}
         <div className="space-y-3">
           <h4 className="font-semibold text-foreground text-xs uppercase tracking-[0.15em]">Product</h4>
-          <button onClick={() => scrollTo("how-it-works")} className="block hover:text-foreground transition-colors">Features</button>
+          <button onClick={() => scrollTo("features")} className="block hover:text-foreground transition-colors">Features</button>
           <a href="#pricing" className="block hover:text-foreground transition-colors">Pricing</a>
-          <button onClick={() => scrollTo("how-it-works")} className="block hover:text-foreground transition-colors">How It Works</button>
+          <button onClick={() => scrollTo("faq")} className="block hover:text-foreground transition-colors">FAQ</button>
         </div>
 
-        {/* Company */}
         <div className="space-y-3">
           <h4 className="font-semibold text-foreground text-xs uppercase tracking-[0.15em]">Company</h4>
           <span className="block">About</span>
@@ -56,7 +70,6 @@ export function MarketingFooter() {
           <span className="block">Careers</span>
         </div>
 
-        {/* Legal */}
         <div className="space-y-3">
           <h4 className="font-semibold text-foreground text-xs uppercase tracking-[0.15em]">Legal</h4>
           <span className="block">Privacy Policy</span>
@@ -65,10 +78,8 @@ export function MarketingFooter() {
         </div>
       </div>
 
-      <div
-        className="max-w-6xl mx-auto mt-10 pt-6 border-t text-center text-xs text-muted-foreground"
-        style={{ borderColor: "hsl(var(--glass-border))" }}
-      >
+      <div className="max-w-6xl mx-auto mt-10 pt-6 border-t text-center text-xs text-muted-foreground"
+        style={{ borderColor: "hsl(var(--glass-border))" }}>
         © {new Date().getFullYear()} InfluenceIQ. All rights reserved.
       </div>
     </footer>

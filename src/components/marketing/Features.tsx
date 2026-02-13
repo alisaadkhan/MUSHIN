@@ -6,28 +6,24 @@ const fadeUp: Variants = {
 };
 const stagger: Variants = { visible: { transition: { staggerChildren: 0.08 } } };
 
-/* Inline SVG icons — lightweight geometric line art */
 function IconSearch() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
-      <circle cx="11" cy="11" r="3" strokeDasharray="2 2" />
+      <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /><circle cx="11" cy="11" r="3" strokeDasharray="2 2" />
     </svg>
   );
 }
 function IconShield() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-      <path d="m9 12 2 2 4-4" />
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" />
     </svg>
   );
 }
 function IconMail() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <rect width="20" height="16" x="2" y="4" rx="2" />
-      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+      <rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
     </svg>
   );
 }
@@ -54,35 +50,31 @@ function IconChart() {
   );
 }
 
-const FEATURES = [
-  { Icon: IconSearch, title: "Live Influencer Search", desc: "Google‑powered discovery across Instagram, TikTok, and YouTube." },
-  { Icon: IconShield, title: "Fraud Detection", desc: "AI fraud scoring identifies fake followers and inflated engagement." },
-  { Icon: IconMail, title: "Email Extraction", desc: "Find contact emails with source badges for quick outreach." },
-  { Icon: IconKanban, title: "Campaign Kanban", desc: "Drag‑and‑drop pipeline to manage influencer partnerships." },
-  { Icon: IconRocket, title: "Outreach Automation", desc: "Email templates with variable substitution and open tracking." },
-  { Icon: IconChart, title: "Analytics & ROI", desc: "Cross‑campaign dashboards with conversion and budget insights." },
+const CAPABILITIES = [
+  { Icon: IconShield, title: "Reduce fraud risk by 99%", desc: "AI-powered scoring analyzes engagement patterns and audience authenticity before you spend." },
+  { Icon: IconSearch, title: "Find creators in seconds, not hours", desc: "Live Google-powered discovery across Instagram, TikTok, and YouTube — always fresh data." },
+  { Icon: IconMail, title: "Extract verified emails instantly", desc: "Contact information with source badges so you can launch outreach immediately." },
+  { Icon: IconKanban, title: "Manage every partnership visually", desc: "Drag-and-drop Kanban pipeline keeps every deal organized from first touch to signed contract." },
+  { Icon: IconRocket, title: "Automate outreach at scale", desc: "Email templates with variable substitution, open tracking, and bulk sending built in." },
+  { Icon: IconChart, title: "Prove ROI with real data", desc: "Cross-campaign dashboards with conversion tracking and budget insights for stakeholder reporting." },
 ];
 
 export function Features() {
   return (
-    <section className="relative py-24 px-6 md:px-12 lg:px-24">
+    <section id="features" className="relative py-24 px-6 md:px-12 lg:px-24">
       <motion.div
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true }}
+        initial="hidden" whileInView="visible" viewport={{ once: true }}
         variants={stagger}
         className="max-w-6xl mx-auto text-center space-y-16"
       >
         <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-bold tracking-tight">
-          Everything You Need to <span className="aurora-text">Win</span>
+          Built for Teams That Take Influencer Marketing{" "}
+          <span className="aurora-text">Seriously</span>
         </motion.h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {FEATURES.map(({ Icon, title, desc }) => (
-            <motion.div
-              key={title}
-              variants={fadeUp}
-              className="glass-card-hover p-6 rounded-xl text-left space-y-3 will-change-transform"
-            >
+          {CAPABILITIES.map(({ Icon, title, desc }) => (
+            <motion.div key={title} variants={fadeUp}
+              className="glass-card-hover p-6 rounded-xl text-left space-y-3 will-change-transform">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg aurora-gradient text-primary">
                 <Icon />
               </div>
