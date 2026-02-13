@@ -1,147 +1,183 @@
 
 
-# Phase 7 & 8: Integrations + Advanced Analytics
+# Phase 9: Landing Page, Feature Gating, and Production Readiness
 
-## Phase 7: Integrations (Zapier, Google Sheets, HubSpot, Slack)
-
-### 7.1 Integration Settings Tab
-
-Add an **"Integrations"** tab to the existing Settings page (`src/pages/Settings.tsx`) where users configure webhook URLs and connection details for each integration.
-
-Each integration stores its config in the `workspaces.settings` JSONB column (already exists), under keys like `zapier_webhook_url`, `google_sheets_webhook_url`, `hubspot_webhook_url`, `slack_webhook_url`.
-
-### 7.2 Zapier Integration
-
-- **Approach**: User pastes a Zapier Webhook URL in Settings > Integrations
-- **Triggers**: Fire `no-cors` POST requests to the webhook on key events:
-  - New influencer added to a campaign pipeline
-  - Campaign status changed
-  - Outreach email sent
-- **Implementation**:
-  - Create a utility `src/lib/integrations.ts` with a `fireWebhook(url, payload)` helper
-  - Call it from existing mutation hooks (`usePipelineCards`, `useCampaigns`, `SendEmailDialog`) after successful operations
-  - Payload includes event type, timestamp, and relevant data
-
-### 7.3 Google Sheets Export
-
-- **Approach**: User pastes a Google Sheets webhook URL (via Apps Script or Zapier) in Settings
-- **Triggers**:
-  - "Export to Sheets" button on List detail page and Campaign detail page
-  - Sends influencer data (username, platform, followers, engagement, etc.) as JSON to the webhook
-- **Implementation**:
-  - Add an "Export to Sheets" button on `ListDetailPage` and `CampaignDetailPage`
-  - Uses the same `fireWebhook` utility
-
-### 7.4 HubSpot Sync
-
-- **Approach**: User pastes a HubSpot webhook URL or private app token
-- **Edge Function**: `sync-hubspot` -- pushes confirmed influencers as HubSpot contacts
-- **Trigger**: "Sync to HubSpot" button on campaign pipeline cards in the "Confirmed" or "Completed" stages
-- **Data mapped**: Name, email (if available), platform handle, agreed rate, campaign name
-
-### 7.5 Slack Notifications
-
-- **Approach**: User pastes a Slack Incoming Webhook URL in Settings
-- **Triggers**: Fire Slack messages on:
-  - Campaign status changed to "active" or "completed"
-  - Influencer moved to "Confirmed" stage
-  - Weekly digest (optional, future)
-- **Implementation**:
-  - Slack webhooks accept simple JSON `{ "text": "..." }` via POST
-  - Reuse the `fireWebhook` utility with formatted message text
+This plan covers all remaining work to make InfluenceIQ market-ready. After reviewing the codebase, many features from the backlog are already implemented. This plan focuses on what is genuinely missing.
 
 ---
 
-## Phase 8: Advanced Analytics, PDF Reports, Compliance
+## What Is Already Done (No Work Needed)
 
-### 8.1 Advanced Campaign Analytics
-
-Extend the existing `CampaignAnalytics` component with:
-
-- **ROI Calculator**: (Total revenue or estimated value) vs budget spent. User inputs "estimated value per confirmed influencer" in campaign edit dialog; the system computes ROI automatically.
-- **Outreach response rate**: Emails sent vs influencers who moved past "Contacted" stage
-- **Time-in-stage metrics**: Average days an influencer spends in each pipeline stage (computed from `pipeline_cards.updated_at` and `campaign_activity`)
-- **Cost-per-influencer**: Budget / confirmed influencers
-
-### 8.2 Analytics Dashboard Page
-
-New page: `src/pages/AnalyticsPage.tsx` (route: `/analytics`)
-
-- Cross-campaign overview: total spend, total influencers, overall conversion rate
-- Monthly trends: searches performed, emails sent, credits consumed (from `credits_usage` table)
-- Top-performing campaigns by conversion rate
-- Credit usage breakdown chart (search, enrichment, email, AI)
-
-### 8.3 PDF Report Generation
-
-- **Approach**: Client-side PDF generation using the browser's `window.print()` with a print-optimized layout, or a lightweight library like `html2canvas` + `jspdf`
-- **New component**: `src/components/campaigns/CampaignReport.tsx` -- a print-friendly layout of:
-  - Campaign summary (name, dates, budget, status)
-  - Pipeline funnel chart
-  - Stage distribution
-  - Conversion rates
-  - Influencer roster with key metrics
-  - Outreach log summary
-- **Trigger**: "Download Report" button on `CampaignDetailPage`
-- **No new dependencies needed** if using `window.print()` approach; otherwise add `jspdf` + `html2canvas`
-
-### 8.4 Compliance & Data Management
-
-- **Data export (GDPR)**: "Export My Data" button in Settings that downloads a JSON file of the user's profile, workspace data, campaigns, and outreach logs
-- **Data deletion**: "Delete Account" button in Settings that:
-  - Deletes all user data (profile, workspace, campaigns, pipeline data, outreach logs)
-  - Signs the user out
-  - Edge function `delete-account` handles cascading deletion server-side with service role
-- **Consent logging**: Add a `consent_given_at` timestamp to `profiles` table (set during onboarding)
-- **Email opt-out tracking**: Add `unsubscribed` boolean to `outreach_log` so bounced or opt-out emails can be flagged
+- Authentication: sign up, sign in, Google OAuth, email verification with resend, password reset, profile error retry
+- Onboarding: 3-step flow with consent timestamp, pre-fill from profile, redirect guard
+- Search: soft ranking (3-tier), 100 results from Serper, URL filtering, platform domain validation
+- AI features: summary generation, fraud check with structured scoring, campaign recommendations -- all via a single `ai-insights` edge function using Lovable AI
+- Email templates: CRUD in Settings > Outreach with variable substitution
+- Billing: Stripe checkout, customer portal, subscription checking, plan limits hook
+- Integrations: Zapier/Slack/HubSpot/Sheets webhook config in Settings
+- Analytics: cross-campaign dashboard with Recharts charts
+- Campaign reports: print-friendly PDF layout
+- Data management: GDPR export and account deletion
+- Edge functions: search-influencers, ai-insights, send-outreach-email, sync-hubspot, delete-account, check-subscription, create-checkout, customer-portal
 
 ---
 
-## Database Changes
+## Batch 1: Public Landing Page and Routing
 
-```sql
--- Phase 8: Compliance additions
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS consent_given_at TIMESTAMPTZ;
-ALTER TABLE public.outreach_log ADD COLUMN IF NOT EXISTS unsubscribed BOOLEAN DEFAULT false;
-```
+### Routing Changes
 
-## New Files
+- Create `src/pages/LandingPage.tsx` as the public marketing homepage at `/`
+- Move the current authenticated dashboard from `/` to `/dashboard`
+- In `App.tsx`: `/` renders LandingPage (no auth wrapper), `/dashboard` renders the existing `Index` component inside `ProtectedPage`
+- Update `AppSidebar.tsx` nav items: change Dashboard path from `/` to `/dashboard`
+- Update `Auth.tsx` redirect: change `navigate("/")` to `navigate("/dashboard")`
+- Update `Onboarding.tsx` redirect: change `navigate("/")` to `navigate("/dashboard")`
+- In `LandingPage.tsx`: if user is logged in (check via `useAuth`), show "Go to Dashboard" instead of "Start Free"
 
-| File | Purpose |
-|---|---|
-| `src/lib/integrations.ts` | `fireWebhook` utility + integration helpers |
-| `src/components/settings/IntegrationsTab.tsx` | Integrations config UI (Zapier, Sheets, HubSpot, Slack) |
-| `src/pages/AnalyticsPage.tsx` | Cross-campaign analytics dashboard |
-| `src/components/campaigns/CampaignReport.tsx` | Print-friendly PDF report layout |
-| `src/components/settings/DataManagement.tsx` | GDPR export + account deletion UI |
-| `supabase/functions/sync-hubspot/index.ts` | Push influencer data to HubSpot |
-| `supabase/functions/delete-account/index.ts` | Cascade-delete user data |
+### Landing Page Sections
 
-## Modified Files
+All sections use the existing dark "Data Cockpit" design system (aurora gradients, glass-morphism, framer-motion animations).
 
-| File | Changes |
-|---|---|
-| `src/pages/Settings.tsx` | Add Integrations + Data Management tabs |
-| `src/pages/CampaignDetailPage.tsx` | Add "Download Report" and "Export to Sheets" buttons |
-| `src/pages/ListDetailPage.tsx` | Add "Export to Sheets" button |
-| `src/hooks/usePipelineCards.ts` | Fire webhook on card add/move |
-| `src/hooks/useCampaigns.ts` | Fire webhook on status change |
-| `src/components/campaigns/SendEmailDialog.tsx` | Fire webhook after email sent |
-| `src/components/campaigns/CampaignAnalytics.tsx` | Add ROI, response rate, time-in-stage charts |
-| `src/components/layout/AppSidebar.tsx` | Add Analytics nav item |
-| `src/App.tsx` | Add `/analytics` route |
-| `supabase/config.toml` | Add new edge functions config |
+1. **Hero**: headline, subheadline, CTAs ("Start Free" links to `/auth`, "See How It Works" smooth scrolls), animated aurora background using existing `AuroraBackground` component
+2. **Trust Signals**: logo cloud with placeholder brand SVGs, animated counters
+3. **Problem/Solution**: two-column layout with animated cards
+4. **How It Works**: 3 steps with icons (Search, Analyze, Contact)
+5. **Feature Highlights**: 6-card grid with scroll-triggered animations via `framer-motion` `whileInView`
+6. **Pricing Preview**: 3 cards using the existing `PLANS` constant from `src/lib/plans.ts`
+7. **Security and Compliance**: icons with text (GDPR, Stripe, SOC2)
+8. **Final CTA**: gradient background, "Get Started Free" button
+9. **Footer**: product links, company, legal, social icons
+
+### Files
+
+| Action | File |
+|--------|------|
+| Create | `src/pages/LandingPage.tsx` |
+| Modify | `src/App.tsx` (routing) |
+| Modify | `src/components/layout/AppSidebar.tsx` (Dashboard path) |
+| Modify | `src/pages/Auth.tsx` (redirect to `/dashboard`) |
+| Modify | `src/pages/Onboarding.tsx` (redirect to `/dashboard`) |
+
+---
+
+## Batch 2: Free Tier Blur on Search Results
+
+### Implementation
+
+- In `SearchPage.tsx`, import `useWorkspaceCredits` (already imported) and check `workspaceCredits?.plan`
+- After results render, if `plan === 'free'`, wrap each result card with a relative container that adds:
+  - `filter: blur(4px)` and `pointer-events: none` on the card content
+  - An absolute glass overlay with a lock icon and "Upgrade to Unlock" button linking to `/billing`
+- Add a top banner: "You're on the Free plan. Upgrade to see full influencer profiles."
+- Free users can still search (credits are consumed) but cannot read the detailed results
+
+### Files
+
+| Action | File |
+|--------|------|
+| Modify | `src/pages/SearchPage.tsx` |
+
+---
+
+## Batch 3: Feature Gating and Credit Deduction
+
+### Frontend Gating
+
+Wire the existing `usePlanLimits` hook into these components:
+
+| Component | Gate |
+|-----------|------|
+| `CampaignsPage.tsx` | Disable "New Campaign" button when `canCreateCampaign()` returns false; show upgrade toast |
+| `SendEmailDialog.tsx` | Check `canSendEmail()` before sending; show upgrade prompt if exhausted |
+| `CardDetailDialog.tsx` | Check `canUseAI()` before AI Summary and Fraud Check buttons |
+| `AIInsightsPanel.tsx` | Check `canUseAI()` before generating recommendations |
+
+Each gate shows a toast with message and link to `/billing`.
+
+### Backend Credit Deduction
+
+**send-outreach-email**: Before sending, query `workspaces.email_sends_remaining` via service role. If 0, return 402. After successful send, decrement by 1.
+
+**ai-insights**: Before calling AI gateway, query `workspaces.ai_credits_remaining` via service role. If 0, return 402. After successful response, decrement by 1.
+
+### Files
+
+| Action | File |
+|--------|------|
+| Modify | `src/pages/CampaignsPage.tsx` |
+| Modify | `src/components/campaigns/SendEmailDialog.tsx` |
+| Modify | `src/components/campaigns/CardDetailDialog.tsx` |
+| Modify | `src/components/campaigns/AIInsightsPanel.tsx` |
+| Modify | `supabase/functions/send-outreach-email/index.ts` |
+| Modify | `supabase/functions/ai-insights/index.ts` |
+
+---
+
+## Batch 4: Bulk Email and Batch Fraud Check
+
+### Bulk Email
+
+- Create `src/components/campaigns/BulkEmailDialog.tsx`
+- In `KanbanBoard.tsx`, when `selectMode` is active and cards are selected, add a "Send Email" button in the bulk action bar (next to existing Move and Remove buttons)
+- `BulkEmailDialog` shows a template selector (using `useEmailTemplates`), sends emails sequentially to all selected cards via `send-outreach-email`, substitutes variables per card, shows progress counter and summary toast
+
+### Batch Fraud Check
+
+- In `KanbanBoard.tsx`, add a "Fraud Check" option in each stage's dropdown menu (alongside Rename, Change Color, Delete)
+- Clicking it runs `runFraudCheck` from `useAIInsights` for each card in that stage sequentially
+- Stores results in each card's `data` JSONB field under `ai_fraud_check` key via `updateCard`
+- Shows progress toast ("Checking 3/10...") and final summary
+
+### Files
+
+| Action | File |
+|--------|------|
+| Create | `src/components/campaigns/BulkEmailDialog.tsx` |
+| Modify | `src/components/campaigns/KanbanBoard.tsx` |
+
+---
+
+## Batch 5: Email Tracking and CSV Export
+
+### Email Open/Click Tracking
+
+- Database migration: add `opened_at TIMESTAMPTZ` and `clicked_at TIMESTAMPTZ` columns to `outreach_log`
+- Create `supabase/functions/email-webhook/index.ts`: public endpoint (no JWT) that receives Resend webhook events, validates them, and updates the corresponding `outreach_log` record
+- Register in `supabase/config.toml` with `verify_jwt = false`
+- In `CardDetailDialog.tsx` outreach history section, show open/click status badges next to each outreach entry
+
+### Campaign Comparison CSV Export
+
+- In `CampaignComparePage.tsx`, add an "Export CSV" button
+- Generates a CSV from the comparison table data (campaign names, stats, stage counts) and triggers browser download via `Blob` and `URL.createObjectURL`
+
+### Files
+
+| Action | File |
+|--------|------|
+| Migration | Add columns to `outreach_log` |
+| Create | `supabase/functions/email-webhook/index.ts` |
+| Modify | `supabase/config.toml` |
+| Modify | `src/components/campaigns/CardDetailDialog.tsx` |
+| Modify | `src/pages/CampaignComparePage.tsx` |
+
+---
 
 ## Implementation Order
 
-1. Create `src/lib/integrations.ts` with `fireWebhook` utility
-2. Add Integrations tab to Settings (Zapier, Sheets, HubSpot, Slack webhook URLs)
-3. Wire webhook calls into existing hooks and components
-4. Create `sync-hubspot` edge function
-5. Build Analytics page with cross-campaign charts
-6. Extend `CampaignAnalytics` with ROI, response rate, time-in-stage
-7. Build `CampaignReport` component and "Download Report" button
-8. Database migration for compliance columns
-9. Build Data Management UI (export + delete account)
-10. Create `delete-account` edge function
-11. Update onboarding to record consent timestamp
+1. Batch 1 -- Landing page and routing (largest visual impact, marketing-critical)
+2. Batch 2 -- Free tier blur (drives conversions)
+3. Batch 3 -- Feature gating and credit deduction (billing integrity)
+4. Batch 4 -- Bulk email and batch fraud (power-user features)
+5. Batch 5 -- Email tracking and CSV export (polish)
+
+---
+
+## Technical Notes
+
+- No new dependencies needed; framer-motion and recharts are already installed
+- All landing page animations use CSS `transform` and `opacity` via framer-motion `whileInView` for GPU acceleration
+- The landing page imports no authenticated components or hooks (except optionally `useAuth` to detect logged-in state for CTA text)
+- Credit deduction in edge functions uses the service role client for atomic writes
+- The email-webhook function is public (Resend calls it directly) and validates webhook signatures
+
