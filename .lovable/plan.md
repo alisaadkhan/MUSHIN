@@ -1,107 +1,187 @@
 
-# Batches 2-5: Free Tier Blur, Feature Gating, Bulk Actions, Email Tracking & CSV Export
 
-Now that Batch 1 (Landing Page and Routing) is complete, this plan covers the remaining four batches to finalize production readiness.
+# High-Converting Enterprise Landing Page Rebuild
 
----
-
-## Batch 2: Free Tier Blur on Search Results
-
-Modify `src/pages/SearchPage.tsx` to add a paywall overlay for free-plan users.
-
-**Changes:**
-- After results render, check `workspaceCredits?.plan`
-- If `plan === 'free'`, wrap each result card's content area with a blur layer (`filter: blur(4px)`, `pointer-events: none`) and overlay a glass panel with a Lock icon and "Upgrade to Unlock" button linking to `/billing`
-- Add a dismissible top banner: "You're on the Free plan. Upgrade to see full influencer profiles."
-- Free users can still trigger searches (consuming credits) but cannot read detailed card content
+This plan transforms the current landing page from a generic startup layout into a NordVPN/Linear-caliber conversion machine. Every section is redesigned around psychological triggers: clarity, authority, proof, and urgency.
 
 ---
 
-## Batch 3: Feature Gating and Credit Deduction
+## What Gets Removed
 
-### Frontend Gating
+- **TrustSignals.tsx**: The "Trusted by agencies & brands worldwide" logo cloud is deleted entirely. The animated counter component is preserved and moved into a new section.
+- **ProblemSolution.tsx**: Replaced with a benefit-driven "Outcomes" section (not just problem/solution comparison).
+- **Features.tsx**: Replaced with a benefit-first "Capabilities" section that leads with outcomes, not feature names.
+- **SecurityCompliance.tsx**: Absorbed into a new "Enterprise-Ready" credibility bar.
 
-Wire `usePlanLimits` into four components:
+## What Gets Created/Rewritten
 
-1. **`CampaignsPage.tsx`** -- Import `usePlanLimits`; disable "New Campaign" button and show upgrade toast when `canCreateCampaign()` is false
-2. **`SendEmailDialog.tsx`** -- Check `canSendEmail()` before `handleSend`; show upgrade toast if exhausted
-3. **`CardDetailDialog.tsx`** -- Check `canUseAI()` before AI Summary and Fraud Check buttons; disable and show tooltip
-4. **`AIInsightsPanel.tsx`** -- Check `canUseAI()` before generating recommendations; show upgrade toast
-
-### Backend Credit Deduction
-
-**`send-outreach-email` edge function:**
-- Create a service-role Supabase client
-- Before sending, query `workspaces` for the user's `email_sends_remaining`
-- If 0, return HTTP 402 with clear message
-- After successful Resend send, atomically decrement `email_sends_remaining` by 1
-
-**`ai-insights` edge function:**
-- Create a service-role Supabase client
-- Before calling AI gateway, query `workspaces` for `ai_credits_remaining`
-- If 0, return HTTP 402
-- After successful AI response, decrement `ai_credits_remaining` by 1
-
----
-
-## Batch 4: Bulk Email and Batch Fraud Check
-
-### Bulk Email Dialog
-
-Create `src/components/campaigns/BulkEmailDialog.tsx`:
-- Template selector using `useEmailTemplates`
-- Email address input per card (or skip cards without email)
-- Sends emails sequentially via `send-outreach-email` with per-card variable substitution
-- Progress counter and summary toast ("Sent 5/8 emails")
-
-### KanbanBoard Integration
-
-Modify `src/components/campaigns/KanbanBoard.tsx`:
-- In the bulk action bar (when `selectMode` is active), add a "Send Email" button that opens `BulkEmailDialog`
-- In each stage's dropdown menu, add a "Fraud Check Stage" option
-- Clicking it runs `runFraudCheck` from `useAIInsights` for each card in the stage sequentially
-- Updates card data via `updateCard` with results stored under `data.ai_fraud_check`
-- Shows progress toast and final summary
+| File | Action | Purpose |
+|------|--------|---------|
+| `src/components/marketing/Hero.tsx` | Rewrite | Conversion-focused hero with bold value prop, sub-headline with outcome clarity, single primary CTA, secondary text link (no outline button), social proof metrics inline below CTA |
+| `src/components/marketing/TrustSignals.tsx` | Delete | Remove logo cloud entirely |
+| `src/components/marketing/OutcomeMetrics.tsx` | Create | 3 large data-backed metric cards with animated counters (replaces TrustSignals) |
+| `src/components/marketing/ProblemSolution.tsx` | Rewrite | "Before/After" framing with authoritative tone: what agencies lose without InfluenceIQ vs. what they gain |
+| `src/components/marketing/HowItWorks.tsx` | Rewrite | Tighter 3-step flow with numbered badges, connecting lines between steps, benefit-driven descriptions |
+| `src/components/marketing/Features.tsx` | Rewrite | Rename to "Capabilities" internally. 6 cards leading with outcomes ("Reduce fraud risk by 99%") not feature names ("Fraud Detection") |
+| `src/components/marketing/Testimonials.tsx` | Create | 3 testimonial cards with name, role, company, quote, and a star rating row. No photos (text-only for authority). |
+| `src/components/marketing/FAQ.tsx` | Create | 6-item accordion using existing Radix accordion. Addresses objections: "How is this different from CreatorIQ?", "Is my data safe?", "Can I cancel anytime?", etc. |
+| `src/components/marketing/PricingPreview.tsx` | Rewrite | Add annual toggle with "Save 20%" badge, add "No credit card required" under Free CTA, add a "Compare all features" expandable row |
+| `src/components/marketing/SecurityCompliance.tsx` | Delete | Folded into a minimal trust bar above the footer |
+| `src/components/marketing/FinalCTA.tsx` | Rewrite | Urgency framing: "Join 2,000+ agencies already using InfluenceIQ" with single bold CTA |
+| `src/components/marketing/MarketingFooter.tsx` | Rewrite | Add a slim enterprise trust bar above footer columns (GDPR, SOC2, Stripe icons inline) |
+| `src/pages/LandingPage.tsx` | Rewrite | New section order, new nav links (Features, Pricing, FAQ), remove TrustSignals/SecurityCompliance imports |
 
 ---
 
-## Batch 5: Email Tracking and CSV Export
+## Section-by-Section Design
 
-### Database Migration
+### 1. Nav Bar (in LandingPage.tsx)
+- Links: Features, Pricing, FAQ (replace "How It Works")
+- CTA button: "Start Free Trial" (not "Start Free" -- trial implies value)
+- Add "Log In" text link before the CTA button for returning users
 
-Add two columns to `outreach_log`:
+### 2. Hero (above the fold -- the most critical 5 seconds)
 
-```sql
-ALTER TABLE public.outreach_log ADD COLUMN IF NOT EXISTS opened_at TIMESTAMPTZ;
-ALTER TABLE public.outreach_log ADD COLUMN IF NOT EXISTS clicked_at TIMESTAMPTZ;
-```
+**Headline:** `The Influencer Discovery Platform That Pays for Itself`
+- `text-5xl md:text-7xl font-extrabold tracking-tight`
+- "Pays for Itself" in `aurora-text` gradient
 
-### Email Webhook Edge Function
+**Sub-headline:** `Find verified creators, detect fraud before you spend, and run outreach campaigns -- all from one workspace. Used by 2,000+ marketing teams.`
+- `text-lg md:text-xl text-muted-foreground max-w-2xl`
 
-Create `supabase/functions/email-webhook/index.ts`:
-- Public endpoint (`verify_jwt = false`) receiving Resend webhook POST events
-- Parses event type (`email.opened`, `email.clicked`)
-- Matches the `email_id` or `to` address against `outreach_log` records
-- Updates `opened_at` or `clicked_at` timestamps using service-role client
-- Returns 200 OK
+**CTA block:**
+- Primary: "Start Free Trial" `btn-shine` button (large, `px-10 py-6`)
+- Below button: "No credit card required. Cancel anytime." in `text-xs text-muted-foreground`
+- No secondary outline button (reduces decision friction)
 
-Register in `supabase/config.toml`:
-```toml
-[functions.email-webhook]
-verify_jwt = false
-```
+**Inline social proof (below CTA):**
+- 3 metrics in a horizontal row: "10,000+ searches run" | "99% fraud accuracy" | "4.9/5 avg rating"
+- Small text, `data-mono` font, separated by subtle dividers
 
-### CardDetailDialog Enhancement
+**Right side (desktop):** Keep the network SVG graphic but make it smaller and more subtle (reduce opacity to 0.6)
 
-Modify outreach history section in `CardDetailDialog.tsx`:
-- Display open/click status badges (green "Opened" badge if `opened_at` exists, blue "Clicked" badge if `clicked_at` exists) next to each outreach entry
+### 3. Outcome Metrics (replaces TrustSignals)
 
-### Campaign Comparison CSV Export
+Remove logo cloud entirely. Replace with 3 large glass cards:
 
-Modify `src/pages/CampaignComparePage.tsx`:
-- Add an "Export CSV" button
-- Generates CSV from the comparison table data (campaign names, total cards, per-stage counts)
-- Triggers download via `Blob` + `URL.createObjectURL`
+| Metric | Label |
+|--------|-------|
+| 10,000+ | Live influencer searches completed |
+| 99% | Fraud detection accuracy rate |
+| 73% | Average reduction in campaign cost |
+
+Each card has the animated counter (reuse existing `AnimatedCounter`) with a brief one-line explanation. Clean, authoritative, no fluff.
+
+### 4. Before/After (replaces ProblemSolution)
+
+**Heading:** `Why Agencies Switch to InfluenceIQ`
+
+Two-column layout but reframed as outcomes:
+
+**Left ("Without InfluenceIQ"):**
+- Wasting budget on influencers with fake followers
+- Manually searching across platforms for hours
+- Locked into expensive annual contracts with legacy tools
+
+**Right ("With InfluenceIQ"):**
+- AI fraud scoring catches fakes before you spend
+- Live discovery across Instagram, TikTok, YouTube in seconds
+- Pay-as-you-go credits with no commitments
+
+Use red (`destructive`) accents on left, green (`accent`) on right. Each item is a glass card.
+
+### 5. How It Works (refined)
+
+**Heading:** `From Search to Signed Deal in 3 Steps`
+
+3 cards with:
+- Large step number in `data-mono` (`01`, `02`, `03`)
+- Outcome-driven title: "Discover Verified Creators", "Analyze Trust Signals", "Close the Deal"
+- One-sentence benefit description
+- Subtle connecting line between cards on desktop (CSS `::after` pseudo-element)
+
+### 6. Capabilities (replaces Features)
+
+**Heading:** `Built for Teams That Take Influencer Marketing Seriously`
+
+6 cards, but each leads with the outcome:
+- "Reduce fraud risk by 99%" (not "Fraud Detection")
+- "Find creators in seconds, not hours" (not "Live Search")
+- "Extract verified emails instantly" (not "Email Extraction")
+- "Manage every partnership visually" (not "Campaign Kanban")
+- "Automate outreach at scale" (not "Outreach Automation")
+- "Prove ROI with real data" (not "Analytics")
+
+Same SVG icons, same glass-card-hover styling.
+
+### 7. Testimonials (NEW)
+
+**Heading:** `What Marketing Leaders Say`
+
+3 cards in a grid:
+- Quote text in `text-base italic`
+- 5-star row (lucide `Star` icons filled)
+- Name, title, company in `text-sm text-muted-foreground`
+- Glass card styling
+
+Mock testimonials:
+1. "InfluenceIQ cut our influencer vetting time by 80%. The fraud detection alone saved us from a $50K mistake." -- Sarah Chen, VP Marketing, Elevate Agency
+2. "We switched from CreatorIQ and haven't looked back. The live search is a game-changer for fast-moving campaigns." -- Marcus Johnson, Head of Partnerships, Velocity Growth
+3. "Finally, a tool that doesn't lock you into an annual contract. The pay-as-you-go model is exactly what growing agencies need." -- Elena Rodriguez, Founder, Bright Spark Media
+
+### 8. FAQ (NEW)
+
+**Heading:** `Common Questions`
+
+6 items using existing `Accordion` component from `@radix-ui/react-accordion`:
+
+1. "How is InfluenceIQ different from legacy tools like CreatorIQ?" -- Focuses on live data, no stale databases, pay-as-you-go pricing
+2. "How accurate is the fraud detection?" -- 99% accuracy, AI-powered scoring with engagement analysis
+3. "Do I need a credit card to start?" -- No, free tier with 50 search credits
+4. "Can I cancel anytime?" -- Yes, no contracts, downgrade or cancel instantly
+5. "Is my data secure?" -- GDPR-compliant, Stripe payments, SOC2-ready infrastructure
+6. "What platforms do you support?" -- Instagram, TikTok, YouTube with more coming
+
+### 9. Pricing (enhanced)
+
+Keep existing 3-card layout from `PLANS` but add:
+- Annual/Monthly toggle at the top with "Save 20%" pill badge on annual
+- "No credit card required" text under the Free plan CTA
+- "Most Popular" badge remains on Pro
+- Add Business plan highlight: "Priority Support" badge
+
+The toggle is visual-only for now (shows monthly prices multiplied by 0.8 for annual display).
+
+### 10. Final CTA (rewritten)
+
+**Heading:** `Join 2,000+ Teams Finding Real Creators`
+**Sub-text:** `Start free. No credit card required. See results in under 60 seconds.`
+**CTA:** "Start Your Free Trial" `btn-shine`
+
+Aurora-gradient background card, centered.
+
+### 11. Footer (enhanced)
+
+Add a slim trust bar above the 4-column footer:
+- Horizontal row with: Lock icon "GDPR Compliant" | Shield icon "SOC2 Ready" | CreditCard icon "Stripe Secured" | Eye icon "Transparent Billing"
+- `text-xs text-muted-foreground` with icons at `h-4 w-4`
+- This replaces the standalone SecurityCompliance section
+
+---
+
+## New Section Order in LandingPage.tsx
+
+1. Nav (with "Log In" link + "Start Free Trial" CTA)
+2. Hero (bold value prop + inline proof)
+3. OutcomeMetrics (3 data cards)
+4. Before/After (why agencies switch)
+5. HowItWorks (3 steps)
+6. Capabilities (6 outcome-led cards)
+7. Testimonials (3 quotes)
+8. Pricing (with annual toggle)
+9. FAQ (6-item accordion)
+10. FinalCTA (urgency + proof)
+11. Footer (trust bar + columns)
 
 ---
 
@@ -109,23 +189,27 @@ Modify `src/pages/CampaignComparePage.tsx`:
 
 | Action | File |
 |--------|------|
-| Modify | `src/pages/SearchPage.tsx` (blur overlay) |
-| Modify | `src/pages/CampaignsPage.tsx` (campaign limit gate) |
-| Modify | `src/components/campaigns/SendEmailDialog.tsx` (email credit gate) |
-| Modify | `src/components/campaigns/CardDetailDialog.tsx` (AI gates + open/click badges) |
-| Modify | `src/components/campaigns/AIInsightsPanel.tsx` (AI credit gate) |
-| Modify | `supabase/functions/send-outreach-email/index.ts` (credit deduction) |
-| Modify | `supabase/functions/ai-insights/index.ts` (credit deduction) |
-| Create | `src/components/campaigns/BulkEmailDialog.tsx` |
-| Modify | `src/components/campaigns/KanbanBoard.tsx` (bulk email + batch fraud) |
-| Create | `supabase/functions/email-webhook/index.ts` |
-| Modify | `supabase/config.toml` (register email-webhook) |
-| Modify | `src/pages/CampaignComparePage.tsx` (CSV export) |
-| Migration | Add `opened_at`, `clicked_at` to `outreach_log` |
+| Rewrite | `src/pages/LandingPage.tsx` |
+| Rewrite | `src/components/marketing/Hero.tsx` |
+| Create | `src/components/marketing/OutcomeMetrics.tsx` |
+| Rewrite | `src/components/marketing/ProblemSolution.tsx` |
+| Rewrite | `src/components/marketing/HowItWorks.tsx` |
+| Rewrite | `src/components/marketing/Features.tsx` |
+| Create | `src/components/marketing/Testimonials.tsx` |
+| Create | `src/components/marketing/FAQ.tsx` |
+| Rewrite | `src/components/marketing/PricingPreview.tsx` |
+| Rewrite | `src/components/marketing/FinalCTA.tsx` |
+| Rewrite | `src/components/marketing/MarketingFooter.tsx` |
+| Delete | `src/components/marketing/TrustSignals.tsx` |
+| Delete | `src/components/marketing/SecurityCompliance.tsx` |
 
-## Implementation Order
+---
 
-1. Batch 2 -- Search page blur (small, self-contained)
-2. Batch 3 -- Feature gating frontend + edge function credit deduction
-3. Batch 4 -- Bulk email dialog + batch fraud in Kanban
-4. Batch 5 -- Database migration, email-webhook function, open/click badges, CSV export
+## Technical Notes
+
+- No new dependencies. FAQ uses existing `@radix-ui/react-accordion`. Testimonials and OutcomeMetrics use existing `framer-motion`.
+- The `AnimatedCounter` component from the deleted `TrustSignals.tsx` is moved into `OutcomeMetrics.tsx`.
+- Annual pricing toggle is frontend-only state (`useState`); it displays `price * 12 * 0.8` for annual, no backend changes.
+- All animations remain `whileInView` with `viewport={{ once: true }}` for performance.
+- Connecting lines between HowItWorks steps use CSS `::after` with `border-top` and absolute positioning, hidden on mobile.
+
