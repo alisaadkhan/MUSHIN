@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
-import { Plus, Users, MoreHorizontal, Trash2, Pencil, GripVertical } from "lucide-react";
+import { Plus, Users, MoreHorizontal, Trash2, Pencil, GripVertical, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -20,10 +20,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { KanbanCard } from "./KanbanCard";
 import { CardDetailDialog } from "./CardDetailDialog";
 import { usePipelineStages, usePipelineCards } from "@/hooks/usePipelineCards";
 import { useToast } from "@/hooks/use-toast";
+
+const STAGE_COLORS = [
+  "#6366f1", "#f59e0b", "#3b82f6", "#22c55e",
+  "#a855f7", "#ec4899", "#ef4444", "#06b6d4",
+  "#f97316", "#6b7280",
+];
 
 interface KanbanBoardProps {
   campaignId: string;
@@ -38,6 +45,7 @@ export function KanbanBoard({ campaignId }: KanbanBoardProps) {
   const [renamingStageId, setRenamingStageId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deleteConfirmStageId, setDeleteConfirmStageId] = useState<string | null>(null);
+  const [colorPickerStageId, setColorPickerStageId] = useState<string | null>(null);
   const [showAddStage, setShowAddStage] = useState(false);
   const [newStageName, setNewStageName] = useState("");
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -213,6 +221,10 @@ export function KanbanBoard({ campaignId }: KanbanBoardProps) {
                             <Pencil className="h-3 w-3 mr-2" />
                             Rename
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setColorPickerStageId(stage.id)}>
+                            <Palette className="h-3 w-3 mr-2" />
+                            Change Color
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive"
                             onClick={() => setDeleteConfirmStageId(stage.id)}
@@ -299,6 +311,35 @@ export function KanbanBoard({ campaignId }: KanbanBoardProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Stage Color Picker */}
+      <Popover open={!!colorPickerStageId} onOpenChange={(open) => !open && setColorPickerStageId(null)}>
+        <PopoverTrigger asChild>
+          <span className="hidden" />
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-3" align="center" side="bottom">
+          <p className="text-xs font-medium mb-2 text-muted-foreground">Pick a color</p>
+          <div className="grid grid-cols-5 gap-2">
+            {STAGE_COLORS.map((color) => (
+              <button
+                key={color}
+                className="h-7 w-7 rounded-full border-2 border-transparent hover:border-foreground/30 transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+                style={{ backgroundColor: color }}
+                onClick={async () => {
+                  if (!colorPickerStageId) return;
+                  try {
+                    await updateStage.mutateAsync({ id: colorPickerStageId, color });
+                    toast({ title: "Color updated" });
+                  } catch {
+                    toast({ title: "Failed to update color", variant: "destructive" });
+                  }
+                  setColorPickerStageId(null);
+                }}
+              />
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
     </>
   );
 }
