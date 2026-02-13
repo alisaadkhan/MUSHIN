@@ -11,6 +11,7 @@ import SearchPage from "./pages/SearchPage";
 import ListsPage from "./pages/ListsPage";
 import ListDetailPage from "./pages/ListDetailPage";
 import CampaignsPage from "./pages/CampaignsPage";
+import CampaignComparePage from "./pages/CampaignComparePage";
 import CampaignDetailPage from "./pages/CampaignDetailPage";
 import SavedSearchesPage from "./pages/SavedSearchesPage";
 import HistoryPage from "./pages/HistoryPage";
@@ -43,6 +44,7 @@ const App = () => (
             <Route path="/lists" element={<ProtectedPage><ListsPage /></ProtectedPage>} />
             <Route path="/lists/:id" element={<ProtectedPage><ListDetailPage /></ProtectedPage>} />
             <Route path="/campaigns" element={<ProtectedPage><CampaignsPage /></ProtectedPage>} />
+            <Route path="/campaigns/compare" element={<ProtectedPage><CampaignComparePage /></ProtectedPage>} />
             <Route path="/campaigns/:id" element={<ProtectedPage><CampaignDetailPage /></ProtectedPage>} />
             <Route path="/saved-searches" element={<ProtectedPage><SavedSearchesPage /></ProtectedPage>} />
             <Route path="/history" element={<ProtectedPage><HistoryPage /></ProtectedPage>} />
