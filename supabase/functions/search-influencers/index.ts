@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
       youtube: "site:youtube.com",
     };
     const sitePart = siteMap[platform] || "";
-    const locationPart = location && location !== "All Pakistan" ? location : "";
+    const locationPart = location === "All Pakistan" ? "Pakistan" : (location || "Pakistan");
     const serperQuery = `"${query}" ${sitePart} ${locationPart}`.trim();
 
     // Call Serper
@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
         "X-API-KEY": SERPER_API_KEY,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ q: serperQuery, num: 20 }),
+      body: JSON.stringify({ q: serperQuery, num: 30, gl: "pk", hl: "en" }),
     });
 
     if (!serperRes.ok) {
@@ -127,8 +127,40 @@ Deno.serve(async (req) => {
     const serperData = await serperRes.json();
     const organic = serperData.organic || [];
 
+    // Filter by platform domain to prevent cross-platform leakage
+    const domainMap: Record<string, string> = {
+      instagram: "instagram.com",
+      tiktok: "tiktok.com",
+      youtube: "youtube.com",
+    };
+    const expectedDomain = domainMap[platform];
+    const platformFiltered = expectedDomain
+      ? organic.filter((item: any) => item.link?.includes(expectedDomain))
+      : organic;
+
+    // Soft filter: prioritize Pakistan-related results
+    const PAKISTAN_KEYWORDS = [
+      "pakistan", "karachi", "lahore", "islamabad", "rawalpindi", "faisalabad",
+      "multan", "peshawar", "quetta", "sialkot", "gujranwala",
+      "hyderabad", "bahawalpur",
+      "paki", "pakistani", "isb", "lhr", "khi",
+      "punjab", "sindh", "balochistan", "kpk", "khyber",
+    ];
+
+    const withLocation: any[] = [];
+    const withoutLocation: any[] = [];
+    for (const item of platformFiltered) {
+      const text = ((item.title || "") + " " + (item.snippet || "")).toLowerCase();
+      if (PAKISTAN_KEYWORDS.some((kw) => text.includes(kw))) {
+        withLocation.push(item);
+      } else {
+        withoutLocation.push(item);
+      }
+    }
+    const finalResults = [...withLocation, ...withoutLocation].slice(0, 20);
+
     // Parse results
-    const results = organic
+    const results = finalResults
       .map((item: any) => {
         const username = extractUsername(item.link, platform);
         if (!username) return null;
