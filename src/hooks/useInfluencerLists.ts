@@ -89,6 +89,17 @@ export function useListItems(listId: string | undefined) {
     },
   });
 
+  const removeItems = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase.from("list_items").delete().in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["list-items", listId] });
+      qc.invalidateQueries({ queryKey: ["influencer-lists"] });
+    },
+  });
+
   const updateNotes = useMutation({
     mutationFn: async ({ id, notes }: { id: string; notes: string }) => {
       const { error } = await supabase.from("list_items").update({ notes }).eq("id", id);
@@ -97,5 +108,5 @@ export function useListItems(listId: string | undefined) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["list-items", listId] }),
   });
 
-  return { ...itemsQuery, addItem, removeItem, updateNotes };
+  return { ...itemsQuery, addItem, removeItem, removeItems, updateNotes };
 }
