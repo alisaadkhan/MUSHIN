@@ -1,151 +1,201 @@
-# Phase 5: AI Layer (Summaries, Fraud Detection, Recommendations)
+
+
+# Phase 6: Stripe Billing Integration
 
 ## Overview
 
-Add AI-powered intelligence across the platform using Lovable AI (Google Gemini) to help users evaluate influencers faster, detect suspicious profiles, and get smart campaign recommendations.
+Add tiered subscription plans with usage-based credits via Stripe. Users can upgrade from a free plan to paid tiers (Pro, Business) that unlock higher credit limits, more campaigns, and premium features. Credits reset monthly based on the active plan.
 
 ---
 
-## 5.1 AI Infrastructure
+## 6.1 Plan Tiers
 
-### Edge Function: `supabase/functions/ai-insights/index.ts`
-
-A single edge function with branching logic based on `type` parameter:
-
-- **`summarize`** — Generate a concise influencer profile summary from their data
-- **`fraud-check`** — Analyze an influencer's metrics for red flags (fake followers, engagement anomalies)
-- **`recommend`** — Suggest next actions for a campaign based on pipeline state and goals
-
-**Model**: `google/gemini-3-flash-preview` (fast, cost-efficient for all three use cases)
-
-**Auth**: Validates JWT via `getClaims()`, no additional secrets needed (`LOVABLE_API_KEY` is pre-provisioned).
+| Feature | Free | Pro ($29/mo) | Business ($79/mo) |
+|---|---|---|---|
+| Search credits / month | 50 | 500 | 2,000 |
+| Enrichment credits / month | 10 | 100 | 500 |
+| Campaigns | 3 | Unlimited | Unlimited |
+| Email sends / month | 20 | 500 | 2,000 |
+| AI insights | 5 / month | 100 / month | Unlimited |
+| Team members | 1 | 3 | 10 |
+| Priority support | -- | -- | Yes |
 
 ---
 
-## 5.2 Influencer Profile Summary
+## 6.2 Stripe Setup
 
-### What it does
-Generates a 2-3 sentence summary of an influencer based on their cached data (followers, engagement rate, avg views, platform, niche, location).
+### Enable Stripe Integration
 
-### Integration Points
+Use Lovable's built-in Stripe integration tool to connect the user's Stripe account and create the products/prices.
 
-- **CardDetailDialog**: Add an "AI Summary" section that auto-generates on open (with a refresh button)
-- **Search results**: Optional "Summarize" button on each result card
+### Products and Prices to Create
 
-### UX
-- Shows a skeleton loader while generating
-- Caches the summary in component state (not DB) to avoid unnecessary calls
-- Non-streaming (short response, invoke pattern)
+- **InfluenceIQ Pro** -- $29/month recurring
+- **InfluenceIQ Business** -- $79/month recurring
 
 ---
 
-## 5.3 Fraud Detection
+## 6.3 Database Changes
 
-### What it does
-Analyzes influencer metrics and flags suspicious patterns:
-- Follower/engagement ratio anomalies
-- Sudden follower spikes (if historical data available)
-- Low avg views relative to follower count
-- Generic/bot-like content patterns
+### New Table: `subscriptions`
 
-Returns a **risk score** (low/medium/high) and **specific flags** with explanations.
-
-### Integration Points
-
-- **CardDetailDialog**: "Fraud Check" button → shows risk badge + flag list
-- **KanbanCard**: Small risk indicator dot (green/yellow/red) after analysis
-- **Batch analysis**: Option to run fraud check on all cards in a stage
-
-### Data Model
-
-Store results in `pipeline_cards.data` JSONB (no new table needed):
-```json
-{
-  "ai_fraud_check": {
-    "risk": "medium",
-    "flags": ["Engagement rate (8.5%) unusually high for 500K followers"],
-    "checked_at": "2026-02-13T..."
-  }
-}
+```sql
+CREATE TABLE public.subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id UUID NOT NULL UNIQUE,
+  stripe_customer_id TEXT NOT NULL,
+  stripe_subscription_id TEXT,
+  plan TEXT NOT NULL DEFAULT 'free',  -- 'free', 'pro', 'business'
+  status TEXT NOT NULL DEFAULT 'active', -- 'active', 'canceled', 'past_due', 'trialing'
+  current_period_start TIMESTAMPTZ,
+  current_period_end TIMESTAMPTZ,
+  cancel_at_period_end BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 ```
 
-### Edge Function Logic
-Uses tool calling to extract structured output:
-```
-tools: [{
-  type: "function",
-  function: {
-    name: "fraud_analysis",
-    parameters: {
-      properties: {
-        risk: { type: "string", enum: ["low", "medium", "high"] },
-        flags: { type: "array", items: { type: "string" } },
-        summary: { type: "string" }
-      }
-    }
-  }
-}]
+RLS: Workspace members can SELECT; workspace owners can UPDATE.
+
+### Modify `workspaces` Table
+
+Add columns to support plan-based credit limits:
+
+```sql
+ALTER TABLE public.workspaces
+  ADD COLUMN plan TEXT NOT NULL DEFAULT 'free',
+  ADD COLUMN email_sends_remaining INTEGER NOT NULL DEFAULT 20,
+  ADD COLUMN ai_credits_remaining INTEGER NOT NULL DEFAULT 5;
 ```
 
 ---
 
-## 5.4 Campaign Recommendations
+## 6.4 Edge Functions
 
-### What it does
-Analyzes the current campaign state (budget, stage distribution, outreach history, timeline) and suggests:
-- Which influencers to prioritize contacting
-- Budget allocation suggestions
-- Timeline warnings (e.g., "Campaign ends in 5 days, 3 influencers still in Negotiating")
-- Stage progression nudges
+### `stripe-webhook` (new)
 
-### Integration Points
+Handles Stripe webhook events:
+- `checkout.session.completed` -- Activate subscription, set plan on workspace, reset credits to plan limits
+- `customer.subscription.updated` -- Plan changes (upgrade/downgrade), update credit limits
+- `customer.subscription.deleted` -- Revert to free plan, reset credits to free limits
+- `invoice.payment_failed` -- Mark subscription as `past_due`
 
-- **CampaignDetailPage**: New "AI Insights" collapsible section below stats
-- Shows 3-5 actionable recommendations as cards
-- Refresh button to re-generate
+### `create-checkout` (new)
 
-### Edge Function Logic
-Receives full campaign context (stages, card counts, budget, dates, outreach stats) and returns structured recommendations via tool calling.
+Creates a Stripe Checkout session for a given price ID. Returns the checkout URL. Validates workspace ownership.
+
+### `create-portal` (new)
+
+Creates a Stripe Customer Portal session so users can manage their subscription, update payment method, or cancel. Returns the portal URL.
+
+### `reset-credits` (handled by webhook)
+
+When a new billing period starts (`invoice.paid`), reset all credits to the plan's limits.
 
 ---
 
-## 5.5 New Hook: `src/hooks/useAIInsights.ts`
+## 6.5 New Hook: `useSubscription`
 
-Manages all AI calls with:
-- `generateSummary(influencerData)` → string
-- `runFraudCheck(influencerData)` → `{ risk, flags, summary }`
-- `getCampaignRecommendations(campaignContext)` → `Recommendation[]`
-- Loading/error states per call type
-- Rate limit error handling (429/402 → user-friendly toast)
+```typescript
+// src/hooks/useSubscription.ts
+- Fetches subscription data from `subscriptions` table
+- `checkout(priceId)` -- calls create-checkout edge function, redirects to Stripe
+- `openPortal()` -- calls create-portal edge function, redirects to Stripe portal
+- Plan comparison helpers (isPro, isBusiness, canAccessFeature)
+```
+
+---
+
+## 6.6 Billing Page UI
+
+### New Page: `src/pages/BillingPage.tsx`
+
+- Route: `/billing`
+- Shows current plan with a badge
+- Pricing cards for Free / Pro / Business with feature comparison
+- "Upgrade" buttons that trigger Stripe Checkout
+- "Manage Subscription" button for existing subscribers (opens Stripe Portal)
+- Current credit usage breakdown (search, enrichment, email, AI)
+- Next billing date and renewal info
+
+### Sidebar Update
+
+Add "Billing" nav item with a `CreditCard` icon between Settings and the credits section. Update the credits widget to show plan name and link to billing page.
+
+---
+
+## 6.7 Feature Gating
+
+### `src/hooks/usePlanLimits.ts` (new)
+
+Returns plan-based limits and checks:
+- `canCreateCampaign()` -- Free plan: max 3
+- `canSendEmail()` -- checks email_sends_remaining
+- `canUseAI()` -- checks ai_credits_remaining
+- `getLimit(feature)` -- returns the max for the current plan
+
+### Integration Points
+
+- **CampaignsPage**: Show upgrade prompt when campaign limit is reached
+- **SendEmailDialog**: Check email credits before sending; show upgrade prompt if exhausted
+- **AI Insights**: Check AI credits before calling; show upgrade prompt if exhausted
+- **SearchPage**: Already gated by search_credits_remaining; update limits per plan
+- **Settings page**: Show plan badge
+
+---
+
+## 6.8 Credit Deduction Updates
+
+### Modify existing edge functions
+
+- `send-outreach-email`: Deduct from `email_sends_remaining`, log to `credits_usage`
+- `ai-insights`: Deduct from `ai_credits_remaining`, log to `credits_usage`
+- `search-influencers`: Already deducts search credits; update max per plan
 
 ---
 
 ## Files Summary
 
 | File | Action |
-|------|--------|
-| `supabase/functions/ai-insights/index.ts` | Create |
-| `src/hooks/useAIInsights.ts` | Create |
-| `src/components/campaigns/AIInsightsPanel.tsx` | Create (campaign recommendations) |
-| `src/components/campaigns/FraudCheckBadge.tsx` | Create (risk indicator) |
-| `src/components/campaigns/CardDetailDialog.tsx` | Modify (add AI summary + fraud check) |
-| `src/components/campaigns/KanbanCard.tsx` | Modify (add fraud risk dot) |
-| `src/pages/CampaignDetailPage.tsx` | Modify (add AI Insights section) |
+|---|---|
+| `supabase/functions/create-checkout/index.ts` | Create |
+| `supabase/functions/create-portal/index.ts` | Create |
+| `supabase/functions/stripe-webhook/index.ts` | Create |
+| `src/hooks/useSubscription.ts` | Create |
+| `src/hooks/usePlanLimits.ts` | Create |
+| `src/pages/BillingPage.tsx` | Create |
+| `src/App.tsx` | Modify (add /billing route) |
+| `src/components/layout/AppSidebar.tsx` | Modify (add Billing nav + plan badge) |
+| `src/pages/Index.tsx` | Modify (show plan in credit widget) |
+| `src/hooks/useWorkspaceCredits.ts` | Modify (include new credit types) |
+| `supabase/functions/send-outreach-email/index.ts` | Modify (deduct email credits) |
+| `supabase/functions/ai-insights/index.ts` | Modify (deduct AI credits) |
+| `src/components/campaigns/SendEmailDialog.tsx` | Modify (credit gate) |
+| `src/hooks/useAIInsights.ts` | Modify (credit gate) |
+| `src/pages/CampaignsPage.tsx` | Modify (campaign limit gate) |
+| Database migration | Create `subscriptions`, alter `workspaces` |
 
 ## Implementation Order
 
-1. Create `ai-insights` edge function with all three modes
-2. Create `useAIInsights` hook
-3. Build AI summary in CardDetailDialog
-4. Build fraud detection UI (badge + card detail integration)
-5. Build campaign recommendations panel
-6. Add fraud risk indicator to KanbanCard
-7. End-to-end testing
+1. Enable Stripe integration (collect secret key)
+2. Create Stripe products and prices
+3. Database migration (subscriptions table + workspace columns)
+4. Create `create-checkout` edge function
+5. Create `create-portal` edge function
+6. Create `stripe-webhook` edge function (with credit reset logic)
+7. Create `useSubscription` and `usePlanLimits` hooks
+8. Build BillingPage with pricing cards
+9. Add Billing to sidebar navigation
+10. Integrate feature gating across existing components
+11. Update edge functions for credit deduction
+12. End-to-end testing
 
 ## Technical Considerations
 
-- **Cost control**: Gemini Flash is cheap but calls add up. Summaries/fraud checks are cached in component state or card JSONB to avoid re-running.
-- **Rate limits**: All 429/402 errors are caught and surfaced as toasts. The hook includes a simple debounce.
-- **Structured output**: Fraud check and recommendations use tool calling for reliable JSON extraction — no fragile JSON parsing.
-- **No streaming needed**: All three use cases return short responses; `supabase.functions.invoke()` is sufficient.
-- **Privacy**: Only aggregated metrics are sent to the AI — no personal data or email addresses.
+- **Stripe Checkout**: Using Stripe-hosted checkout (not embedded) for PCI compliance simplicity. Users are redirected to Stripe and back.
+- **Webhook idempotency**: The webhook handler checks `stripe_subscription_id` before processing to avoid duplicate activations.
+- **Plan downgrades**: When downgrading, credits are NOT reduced mid-cycle. New limits apply at next reset.
+- **Free plan**: No Stripe subscription needed. The default state. Stripe customer is only created on first checkout.
+- **Credit reset**: Handled by `invoice.paid` webhook event, which fires at the start of each billing cycle. For free users, the existing `credits_reset_at` mechanism continues.
+- **Security**: Webhook endpoint validates Stripe signature. Checkout/portal endpoints validate workspace ownership via JWT.
+
