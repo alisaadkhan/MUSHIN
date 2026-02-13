@@ -1,4 +1,4 @@
-import { Instagram, Youtube, SlidersHorizontal, Search, ExternalLink, GripVertical } from "lucide-react";
+import { Instagram, Youtube, SlidersHorizontal, Search, ExternalLink, GripVertical, Mail } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -31,9 +31,10 @@ interface KanbanCardProps {
   selectable?: boolean;
   selected?: boolean;
   onSelect?: (id: string) => void;
+  contacted?: boolean;
 }
 
-export function KanbanCard({ card, onEdit, draggable, onDragStart, selectable, selected, onSelect }: KanbanCardProps) {
+export function KanbanCard({ card, onEdit, draggable, onDragStart, selectable, selected, onSelect, contacted }: KanbanCardProps) {
   const PlatformIcon = platformIcons[card.platform] || Search;
   const d = card.data as any;
 
@@ -68,7 +69,15 @@ export function KanbanCard({ card, onEdit, draggable, onDragStart, selectable, s
                 {card.platform}
               </Badge>
             </div>
-            <p className="text-xs text-muted-foreground truncate">{card.username}</p>
+            <div className="flex items-center gap-1">
+              <p className="text-xs text-muted-foreground truncate">{card.username}</p>
+              {contacted && (
+                <Badge variant="outline" className="text-[9px] gap-0.5 bg-green-500/10 text-green-500 border-green-500/20">
+                  <Mail className="h-2.5 w-2.5" />
+                  Contacted
+                </Badge>
+              )}
+            </div>
             {card.notes && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{card.notes}</p>}
             <div className="flex items-center justify-between mt-2">
               {card.agreed_rate != null && (

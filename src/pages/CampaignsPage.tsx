@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, Megaphone, Trash2, Users, CalendarIcon } from "lucide-react";
+import { Plus, Megaphone, Trash2, Users, CalendarIcon, BarChart3 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -94,10 +94,18 @@ export default function CampaignsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Campaigns</h1>
           <p className="text-muted-foreground mt-1">Manage your influencer campaigns</p>
         </div>
-        <Button className="btn-shine gap-2" onClick={() => setShowCreate(true)}>
-          <Plus className="h-4 w-4" />
-          New Campaign
-        </Button>
+        <div className="flex items-center gap-2">
+          <Link to="/campaigns/compare">
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <BarChart3 className="h-3.5 w-3.5" />
+              Compare
+            </Button>
+          </Link>
+          <Button className="btn-shine gap-2" onClick={() => setShowCreate(true)}>
+            <Plus className="h-4 w-4" />
+            New Campaign
+          </Button>
+        </div>
       </div>
 
       {isLoading && (

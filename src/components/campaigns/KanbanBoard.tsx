@@ -35,6 +35,7 @@ import { KanbanCard } from "./KanbanCard";
 import { CardDetailDialog } from "./CardDetailDialog";
 import { usePipelineStages, usePipelineCards } from "@/hooks/usePipelineCards";
 import { useCampaignActivity } from "@/hooks/useCampaignActivity";
+import { useOutreachLog } from "@/hooks/useOutreachLog";
 import { useToast } from "@/hooks/use-toast";
 
 const STAGE_COLORS = [
@@ -57,6 +58,7 @@ export function KanbanBoard({ campaignId }: KanbanBoardProps) {
   const { data: stages, addStage, updateStage, deleteStage, reorderStages } = usePipelineStages(campaignId);
   const { data: cards, moveCard, updateCard, removeCard } = usePipelineCards(campaignId);
   const { logActivity } = useCampaignActivity(campaignId);
+  const { outreachEntries, logOutreach, isContacted } = useOutreachLog(campaignId);
   const [editingCard, setEditingCard] = useState<any>(null);
   const [dragCardId, setDragCardId] = useState<string | null>(null);
   const [dragStageId, setDragStageId] = useState<string | null>(null);
@@ -153,6 +155,11 @@ export function KanbanBoard({ campaignId }: KanbanBoardProps) {
       await moveCard.mutateAsync({ cardId: dragCardId, stageId, position: stageCards.length });
       if (fromStage && toStage && fromStage.id !== toStage.id) {
         logActivity.mutate({ action: "card_moved", details: { username: card?.username, from_stage: fromStage.name, to_stage: toStage.name } });
+        // Auto-log outreach when moved to "Contacted" stage
+        if (toStage.name.toLowerCase() === "contacted" && card) {
+          logOutreach.mutate({ campaign_id: campaignId, card_id: card.id, username: card.username, platform: card.platform });
+          logActivity.mutate({ action: "influencer_contacted", details: { username: card.username } });
+        }
       }
     } catch {
       toast({ title: "Failed to move card", variant: "destructive" });
@@ -168,6 +175,10 @@ export function KanbanBoard({ campaignId }: KanbanBoardProps) {
       await moveCard.mutateAsync({ cardId, stageId, position: 0 });
       if (fromStage && toStage && fromStage.id !== toStage.id) {
         logActivity.mutate({ action: "card_moved", details: { username: card?.username, from_stage: fromStage.name, to_stage: toStage.name } });
+        if (toStage.name.toLowerCase() === "contacted" && card) {
+          logOutreach.mutate({ campaign_id: campaignId, card_id: card.id, username: card.username, platform: card.platform });
+          logActivity.mutate({ action: "influencer_contacted", details: { username: card.username } });
+        }
       }
       toast({ title: "Card moved" });
     } catch {
@@ -424,6 +435,7 @@ export function KanbanBoard({ campaignId }: KanbanBoardProps) {
                         selectable={selectMode}
                         selected={selectedCardIds.has(card.id)}
                         onSelect={toggleCardSelect}
+                        contacted={isContacted(card.id)}
                       />
                     ))}
                   </div>
@@ -518,6 +530,7 @@ export function KanbanBoard({ campaignId }: KanbanBoardProps) {
         onRemove={handleRemoveCard}
         stages={stages}
         onMove={handleMoveCard}
+        outreachEntries={outreachEntries}
       />
 
       <AlertDialog open={!!deleteConfirmStageId} onOpenChange={(open) => !open && setDeleteConfirmStageId(null)}>

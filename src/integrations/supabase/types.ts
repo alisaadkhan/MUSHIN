@@ -284,6 +284,57 @@ export type Database = {
           },
         ]
       }
+      outreach_log: {
+        Row: {
+          campaign_id: string
+          card_id: string
+          contacted_at: string
+          id: string
+          method: string
+          notes: string | null
+          platform: string
+          status: string
+          username: string
+        }
+        Insert: {
+          campaign_id: string
+          card_id: string
+          contacted_at?: string
+          id?: string
+          method?: string
+          notes?: string | null
+          platform: string
+          status?: string
+          username: string
+        }
+        Update: {
+          campaign_id?: string
+          card_id?: string
+          contacted_at?: string
+          id?: string
+          method?: string
+          notes?: string | null
+          platform?: string
+          status?: string
+          username?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outreach_log_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outreach_log_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pipeline_cards: {
         Row: {
           agreed_rate: number | null
