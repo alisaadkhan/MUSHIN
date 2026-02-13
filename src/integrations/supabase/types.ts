@@ -390,6 +390,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_user_workspace: {
+        Args: never
+        Returns: {
+          role: string
+          workspace_id: string
+        }[]
+      }
       get_user_workspace_id: { Args: never; Returns: string }
       has_role: {
         Args: {

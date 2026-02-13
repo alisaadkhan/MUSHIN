@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { UserMenu } from "@/components/auth/UserMenu";
 import {
   LayoutDashboard,
   Search,
@@ -57,8 +58,8 @@ export function AppSidebar() {
         })}
       </nav>
 
-      {/* Credits footer */}
-      <div className="border-t border-border p-4">
+      {/* Credits + User */}
+      <div className="border-t border-border p-4 space-y-3">
         <div className="glass-card rounded-lg p-3">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
             <span>Credits</span>
@@ -71,6 +72,7 @@ export function AppSidebar() {
             />
           </div>
         </div>
+        <UserMenu />
       </div>
     </aside>
   );
