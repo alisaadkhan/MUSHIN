@@ -26,6 +26,7 @@ import {
 import { KanbanBoard } from "@/components/campaigns/KanbanBoard";
 import { CampaignStats } from "@/components/campaigns/CampaignStats";
 import { CampaignTimeline } from "@/components/campaigns/CampaignTimeline";
+import { CampaignAnalytics } from "@/components/campaigns/CampaignAnalytics";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useInfluencerLists, useListItems } from "@/hooks/useInfluencerLists";
@@ -210,6 +211,10 @@ export default function CampaignDetailPage() {
       )}
 
       {id && <KanbanBoard campaignId={id} />}
+
+      {id && campaign && stages && cards && (
+        <CampaignAnalytics stages={stages} cards={cards} campaign={campaign} />
+      )}
 
       {id && <CampaignTimeline campaignId={id} />}
 
