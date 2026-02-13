@@ -69,7 +69,7 @@ export function PricingPreview({ ctaPath }: Props) {
                   <h3 className="text-xl font-bold">{plan.name}</h3>
                   <p className="text-3xl font-extrabold mt-2 data-mono">
                     ${displayPrice}
-                    <span className="text-sm font-normal text-muted-foreground">/{annual ? "mo" : "mo"}</span>
+                    <span className="text-sm font-normal text-muted-foreground">/mo</span>
                   </p>
                   {annual && plan.price > 0 && (
                     <p className="text-xs text-muted-foreground mt-1">Billed annually</p>
