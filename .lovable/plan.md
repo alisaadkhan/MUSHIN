@@ -1,201 +1,147 @@
 
 
-# Phase 6: Stripe Billing Integration
+# Phase 7 & 8: Integrations + Advanced Analytics
 
-## Overview
+## Phase 7: Integrations (Zapier, Google Sheets, HubSpot, Slack)
 
-Add tiered subscription plans with usage-based credits via Stripe. Users can upgrade from a free plan to paid tiers (Pro, Business) that unlock higher credit limits, more campaigns, and premium features. Credits reset monthly based on the active plan.
+### 7.1 Integration Settings Tab
+
+Add an **"Integrations"** tab to the existing Settings page (`src/pages/Settings.tsx`) where users configure webhook URLs and connection details for each integration.
+
+Each integration stores its config in the `workspaces.settings` JSONB column (already exists), under keys like `zapier_webhook_url`, `google_sheets_webhook_url`, `hubspot_webhook_url`, `slack_webhook_url`.
+
+### 7.2 Zapier Integration
+
+- **Approach**: User pastes a Zapier Webhook URL in Settings > Integrations
+- **Triggers**: Fire `no-cors` POST requests to the webhook on key events:
+  - New influencer added to a campaign pipeline
+  - Campaign status changed
+  - Outreach email sent
+- **Implementation**:
+  - Create a utility `src/lib/integrations.ts` with a `fireWebhook(url, payload)` helper
+  - Call it from existing mutation hooks (`usePipelineCards`, `useCampaigns`, `SendEmailDialog`) after successful operations
+  - Payload includes event type, timestamp, and relevant data
+
+### 7.3 Google Sheets Export
+
+- **Approach**: User pastes a Google Sheets webhook URL (via Apps Script or Zapier) in Settings
+- **Triggers**:
+  - "Export to Sheets" button on List detail page and Campaign detail page
+  - Sends influencer data (username, platform, followers, engagement, etc.) as JSON to the webhook
+- **Implementation**:
+  - Add an "Export to Sheets" button on `ListDetailPage` and `CampaignDetailPage`
+  - Uses the same `fireWebhook` utility
+
+### 7.4 HubSpot Sync
+
+- **Approach**: User pastes a HubSpot webhook URL or private app token
+- **Edge Function**: `sync-hubspot` -- pushes confirmed influencers as HubSpot contacts
+- **Trigger**: "Sync to HubSpot" button on campaign pipeline cards in the "Confirmed" or "Completed" stages
+- **Data mapped**: Name, email (if available), platform handle, agreed rate, campaign name
+
+### 7.5 Slack Notifications
+
+- **Approach**: User pastes a Slack Incoming Webhook URL in Settings
+- **Triggers**: Fire Slack messages on:
+  - Campaign status changed to "active" or "completed"
+  - Influencer moved to "Confirmed" stage
+  - Weekly digest (optional, future)
+- **Implementation**:
+  - Slack webhooks accept simple JSON `{ "text": "..." }` via POST
+  - Reuse the `fireWebhook` utility with formatted message text
 
 ---
 
-## 6.1 Plan Tiers
+## Phase 8: Advanced Analytics, PDF Reports, Compliance
 
-| Feature | Free | Pro ($29/mo) | Business ($79/mo) |
-|---|---|---|---|
-| Search credits / month | 50 | 500 | 2,000 |
-| Enrichment credits / month | 10 | 100 | 500 |
-| Campaigns | 3 | Unlimited | Unlimited |
-| Email sends / month | 20 | 500 | 2,000 |
-| AI insights | 5 / month | 100 / month | Unlimited |
-| Team members | 1 | 3 | 10 |
-| Priority support | -- | -- | Yes |
+### 8.1 Advanced Campaign Analytics
+
+Extend the existing `CampaignAnalytics` component with:
+
+- **ROI Calculator**: (Total revenue or estimated value) vs budget spent. User inputs "estimated value per confirmed influencer" in campaign edit dialog; the system computes ROI automatically.
+- **Outreach response rate**: Emails sent vs influencers who moved past "Contacted" stage
+- **Time-in-stage metrics**: Average days an influencer spends in each pipeline stage (computed from `pipeline_cards.updated_at` and `campaign_activity`)
+- **Cost-per-influencer**: Budget / confirmed influencers
+
+### 8.2 Analytics Dashboard Page
+
+New page: `src/pages/AnalyticsPage.tsx` (route: `/analytics`)
+
+- Cross-campaign overview: total spend, total influencers, overall conversion rate
+- Monthly trends: searches performed, emails sent, credits consumed (from `credits_usage` table)
+- Top-performing campaigns by conversion rate
+- Credit usage breakdown chart (search, enrichment, email, AI)
+
+### 8.3 PDF Report Generation
+
+- **Approach**: Client-side PDF generation using the browser's `window.print()` with a print-optimized layout, or a lightweight library like `html2canvas` + `jspdf`
+- **New component**: `src/components/campaigns/CampaignReport.tsx` -- a print-friendly layout of:
+  - Campaign summary (name, dates, budget, status)
+  - Pipeline funnel chart
+  - Stage distribution
+  - Conversion rates
+  - Influencer roster with key metrics
+  - Outreach log summary
+- **Trigger**: "Download Report" button on `CampaignDetailPage`
+- **No new dependencies needed** if using `window.print()` approach; otherwise add `jspdf` + `html2canvas`
+
+### 8.4 Compliance & Data Management
+
+- **Data export (GDPR)**: "Export My Data" button in Settings that downloads a JSON file of the user's profile, workspace data, campaigns, and outreach logs
+- **Data deletion**: "Delete Account" button in Settings that:
+  - Deletes all user data (profile, workspace, campaigns, pipeline data, outreach logs)
+  - Signs the user out
+  - Edge function `delete-account` handles cascading deletion server-side with service role
+- **Consent logging**: Add a `consent_given_at` timestamp to `profiles` table (set during onboarding)
+- **Email opt-out tracking**: Add `unsubscribed` boolean to `outreach_log` so bounced or opt-out emails can be flagged
 
 ---
 
-## 6.2 Stripe Setup
-
-### Enable Stripe Integration
-
-Use Lovable's built-in Stripe integration tool to connect the user's Stripe account and create the products/prices.
-
-### Products and Prices to Create
-
-- **InfluenceIQ Pro** -- $29/month recurring
-- **InfluenceIQ Business** -- $79/month recurring
-
----
-
-## 6.3 Database Changes
-
-### New Table: `subscriptions`
+## Database Changes
 
 ```sql
-CREATE TABLE public.subscriptions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  workspace_id UUID NOT NULL UNIQUE,
-  stripe_customer_id TEXT NOT NULL,
-  stripe_subscription_id TEXT,
-  plan TEXT NOT NULL DEFAULT 'free',  -- 'free', 'pro', 'business'
-  status TEXT NOT NULL DEFAULT 'active', -- 'active', 'canceled', 'past_due', 'trialing'
-  current_period_start TIMESTAMPTZ,
-  current_period_end TIMESTAMPTZ,
-  cancel_at_period_end BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+-- Phase 8: Compliance additions
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS consent_given_at TIMESTAMPTZ;
+ALTER TABLE public.outreach_log ADD COLUMN IF NOT EXISTS unsubscribed BOOLEAN DEFAULT false;
 ```
 
-RLS: Workspace members can SELECT; workspace owners can UPDATE.
+## New Files
 
-### Modify `workspaces` Table
-
-Add columns to support plan-based credit limits:
-
-```sql
-ALTER TABLE public.workspaces
-  ADD COLUMN plan TEXT NOT NULL DEFAULT 'free',
-  ADD COLUMN email_sends_remaining INTEGER NOT NULL DEFAULT 20,
-  ADD COLUMN ai_credits_remaining INTEGER NOT NULL DEFAULT 5;
-```
-
----
-
-## 6.4 Edge Functions
-
-### `stripe-webhook` (new)
-
-Handles Stripe webhook events:
-- `checkout.session.completed` -- Activate subscription, set plan on workspace, reset credits to plan limits
-- `customer.subscription.updated` -- Plan changes (upgrade/downgrade), update credit limits
-- `customer.subscription.deleted` -- Revert to free plan, reset credits to free limits
-- `invoice.payment_failed` -- Mark subscription as `past_due`
-
-### `create-checkout` (new)
-
-Creates a Stripe Checkout session for a given price ID. Returns the checkout URL. Validates workspace ownership.
-
-### `create-portal` (new)
-
-Creates a Stripe Customer Portal session so users can manage their subscription, update payment method, or cancel. Returns the portal URL.
-
-### `reset-credits` (handled by webhook)
-
-When a new billing period starts (`invoice.paid`), reset all credits to the plan's limits.
-
----
-
-## 6.5 New Hook: `useSubscription`
-
-```typescript
-// src/hooks/useSubscription.ts
-- Fetches subscription data from `subscriptions` table
-- `checkout(priceId)` -- calls create-checkout edge function, redirects to Stripe
-- `openPortal()` -- calls create-portal edge function, redirects to Stripe portal
-- Plan comparison helpers (isPro, isBusiness, canAccessFeature)
-```
-
----
-
-## 6.6 Billing Page UI
-
-### New Page: `src/pages/BillingPage.tsx`
-
-- Route: `/billing`
-- Shows current plan with a badge
-- Pricing cards for Free / Pro / Business with feature comparison
-- "Upgrade" buttons that trigger Stripe Checkout
-- "Manage Subscription" button for existing subscribers (opens Stripe Portal)
-- Current credit usage breakdown (search, enrichment, email, AI)
-- Next billing date and renewal info
-
-### Sidebar Update
-
-Add "Billing" nav item with a `CreditCard` icon between Settings and the credits section. Update the credits widget to show plan name and link to billing page.
-
----
-
-## 6.7 Feature Gating
-
-### `src/hooks/usePlanLimits.ts` (new)
-
-Returns plan-based limits and checks:
-- `canCreateCampaign()` -- Free plan: max 3
-- `canSendEmail()` -- checks email_sends_remaining
-- `canUseAI()` -- checks ai_credits_remaining
-- `getLimit(feature)` -- returns the max for the current plan
-
-### Integration Points
-
-- **CampaignsPage**: Show upgrade prompt when campaign limit is reached
-- **SendEmailDialog**: Check email credits before sending; show upgrade prompt if exhausted
-- **AI Insights**: Check AI credits before calling; show upgrade prompt if exhausted
-- **SearchPage**: Already gated by search_credits_remaining; update limits per plan
-- **Settings page**: Show plan badge
-
----
-
-## 6.8 Credit Deduction Updates
-
-### Modify existing edge functions
-
-- `send-outreach-email`: Deduct from `email_sends_remaining`, log to `credits_usage`
-- `ai-insights`: Deduct from `ai_credits_remaining`, log to `credits_usage`
-- `search-influencers`: Already deducts search credits; update max per plan
-
----
-
-## Files Summary
-
-| File | Action |
+| File | Purpose |
 |---|---|
-| `supabase/functions/create-checkout/index.ts` | Create |
-| `supabase/functions/create-portal/index.ts` | Create |
-| `supabase/functions/stripe-webhook/index.ts` | Create |
-| `src/hooks/useSubscription.ts` | Create |
-| `src/hooks/usePlanLimits.ts` | Create |
-| `src/pages/BillingPage.tsx` | Create |
-| `src/App.tsx` | Modify (add /billing route) |
-| `src/components/layout/AppSidebar.tsx` | Modify (add Billing nav + plan badge) |
-| `src/pages/Index.tsx` | Modify (show plan in credit widget) |
-| `src/hooks/useWorkspaceCredits.ts` | Modify (include new credit types) |
-| `supabase/functions/send-outreach-email/index.ts` | Modify (deduct email credits) |
-| `supabase/functions/ai-insights/index.ts` | Modify (deduct AI credits) |
-| `src/components/campaigns/SendEmailDialog.tsx` | Modify (credit gate) |
-| `src/hooks/useAIInsights.ts` | Modify (credit gate) |
-| `src/pages/CampaignsPage.tsx` | Modify (campaign limit gate) |
-| Database migration | Create `subscriptions`, alter `workspaces` |
+| `src/lib/integrations.ts` | `fireWebhook` utility + integration helpers |
+| `src/components/settings/IntegrationsTab.tsx` | Integrations config UI (Zapier, Sheets, HubSpot, Slack) |
+| `src/pages/AnalyticsPage.tsx` | Cross-campaign analytics dashboard |
+| `src/components/campaigns/CampaignReport.tsx` | Print-friendly PDF report layout |
+| `src/components/settings/DataManagement.tsx` | GDPR export + account deletion UI |
+| `supabase/functions/sync-hubspot/index.ts` | Push influencer data to HubSpot |
+| `supabase/functions/delete-account/index.ts` | Cascade-delete user data |
+
+## Modified Files
+
+| File | Changes |
+|---|---|
+| `src/pages/Settings.tsx` | Add Integrations + Data Management tabs |
+| `src/pages/CampaignDetailPage.tsx` | Add "Download Report" and "Export to Sheets" buttons |
+| `src/pages/ListDetailPage.tsx` | Add "Export to Sheets" button |
+| `src/hooks/usePipelineCards.ts` | Fire webhook on card add/move |
+| `src/hooks/useCampaigns.ts` | Fire webhook on status change |
+| `src/components/campaigns/SendEmailDialog.tsx` | Fire webhook after email sent |
+| `src/components/campaigns/CampaignAnalytics.tsx` | Add ROI, response rate, time-in-stage charts |
+| `src/components/layout/AppSidebar.tsx` | Add Analytics nav item |
+| `src/App.tsx` | Add `/analytics` route |
+| `supabase/config.toml` | Add new edge functions config |
 
 ## Implementation Order
 
-1. Enable Stripe integration (collect secret key)
-2. Create Stripe products and prices
-3. Database migration (subscriptions table + workspace columns)
-4. Create `create-checkout` edge function
-5. Create `create-portal` edge function
-6. Create `stripe-webhook` edge function (with credit reset logic)
-7. Create `useSubscription` and `usePlanLimits` hooks
-8. Build BillingPage with pricing cards
-9. Add Billing to sidebar navigation
-10. Integrate feature gating across existing components
-11. Update edge functions for credit deduction
-12. End-to-end testing
-
-## Technical Considerations
-
-- **Stripe Checkout**: Using Stripe-hosted checkout (not embedded) for PCI compliance simplicity. Users are redirected to Stripe and back.
-- **Webhook idempotency**: The webhook handler checks `stripe_subscription_id` before processing to avoid duplicate activations.
-- **Plan downgrades**: When downgrading, credits are NOT reduced mid-cycle. New limits apply at next reset.
-- **Free plan**: No Stripe subscription needed. The default state. Stripe customer is only created on first checkout.
-- **Credit reset**: Handled by `invoice.paid` webhook event, which fires at the start of each billing cycle. For free users, the existing `credits_reset_at` mechanism continues.
-- **Security**: Webhook endpoint validates Stripe signature. Checkout/portal endpoints validate workspace ownership via JWT.
-
+1. Create `src/lib/integrations.ts` with `fireWebhook` utility
+2. Add Integrations tab to Settings (Zapier, Sheets, HubSpot, Slack webhook URLs)
+3. Wire webhook calls into existing hooks and components
+4. Create `sync-hubspot` edge function
+5. Build Analytics page with cross-campaign charts
+6. Extend `CampaignAnalytics` with ROI, response rate, time-in-stage
+7. Build `CampaignReport` component and "Download Report" button
+8. Database migration for compliance columns
+9. Build Data Management UI (export + delete account)
+10. Create `delete-account` edge function
+11. Update onboarding to record consent timestamp
