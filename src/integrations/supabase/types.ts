@@ -334,6 +334,7 @@ export type Database = {
           notes: string | null
           platform: string
           status: string
+          unsubscribed: boolean | null
           username: string
         }
         Insert: {
@@ -347,6 +348,7 @@ export type Database = {
           notes?: string | null
           platform: string
           status?: string
+          unsubscribed?: boolean | null
           username: string
         }
         Update: {
@@ -360,6 +362,7 @@ export type Database = {
           notes?: string | null
           platform?: string
           status?: string
+          unsubscribed?: boolean | null
           username?: string
         }
         Relationships: [
@@ -474,6 +477,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          consent_given_at: string | null
           created_at: string
           full_name: string | null
           id: string
@@ -482,6 +486,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          consent_given_at?: string | null
           created_at?: string
           full_name?: string | null
           id: string
@@ -490,6 +495,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          consent_given_at?: string | null
           created_at?: string
           full_name?: string | null
           id?: string

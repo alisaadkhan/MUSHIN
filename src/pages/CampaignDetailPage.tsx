@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Plus, Users, Pencil, CalendarIcon } from "lucide-react";
+import { ArrowLeft, Plus, Users, Pencil, CalendarIcon, FileDown, Sheet } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,7 @@ import { CampaignStats } from "@/components/campaigns/CampaignStats";
 import { CampaignTimeline } from "@/components/campaigns/CampaignTimeline";
 import { CampaignAnalytics } from "@/components/campaigns/CampaignAnalytics";
 import { AIInsightsPanel } from "@/components/campaigns/AIInsightsPanel";
+import { CampaignReport } from "@/components/campaigns/CampaignReport";
 import { useOutreachLog } from "@/hooks/useOutreachLog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,8 +36,10 @@ import { useInfluencerLists, useListItems } from "@/hooks/useInfluencerLists";
 import { usePipelineStages, usePipelineCards } from "@/hooks/usePipelineCards";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { useCampaignActivity } from "@/hooks/useCampaignActivity";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { fireWebhook } from "@/lib/integrations";
 
 const statusColors: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
@@ -48,10 +51,13 @@ const statusColors: Record<string, string> = {
 export default function CampaignDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
+  const { workspace } = useAuth();
   const queryClient = useQueryClient();
   const { updateCampaign } = useCampaigns();
   const { logActivity } = useCampaignActivity(id);
   const [showAddFromList, setShowAddFromList] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
   const [selectedListId, setSelectedListId] = useState<string>("");
   const [showEdit, setShowEdit] = useState(false);
   const [editName, setEditName] = useState("");
@@ -157,6 +163,34 @@ export default function CampaignDetailPage() {
     setSelectedListId("");
   };
 
+  const handleDownloadReport = () => {
+    setShowReport(true);
+    setTimeout(() => window.print(), 500);
+  };
+
+  const handleExportToSheets = async () => {
+    if (!workspace?.workspace_id || !cards) return;
+    const { data: ws } = await supabase
+      .from("workspaces")
+      .select("settings")
+      .eq("id", workspace.workspace_id)
+      .single();
+    const sheetsUrl = (ws?.settings as any)?.google_sheets_webhook_url;
+    if (!sheetsUrl) {
+      toast({ title: "No Google Sheets webhook configured", description: "Go to Settings > Integrations to set it up.", variant: "destructive" });
+      return;
+    }
+    await fireWebhook(sheetsUrl, {
+      event: "campaign_export",
+      timestamp: new Date().toISOString(),
+      data: {
+        campaign: campaign?.name,
+        influencers: cards.map((c) => ({ username: c.username, platform: c.platform, agreed_rate: c.agreed_rate })),
+      },
+    });
+    toast({ title: "Exported to Google Sheets" });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -203,10 +237,20 @@ export default function CampaignDetailPage() {
             )}
           </div>
         </div>
-        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowAddFromList(true)}>
-          <Plus className="h-3.5 w-3.5" />
-          Add from List
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExportToSheets}>
+            <Sheet className="h-3.5 w-3.5" />
+            Export to Sheets
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={handleDownloadReport}>
+            <FileDown className="h-3.5 w-3.5" />
+            Download Report
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowAddFromList(true)}>
+            <Plus className="h-3.5 w-3.5" />
+            Add from List
+          </Button>
+        </div>
       </div>
 
       {id && campaign && stages && cards && (
@@ -322,6 +366,19 @@ export default function CampaignDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Hidden print report */}
+      {showReport && campaign && stages && cards && (
+        <div className="hidden print:block">
+          <CampaignReport
+            ref={reportRef}
+            campaign={campaign}
+            stages={stages}
+            cards={cards}
+            outreachEntries={outreachEntries || []}
+          />
+        </div>
+      )}
     </div>
   );
 }
