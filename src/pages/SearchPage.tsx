@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Search, SlidersHorizontal, Instagram, Youtube } from "lucide-react";
+import { Search, SlidersHorizontal, Instagram, Youtube, ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -12,6 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const PAKISTAN_CITIES = [
   "All Pakistan",
@@ -30,18 +34,89 @@ const PLATFORMS = [
   { value: "youtube", label: "YouTube", icon: Youtube },
 ];
 
+interface SearchResult {
+  title: string;
+  link: string;
+  snippet: string;
+  username: string;
+  platform: string;
+  displayUrl: string;
+}
+
+const platformColors: Record<string, string> = {
+  instagram: "bg-pink-500/10 text-pink-500 border-pink-500/20",
+  tiktok: "bg-cyan-500/10 text-cyan-500 border-cyan-500/20",
+  youtube: "bg-red-500/10 text-red-500 border-red-500/20",
+};
+
 export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [platform, setPlatform] = useState("instagram");
   const [city, setCity] = useState("All Pakistan");
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
+  const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null);
+  const { toast } = useToast();
+
+  const handleSearch = async () => {
+    if (!query.trim()) return;
+    setLoading(true);
+    setSearched(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("search-influencers", {
+        body: { query: query.trim(), platform, location: city },
+      });
+
+      if (error) throw error;
+
+      if (data?.error) {
+        toast({
+          title: "Search failed",
+          description: data.error,
+          variant: "destructive",
+        });
+        setResults([]);
+        return;
+      }
+
+      setResults(data.results || []);
+      setCreditsRemaining(data.credits_remaining ?? null);
+
+      if ((data.results || []).length === 0) {
+        toast({ title: "No results", description: "Try a different keyword or platform." });
+      }
+    } catch (err: any) {
+      console.error("Search error:", err);
+      toast({
+        title: "Search failed",
+        description: err.message || "Something went wrong",
+        variant: "destructive",
+      });
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const PlatformIcon = PLATFORMS.find((p) => p.value === platform)?.icon || Search;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Discover</h1>
-        <p className="text-muted-foreground mt-1">
-          Search for influencers across platforms
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Discover</h1>
+          <p className="text-muted-foreground mt-1">
+            Search for influencers across platforms
+          </p>
+        </div>
+        {creditsRemaining !== null && (
+          <Badge variant="outline" className="text-xs gap-1.5 py-1 px-3">
+            <Loader2 className="h-3 w-3" />
+            {creditsRemaining} credits left
+          </Badge>
+        )}
       </div>
 
       {/* Search Form */}
@@ -60,6 +135,7 @@ export default function SearchPage() {
                     placeholder='e.g. "fashion blogger", "fitness coach"'
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                     className="pl-10 bg-background/50"
                   />
                 </div>
@@ -106,30 +182,119 @@ export default function SearchPage() {
             </div>
 
             <div className="mt-4 flex justify-end">
-              <Button className="btn-shine gap-2" disabled={!query.trim()}>
-                <Search className="h-4 w-4" />
-                Search Influencers
+              <Button
+                className="btn-shine gap-2"
+                disabled={!query.trim() || loading}
+                onClick={handleSearch}
+              >
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                {loading ? "Searching…" : "Search Influencers"}
               </Button>
             </div>
           </CardContent>
         </Card>
       </motion.div>
 
-      {/* Results placeholder */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
+      {/* Loading Skeletons */}
+      {loading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i} className="glass-card">
+              <CardContent className="p-5 space-y-3">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                </div>
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-5/6" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Results */}
+      {!loading && searched && results.length > 0 && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm text-muted-foreground">{results.length} result{results.length !== 1 ? "s" : ""} found</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {results.map((r, i) => (
+              <motion.div
+                key={`${r.platform}-${r.username}-${i}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.04 }}
+              >
+                <Card className="glass-card hover:border-primary/30 transition-colors">
+                  <CardContent className="p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
+                          <PlatformIcon className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold truncate">{r.title}</p>
+                          <p className="text-sm text-muted-foreground truncate">{r.username}</p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className={`shrink-0 text-[10px] ${platformColors[r.platform] || ""}`}>
+                        {r.platform}
+                      </Badge>
+                    </div>
+                    {r.snippet && (
+                      <p className="text-xs text-muted-foreground mt-3 line-clamp-2">{r.snippet}</p>
+                    )}
+                    <div className="mt-3 flex items-center gap-2">
+                      <Button variant="outline" size="sm" className="text-xs gap-1.5" asChild>
+                        <a href={r.link} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="h-3 w-3" />
+                          View Profile
+                        </a>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Empty / Initial State */}
+      {!loading && !searched && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
+          <Card className="glass-card">
+            <CardContent className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl aurora-gradient mb-4">
+                <Search className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold mb-1">Start Your Search</h3>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Enter a niche keyword, select a platform and location to discover
+                real influencers with verified metrics.
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* No results state */}
+      {!loading && searched && results.length === 0 && (
         <Card className="glass-card">
-          <CardContent className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl aurora-gradient mb-4">
-              <Search className="h-8 w-8 text-primary" />
-            </div>
-            <h3 className="text-lg font-semibold mb-1">Start Your Search</h3>
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <Search className="h-10 w-10 text-muted-foreground mb-3" />
+            <h3 className="text-lg font-semibold mb-1">No Results Found</h3>
             <p className="text-sm text-muted-foreground max-w-md">
-              Enter a niche keyword, select a platform and location to discover
-              real influencers with verified metrics.
+              Try different keywords, another platform, or a broader location.
             </p>
           </CardContent>
         </Card>
-      </motion.div>
+      )}
     </div>
   );
 }
