@@ -35,9 +35,17 @@ interface KanbanCardProps {
   onSendEmail?: () => void;
 }
 
+const riskDotColors: Record<string, string> = {
+  low: "bg-green-500",
+  medium: "bg-yellow-500",
+  high: "bg-red-500",
+};
+
 export function KanbanCard({ card, onEdit, draggable, onDragStart, selectable, selected, onSelect, contacted, onSendEmail }: KanbanCardProps) {
   const PlatformIcon = platformIcons[card.platform] || Search;
   const d = card.data as any;
+
+  const fraudRisk = (d?.ai_fraud_check as any)?.risk as string | undefined;
 
   return (
     <Card
@@ -72,6 +80,7 @@ export function KanbanCard({ card, onEdit, draggable, onDragStart, selectable, s
             </div>
             <div className="flex items-center gap-1">
               <p className="text-xs text-muted-foreground truncate">{card.username}</p>
+              {fraudRisk && <span className={`h-2 w-2 rounded-full shrink-0 ${riskDotColors[fraudRisk] || ""}`} title={`Fraud risk: ${fraudRisk}`} />}
               {contacted && (
                 <Badge variant="outline" className="text-[9px] gap-0.5 bg-green-500/10 text-green-500 border-green-500/20">
                   <Mail className="h-2.5 w-2.5" />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Instagram, Youtube, SlidersHorizontal, Search, ExternalLink, Trash2, Users, Eye, TrendingUp, Clock, Mail, Send } from "lucide-react";
+import { Instagram, Youtube, SlidersHorizontal, Search, ExternalLink, Trash2, Users, Eye, TrendingUp, Clock, Mail, Send, Sparkles, ShieldCheck, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SendEmailDialog } from "./SendEmailDialog";
+import { FraudCheckBadge } from "./FraudCheckBadge";
+import { useAIInsights, type FraudCheckResult } from "@/hooks/useAIInsights";
 import type { OutreachEntry } from "@/hooks/useOutreachLog";
 const platformIcons: Record<string, any> = {
   instagram: Instagram,
@@ -63,11 +65,16 @@ export function CardDetailDialog({ card, open, onOpenChange, onSave, onRemove, s
   const [notes, setNotes] = useState("");
   const [emailOpen, setEmailOpen] = useState(false);
   const [rate, setRate] = useState("");
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [fraudResult, setFraudResult] = useState<FraudCheckResult | null>(null);
+  const { generateSummary, summaryLoading, runFraudCheck, fraudLoading } = useAIInsights();
 
   useEffect(() => {
     if (card) {
       setNotes(card.notes || "");
       setRate(card.agreed_rate != null ? String(card.agreed_rate) : "");
+      setAiSummary(null);
+      setFraudResult((card.data as any)?.ai_fraud_check || null);
     }
   }, [card]);
 
@@ -132,6 +139,44 @@ export function CardDetailDialog({ card, open, onOpenChange, onSave, onRemove, s
               )}
             </div>
           )}
+
+          {/* AI Insights */}
+          <div className="space-y-2 rounded-lg border border-border bg-muted/10 p-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-3.5 w-3.5 text-primary" />
+              <span className="text-xs font-semibold">AI Insights</span>
+              <div className="flex gap-1 ml-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 text-[10px] gap-1"
+                  onClick={async () => {
+                    const s = await generateSummary({ username: card.username, platform: card.platform, followers, engagement, avgViews, ...d });
+                    if (s) setAiSummary(s);
+                  }}
+                  disabled={summaryLoading}
+                >
+                  {summaryLoading ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Sparkles className="h-2.5 w-2.5" />}
+                  Summary
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 text-[10px] gap-1"
+                  onClick={async () => {
+                    const r = await runFraudCheck({ username: card.username, platform: card.platform, followers, engagement, avgViews, ...d });
+                    if (r) setFraudResult(r);
+                  }}
+                  disabled={fraudLoading}
+                >
+                  {fraudLoading ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <ShieldCheck className="h-2.5 w-2.5" />}
+                  Fraud Check
+                </Button>
+              </div>
+            </div>
+            {aiSummary && <p className="text-xs text-muted-foreground">{aiSummary}</p>}
+            {fraudResult && <FraudCheckBadge result={fraudResult} />}
+          </div>
 
           {/* Move to stage */}
           {stages && stages.length > 0 && onMove && card.stage_id && (

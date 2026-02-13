@@ -27,6 +27,8 @@ import { KanbanBoard } from "@/components/campaigns/KanbanBoard";
 import { CampaignStats } from "@/components/campaigns/CampaignStats";
 import { CampaignTimeline } from "@/components/campaigns/CampaignTimeline";
 import { CampaignAnalytics } from "@/components/campaigns/CampaignAnalytics";
+import { AIInsightsPanel } from "@/components/campaigns/AIInsightsPanel";
+import { useOutreachLog } from "@/hooks/useOutreachLog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useInfluencerLists, useListItems } from "@/hooks/useInfluencerLists";
@@ -76,6 +78,7 @@ export default function CampaignDetailPage() {
   const { data: listItems } = useListItems(selectedListId || undefined);
   const { data: stages } = usePipelineStages(id);
   const { data: cards, addCard } = usePipelineCards(id);
+  const { outreachEntries } = useOutreachLog(id);
 
   const openEditDialog = () => {
     if (!campaign) return;
@@ -211,6 +214,24 @@ export default function CampaignDetailPage() {
       )}
 
       {id && <KanbanBoard campaignId={id} campaignName={campaign?.name} />}
+
+      {id && campaign && stages && cards && (
+        <AIInsightsPanel
+          campaignContext={{
+            name: campaign.name,
+            status: campaign.status,
+            budget: campaign.budget,
+            start_date: campaign.start_date,
+            end_date: campaign.end_date,
+            stages: stages.map((s) => ({
+              name: s.name,
+              card_count: cards.filter((c) => c.stage_id === s.id).length,
+            })),
+            total_cards: cards.length,
+            outreach_count: outreachEntries?.length || 0,
+          }}
+        />
+      )}
 
       {id && campaign && stages && cards && (
         <CampaignAnalytics stages={stages} cards={cards} campaign={campaign} />
