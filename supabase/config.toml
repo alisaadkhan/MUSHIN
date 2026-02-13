@@ -1,1 +1,4 @@
 project_id = "klxyrefnqnwjbcigdzmc"
+
+[functions.search-influencers]
+verify_jwt = false
