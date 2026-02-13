@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Index from "./pages/Index";
+import LandingPage from "./pages/LandingPage";
 import SearchPage from "./pages/SearchPage";
 import ListsPage from "./pages/ListsPage";
 import ListDetailPage from "./pages/ListDetailPage";
@@ -41,7 +42,8 @@ const App = () => (
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/update-password" element={<ProtectedRoute><UpdatePassword /></ProtectedRoute>} />
-            <Route path="/" element={<ProtectedPage><Index /></ProtectedPage>} />
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/dashboard" element={<ProtectedPage><Index /></ProtectedPage>} />
             <Route path="/search" element={<ProtectedPage><SearchPage /></ProtectedPage>} />
             <Route path="/lists" element={<ProtectedPage><ListsPage /></ProtectedPage>} />
             <Route path="/lists/:id" element={<ProtectedPage><ListDetailPage /></ProtectedPage>} />

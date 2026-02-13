@@ -26,7 +26,7 @@ export default function Onboarding() {
 
   // Guard: already completed
   if (profile?.onboarding_completed) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   const handleComplete = async () => {
@@ -69,7 +69,7 @@ export default function Onboarding() {
       }
 
       await refreshProfile();
-      navigate("/", { replace: true });
+      navigate("/dashboard", { replace: true });
     } catch {
       toast({ title: "Error", description: "Failed to save. Please try again.", variant: "destructive" });
     } finally {
