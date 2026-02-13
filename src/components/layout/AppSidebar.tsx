@@ -10,6 +10,7 @@ import {
   Settings,
   Zap,
 } from "lucide-react";
+import { useWorkspaceCredits } from "@/hooks/useWorkspaceCredits";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/" },
@@ -22,6 +23,11 @@ const navItems = [
 
 export function AppSidebar() {
   const location = useLocation();
+  const { data: credits } = useWorkspaceCredits();
+
+  const searchUsed = 50 - (credits?.search_credits_remaining ?? 50);
+  const totalCredits = credits?.search_credits_remaining ?? 50;
+  const pct = ((totalCredits) / 50) * 100;
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-border bg-sidebar">
@@ -39,7 +45,8 @@ export function AppSidebar() {
       {/* Navigation */}
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navItems.map((item) => {
-          const isActive = location.pathname === item.path;
+          const isActive = location.pathname === item.path ||
+            (item.path === "/lists" && location.pathname.startsWith("/lists"));
           return (
             <Link
               key={item.path}
@@ -63,12 +70,12 @@ export function AppSidebar() {
         <div className="glass-card rounded-lg p-3">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
             <span>Credits</span>
-            <span className="data-mono">50 / 50</span>
+            <span className="data-mono">{totalCredits} / 50</span>
           </div>
           <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
             <div
               className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all"
-              style={{ width: "100%" }}
+              style={{ width: `${pct}%` }}
             />
           </div>
         </div>
