@@ -1,62 +1,55 @@
 
 
-# Campaign Dashboard Stats, Stage Drag-and-Drop Reorder, and E2E Testing
+# Add to Campaign from Lists, Budget Progress Bar, and Stage Color Picker
 
-## 1. Campaign Dashboard Stats
+## 1. "Add to Campaign" Button on List Detail Page
 
-Add a stats summary section between the campaign header and the Kanban board on the Campaign Detail page.
+**File: `src/pages/ListDetailPage.tsx`**
 
-**Stats to display (in a row of cards):**
-- Total Influencers -- count of all pipeline cards
-- Per-Stage Breakdown -- small bar or list showing count per stage with stage color dots
-- Budget -- campaign budget value (from `campaign.budget`)
-- Total Agreed Rates -- sum of all `agreed_rate` values across cards
-- Budget Remaining -- budget minus total agreed rates (with color coding: green if positive, red if negative)
+- Add an "Add to Campaign" button in the floating bulk action bar (appears when influencers are selected)
+- Clicking it opens a dialog with:
+  - A `Select` dropdown to pick a campaign (fetched via `useCampaigns` hook)
+  - A preview showing how many selected influencers will be added
+  - A confirmation button that batch-inserts the selected items as pipeline cards into the campaign's first stage
+- Uses `usePipelineStages` to find the first stage and `usePipelineCards.addCard` to insert each selected influencer
+- After adding, shows a toast with the count and a link to the campaign
 
-**Implementation:**
-- Create a new component `src/components/campaigns/CampaignStats.tsx`
-- It receives `stages`, `cards`, and `campaign` as props
-- Uses the existing `Card` UI component to render 3-4 stat cards in a responsive grid
-- Computed client-side from already-fetched data (no new queries needed)
+## 2. Budget Progress Bar in Campaign Stats
 
-## 2. Stage Drag-and-Drop Reorder
+**File: `src/components/campaigns/CampaignStats.tsx`**
 
-Allow users to drag stage columns left/right to reorder them.
+- Add a `Progress` bar component to the "Budget / Agreed" stat card
+- Calculate percentage: `(totalAgreed / budget) * 100`, capped at 100
+- Color the progress bar indicator:
+  - Default primary color when under 80%
+  - Warning amber when 80-100%
+  - Red/destructive when over 100% (over budget)
+- Show percentage text below the progress bar
+- Only render the progress bar when budget > 0
 
-**Implementation:**
-- Add a `reorderStages` mutation to `usePipelineStages` in `src/hooks/usePipelineCards.ts` that batch-updates positions for all stages
-- In `KanbanBoard.tsx`, add a second drag context for stages (separate from card dragging):
-  - Track `dragStageId` state (distinct from `dragCardId`)
-  - Make stage column headers draggable via a grip icon
-  - On drop between stages, reorder the array and call `reorderStages`
-  - Use `dataTransfer.setData("type", "stage")` vs `"card"` to distinguish drag types
-- Optimistically reorder the stages array in the UI before the mutation completes
+## 3. Stage Color Picker in Kanban Board
 
-## 3. E2E Testing Plan
+**File: `src/components/campaigns/KanbanBoard.tsx`**
 
-After implementation, manually test using browser tools:
-1. **Credits exhausted banner** -- navigate to Search, verify banner/disabled state
-2. **Campaign status dropdown** -- go to a campaign detail page, change status, verify it persists
-3. **Stage customization** -- add a new stage, rename it, delete an empty stage, try deleting a stage with cards (should be blocked)
-4. **Stage reorder** -- drag a stage column to a new position, verify order persists after refresh
-5. **Dashboard stats** -- verify counts match actual cards, budget math is correct
+- Add a "Change Color" option in the stage dropdown menu (alongside Rename and Delete)
+- Clicking it opens a popover with a grid of preset color swatches (8-10 colors)
+- Preset colors: indigo, amber, blue, green, purple, pink, red, cyan, orange, gray
+- Selecting a color calls `updateStage.mutateAsync({ id: stageId, color: selectedColor })`
+- The stage's color dot updates immediately
 
 ---
 
 ## Technical Details
 
-### Files to Create
-| File | Purpose |
-|------|---------|
-| `src/components/campaigns/CampaignStats.tsx` | Stats cards component (total influencers, per-stage counts, budget vs agreed rates) |
-
 ### Files to Modify
+
 | File | Changes |
 |------|---------|
-| `src/hooks/usePipelineCards.ts` | Add `reorderStages` mutation that batch-updates position for all stages |
-| `src/components/campaigns/KanbanBoard.tsx` | Add stage drag-and-drop (dragStageId state, grip handle on headers, drop zone logic to distinguish stage vs card drags) |
-| `src/pages/CampaignDetailPage.tsx` | Import and render `CampaignStats` between header and KanbanBoard, passing stages/cards/campaign data |
+| `src/pages/ListDetailPage.tsx` | Add "Add to Campaign" button in bulk bar, campaign selection dialog, batch insert logic |
+| `src/components/campaigns/CampaignStats.tsx` | Add Progress bar to budget card with color-coded percentage |
+| `src/components/campaigns/KanbanBoard.tsx` | Add color picker popover in stage dropdown menu |
 
-### No Database Changes Required
-All data needed for stats and reorder is already available in existing tables. The `pipeline_stages.position` column already supports reordering.
+### No New Files or Database Changes Required
+
+All features use existing tables, hooks, and UI components (`Progress`, `Popover`, `Select`, `Dialog`). The `updateStage` mutation already supports color updates.
 
