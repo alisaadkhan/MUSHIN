@@ -32,15 +32,16 @@ interface KanbanCardProps {
   selected?: boolean;
   onSelect?: (id: string) => void;
   contacted?: boolean;
+  onSendEmail?: () => void;
 }
 
-export function KanbanCard({ card, onEdit, draggable, onDragStart, selectable, selected, onSelect, contacted }: KanbanCardProps) {
+export function KanbanCard({ card, onEdit, draggable, onDragStart, selectable, selected, onSelect, contacted, onSendEmail }: KanbanCardProps) {
   const PlatformIcon = platformIcons[card.platform] || Search;
   const d = card.data as any;
 
   return (
     <Card
-      className={`glass-card cursor-pointer hover:border-primary/30 transition-colors ${selected ? "border-primary/50 bg-primary/5" : ""}`}
+      className={`glass-card cursor-pointer hover:border-primary/30 transition-colors group ${selected ? "border-primary/50 bg-primary/5" : ""}`}
       draggable={draggable && !selectable}
       onDragStart={onDragStart}
       onClick={() => {
@@ -83,13 +84,20 @@ export function KanbanCard({ card, onEdit, draggable, onDragStart, selectable, s
               {card.agreed_rate != null && (
                 <span className="text-xs font-medium text-primary">${Number(card.agreed_rate).toLocaleString()}</span>
               )}
-              {d?.link && (
-                <Button variant="ghost" size="sm" className="h-6 text-[10px] gap-1 p-1" asChild onClick={(e) => e.stopPropagation()}>
-                  <a href={d.link} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                </Button>
-              )}
+              <div className="flex items-center gap-0.5 ml-auto">
+                {onSendEmail && (
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); onSendEmail(); }}>
+                    <Mail className="h-3 w-3" />
+                  </Button>
+                )}
+                {d?.link && (
+                  <Button variant="ghost" size="sm" className="h-6 text-[10px] gap-1 p-1" asChild onClick={(e) => e.stopPropagation()}>
+                    <a href={d.link} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </div>

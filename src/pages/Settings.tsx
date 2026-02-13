@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -7,9 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+import { EmailTemplateManager } from "@/components/campaigns/EmailTemplateManager";
 
 export default function Settings() {
-  const { user, profile, updatePassword, refreshProfile } = useAuth();
+  const { user, profile, workspace, updatePassword, refreshProfile } = useAuth();
   const { toast } = useToast();
 
   // Profile tab state
@@ -21,6 +22,28 @@ export default function Settings() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordSaving, setPasswordSaving] = useState(false);
+
+  // Outreach tab state
+  const [defaultFromName, setDefaultFromName] = useState("");
+  const [defaultReplyTo, setDefaultReplyTo] = useState("");
+  const [outreachSaving, setOutreachSaving] = useState(false);
+
+  useEffect(() => {
+    if (workspace?.workspace_id) {
+      supabase
+        .from("workspaces")
+        .select("settings")
+        .eq("id", workspace.workspace_id)
+        .single()
+        .then(({ data }) => {
+          const s = data?.settings as any;
+          if (s) {
+            setDefaultFromName(s.default_from_name || "");
+            setDefaultReplyTo(s.default_reply_to || "");
+          }
+        });
+    }
+  }, [workspace?.workspace_id]);
 
   const handleProfileSave = async () => {
     if (avatarUrl.trim() && !/^https?:\/\/.+/.test(avatarUrl.trim())) {
@@ -73,6 +96,37 @@ export default function Settings() {
     }
   };
 
+  const handleOutreachSave = async () => {
+    if (!workspace?.workspace_id) return;
+    setOutreachSaving(true);
+    try {
+      const { data: current } = await supabase
+        .from("workspaces")
+        .select("settings")
+        .eq("id", workspace.workspace_id)
+        .single();
+
+      const existingSettings = (current?.settings as any) || {};
+      const { error } = await supabase
+        .from("workspaces")
+        .update({
+          settings: {
+            ...existingSettings,
+            default_from_name: defaultFromName.trim() || null,
+            default_reply_to: defaultReplyTo.trim() || null,
+          },
+        })
+        .eq("id", workspace.workspace_id);
+
+      if (error) throw error;
+      toast({ title: "Outreach settings saved" });
+    } catch {
+      toast({ title: "Error", description: "Failed to save outreach settings.", variant: "destructive" });
+    } finally {
+      setOutreachSaving(false);
+    }
+  };
+
   return (
     <div className="max-w-2xl space-y-6">
       <h1 className="text-2xl font-bold text-foreground">Settings</h1>
@@ -81,6 +135,7 @@ export default function Settings() {
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
+          <TabsTrigger value="outreach">Outreach</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="mt-6">
@@ -140,6 +195,39 @@ export default function Settings() {
               {passwordSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Update Password
             </Button>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="outreach" className="mt-6 space-y-6">
+          <div className="glass-card p-6 space-y-6">
+            <h3 className="text-sm font-semibold">Email Defaults</h3>
+            <div className="space-y-2">
+              <Label htmlFor="fromName">Default sender name</Label>
+              <Input
+                id="fromName"
+                value={defaultFromName}
+                onChange={(e) => setDefaultFromName(e.target.value)}
+                placeholder="Your Name or Company"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="replyTo">Default reply-to email</Label>
+              <Input
+                id="replyTo"
+                type="email"
+                value={defaultReplyTo}
+                onChange={(e) => setDefaultReplyTo(e.target.value)}
+                placeholder="you@company.com"
+              />
+            </div>
+            <Button onClick={handleOutreachSave} disabled={outreachSaving}>
+              {outreachSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save
+            </Button>
+          </div>
+
+          <div className="glass-card p-6">
+            <EmailTemplateManager />
           </div>
         </TabsContent>
       </Tabs>

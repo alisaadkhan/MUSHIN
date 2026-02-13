@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Instagram, Youtube, SlidersHorizontal, Search, ExternalLink, Trash2, Users, Eye, TrendingUp, Clock, Mail } from "lucide-react";
+import { Instagram, Youtube, SlidersHorizontal, Search, ExternalLink, Trash2, Users, Eye, TrendingUp, Clock, Mail, Send } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SendEmailDialog } from "./SendEmailDialog";
 import type { OutreachEntry } from "@/hooks/useOutreachLog";
 const platformIcons: Record<string, any> = {
   instagram: Instagram,
@@ -52,10 +53,15 @@ interface CardDetailDialogProps {
   stages?: Stage[];
   onMove?: (cardId: string, stageId: string) => void;
   outreachEntries?: OutreachEntry[];
+  campaignId?: string;
+  campaignName?: string;
+  defaultFromName?: string;
+  defaultReplyTo?: string;
 }
 
-export function CardDetailDialog({ card, open, onOpenChange, onSave, onRemove, stages, onMove, outreachEntries }: CardDetailDialogProps) {
+export function CardDetailDialog({ card, open, onOpenChange, onSave, onRemove, stages, onMove, outreachEntries, campaignId, campaignName, defaultFromName, defaultReplyTo }: CardDetailDialogProps) {
   const [notes, setNotes] = useState("");
+  const [emailOpen, setEmailOpen] = useState(false);
   const [rate, setRate] = useState("");
 
   useEffect(() => {
@@ -161,21 +167,29 @@ export function CardDetailDialog({ card, open, onOpenChange, onSave, onRemove, s
             <Input type="number" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="e.g. 500" />
           </div>
 
-          {/* Outreach History */}
-          {cardOutreach.length > 0 && (
-            <div>
-              <Label className="text-xs flex items-center gap-1 mb-1"><Mail className="h-3 w-3" /> Outreach History</Label>
+          {/* Outreach */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <Label className="text-xs flex items-center gap-1"><Mail className="h-3 w-3" /> Outreach</Label>
+              {campaignId && (
+                <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => setEmailOpen(true)}>
+                  <Send className="h-3 w-3" /> Send Email
+                </Button>
+              )}
+            </div>
+            {cardOutreach.length > 0 && (
               <div className="space-y-1.5">
                 {cardOutreach.map((entry) => (
                   <div key={entry.id} className="flex items-center gap-2 text-[11px] text-muted-foreground bg-muted/30 rounded px-2 py-1.5">
                     <Badge variant="outline" className="text-[9px] bg-green-500/10 text-green-500 border-green-500/20">{entry.method}</Badge>
                     <span>{new Date(entry.contacted_at).toLocaleDateString()}</span>
+                    {entry.email_to && <span className="truncate text-primary">→ {entry.email_to}</span>}
                     {entry.notes && <span className="truncate">— {entry.notes}</span>}
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Timestamps */}
           {(card.created_at || card.updated_at) && (
@@ -198,6 +212,17 @@ export function CardDetailDialog({ card, open, onOpenChange, onSave, onRemove, s
           </div>
         </DialogFooter>
       </DialogContent>
+      {campaignId && card && (
+        <SendEmailDialog
+          open={emailOpen}
+          onOpenChange={setEmailOpen}
+          card={card}
+          campaignId={campaignId}
+          campaignName={campaignName}
+          defaultFromName={defaultFromName}
+          defaultReplyTo={defaultReplyTo}
+        />
+      )}
     </Dialog>
   );
 }

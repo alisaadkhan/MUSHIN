@@ -210,7 +210,7 @@ export default function CampaignDetailPage() {
         <CampaignStats stages={stages} cards={cards} campaign={campaign} />
       )}
 
-      {id && <KanbanBoard campaignId={id} />}
+      {id && <KanbanBoard campaignId={id} campaignName={campaign?.name} />}
 
       {id && campaign && stages && cards && (
         <CampaignAnalytics stages={stages} cards={cards} campaign={campaign} />
