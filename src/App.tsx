@@ -20,6 +20,7 @@ import UpdatePassword from "./pages/UpdatePassword";
 import Onboarding from "./pages/Onboarding";
 import Settings from "./pages/Settings";
 import BillingPage from "./pages/BillingPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,6 +53,7 @@ const App = () => (
             <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedPage><Settings /></ProtectedPage>} />
             <Route path="/billing" element={<ProtectedPage><BillingPage /></ProtectedPage>} />
+            <Route path="/analytics" element={<ProtectedPage><AnalyticsPage /></ProtectedPage>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

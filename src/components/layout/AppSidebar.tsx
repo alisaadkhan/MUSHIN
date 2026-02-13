@@ -11,6 +11,7 @@ import {
   Settings,
   Zap,
   CreditCard,
+  BarChart3,
 } from "lucide-react";
 import { useWorkspaceCredits } from "@/hooks/useWorkspaceCredits";
 import { useSubscription } from "@/hooks/useSubscription";
@@ -22,6 +23,7 @@ const navItems = [
   { label: "Campaigns", icon: Megaphone, path: "/campaigns" },
   { label: "Saved Searches", icon: Bookmark, path: "/saved-searches" },
   { label: "History", icon: History, path: "/history" },
+  { label: "Analytics", icon: BarChart3, path: "/analytics" },
   { label: "Settings", icon: Settings, path: "/settings" },
   { label: "Billing", icon: CreditCard, path: "/billing" },
 ];
