@@ -149,7 +149,7 @@ export default function SearchPage() {
         title: "Added to list",
         description: (
           <span>
-            Added to <Link to={`/lists/${listId}`} className="underline font-medium">{listName}</Link>
+            Added to <a href={`/lists/${listId}`} className="underline font-medium">{listName}</a>
           </span>
         ),
       });
