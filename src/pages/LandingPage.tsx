@@ -11,6 +11,7 @@ import { Differentiation } from "@/components/marketing/Differentiation";
 import { HowItWorks } from "@/components/marketing/HowItWorks";
 import { Features } from "@/components/marketing/Features";
 import { ProductDemo } from "@/components/marketing/ProductDemo";
+import { TrustSecurity } from "@/components/marketing/TrustSecurity";
 import { PricingPreview } from "@/components/marketing/PricingPreview";
 import { FAQ } from "@/components/marketing/FAQ";
 import { FinalCTA } from "@/components/marketing/FinalCTA";
@@ -102,6 +103,8 @@ export default function LandingPage() {
       <Features />
       <div className="section-divider" />
       <ProductDemo />
+      <div className="section-divider" />
+      <TrustSecurity />
       <div className="section-divider" />
       <PricingPreview ctaPath={ctaPath} />
       <div className="section-divider" />
