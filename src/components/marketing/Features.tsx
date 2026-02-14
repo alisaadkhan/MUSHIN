@@ -75,7 +75,7 @@ export function Features() {
           {CAPABILITIES.map(({ Icon, title, desc }) => (
             <motion.div key={title} variants={fadeUp}
               className="glass-card-hover p-6 rounded-xl text-left space-y-3 will-change-transform">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg aurora-gradient text-primary">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg aurora-gradient text-primary" style={{ boxShadow: "0 0 20px -5px hsl(var(--aurora-violet) / 0.3)" }}>
                 <Icon />
               </div>
               <h3 className="font-semibold">{title}</h3>
