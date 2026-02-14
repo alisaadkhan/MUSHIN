@@ -1,79 +1,75 @@
 
 
-# Comprehensive System Audit & Landing Page Enhancement
+# Landing Page Visual Theme Enhancement
 
-## Audit Findings
+## Current State Assessment
 
-### Landing Page Issues
+The page already implements the Dark Intelligence theme (deep charcoal base, aurora violet/teal accents, glass-morphism cards) but feels flat because:
 
-| # | Issue | Severity |
-|---|-------|----------|
-| 1 | **SEO metadata is generic** -- `index.html` has title "Lovable App", description "Lovable Generated Project", and OG image pointing to lovable.dev | High |
-| 2 | **No smooth scroll for anchor links** -- Clicking #features, #pricing, #faq in nav jumps instantly with no offset for the fixed 64px header | Medium |
-| 3 | **Missing FAQ section from nav** -- FAQ anchor link works but scrolls behind the fixed nav | Medium |
-| 4 | **Landing page background is flat** -- The enterprise-bg.jpg loads but the heavy gradient overlay makes it nearly invisible. No animated background effect exists | Medium |
-| 5 | **Hero CTA says "Go to Dashboard" for logged-in users** instead of "Start Free Trial" -- fine for returning users but "Go to Dashboard" also appears in the nav, creating duplication | Low |
-| 6 | **Mobile: nav has no hamburger menu** -- On 390px, "Features/Pricing/FAQ" links are hidden with `hidden md:flex` but there's no mobile menu toggle | Medium |
-| 7 | **Pricing section annual label** -- Both monthly and annual show "/mo" (`{annual ? "mo" : "mo"}`) -- annual should show "billed annually" or "/yr" more clearly | Low |
-| 8 | **Footer links (About, Blog, Careers, Privacy Policy, Terms of Service, Cookie Policy) are dead** -- they render as plain `<span>` elements with no href | Low |
+- The animated mesh background is too subtle (5-8% opacity gradients barely visible)
+- No section dividers create visual monotony between sections
+- The hero dashboard mockup lacks floating/parallax depth
+- No dot grid or noise texture adds to the "flat" perception
+- Cards lack glow accents that reinforce the intelligence platform feel
+- CTAs don't have enough visual gravity (glow/pulse)
 
-### Authentication & Backend (Verified Working)
-- Auth flow with email/password and Google OAuth is properly implemented
-- Email verification flow exists with resend capability
-- Password reset flow targets `/update-password` correctly
-- Workspace isolation via RLS policies is comprehensive
-- Role-based access uses separate `user_roles` table (correct pattern)
-- Session management with `onAuthStateChange` set up before `getSession`
+## Changes
 
-### Billing (Verified Working)
-- Stripe integration has STRIPE_SECRET_KEY configured
-- `check-subscription` syncs plan to workspace correctly
-- `create-checkout` handles existing/new customers
-- `customer-portal` for subscription management exists
-- PLAN_TIERS mapping matches plans.ts product IDs
-- RESEND_API_KEY is already configured in secrets
+### 1. Enhanced Background System (`src/index.css`)
 
-### Console
-- No application errors. Only benign `postMessage` origin mismatches from the Lovable preview iframe (not production-relevant)
+Upgrade the `.animated-mesh-bg` to a richer multi-layer system:
 
----
+- Increase gradient opacities from 5-8% to 10-15% for more visible color movement
+- Add a subtle dot grid pattern overlay using a CSS `radial-gradient` repeating pattern (2px dots at 1.5% opacity, 32px spacing) -- pure CSS, no image
+- Add a noise texture using a tiny inline SVG filter (`feTurbulence`) at 2% opacity for depth
+- Slow the animation to 30s for a more premium, understated feel
 
-## Changes to Implement
+### 2. Section Dividers (`src/index.css` + all section components)
 
-### 1. Fix SEO Metadata in `index.html`
-- Title: "InfluenceIQ - The Influencer Discovery Platform That Pays for Itself"
-- Description: "Find verified creators, detect fraud, and run outreach campaigns from one workspace. Used by 2,000+ marketing teams."
-- OG image: keep current (no custom OG image available)
-- Remove "Lovable" references from author/twitter tags
+Create a `.section-divider` utility class that renders a gradient fade between sections:
 
-### 2. Add Animated Background Effect to Landing Page
-Replace the static enterprise-bg.jpg with a CSS-only animated gradient mesh. This will:
-- Use a `@keyframes` animation on 2-3 gradient layers that slowly shift position
-- Run on `background-position` (GPU-composited, no layout thrash)
-- Be extremely subtle (5-8% opacity) to maintain readability
-- Create a living, premium feel without particles or JS overhead
+- A horizontal gradient line that fades from transparent through `aurora-violet/20` to transparent
+- Apply between each major section in `LandingPage.tsx` using simple `<div>` elements
+- This creates visual breathing room and guides the eye downward
 
-**File:** `src/index.css` -- Add `.animated-mesh-bg` utility with keyframe animation
-**File:** `src/pages/LandingPage.tsx` -- Replace the `<img>` background with the CSS animated mesh
+### 3. Hero Visual Depth (`src/components/marketing/Hero.tsx`)
 
-### 3. Add Smooth Scroll with Header Offset
-**File:** `src/pages/LandingPage.tsx`
-- Add `scroll-behavior: smooth` and `scroll-padding-top: 80px` to the root container
-- Convert anchor links to use `scrollIntoView` with offset
+- Add a second, larger radial spotlight glow (teal) on the right side behind the dashboard mockup
+- Add a subtle floating animation to the `DashboardPreview` using framer-motion `y` oscillation (4px over 6s, infinite)
+- Add 3 small floating metric badges around the dashboard mockup (absolute positioned, semi-transparent glass cards) that show stats like "Fraud Score: 97", "Real-time", "247 results" -- these float independently with offset timing
+- Add a faint glow ring around the CTA button using a `box-shadow` with aurora-violet
 
-### 4. Fix Pricing Annual Label
-**File:** `src/components/marketing/PricingPreview.tsx`
-- Change the duplicate `"mo"` to show proper annual context
+### 4. CTA Glow Enhancement (`src/index.css`)
 
-### 5. Add Mobile Nav Menu
-**File:** `src/pages/LandingPage.tsx`
-- Add a hamburger button visible on small screens
-- Toggle a dropdown with Features, Pricing, FAQ links
-- Uses existing `useState` pattern, no new dependencies
+Add a `.btn-glow` utility:
 
-### 6. Fix Footer Dead Links
-**File:** `src/components/marketing/MarketingFooter.tsx`
-- Convert dead `<span>` elements to `<a href="#">` or route links where applicable
+- Persistent soft box-shadow glow around primary CTA buttons using `aurora-violet` at 30% opacity
+- On hover, the glow expands slightly (from 20px to 30px spread)
+- Applied to the hero CTA and final CTA buttons
+- Combines with the existing `.btn-shine` sweep effect
+
+### 5. Card Glow Accents (`src/index.css`)
+
+Enhance `.glass-card-hover` with:
+
+- A top-edge gradient highlight (1px aurora gradient line at top of card) using `::before` pseudo-element
+- On hover, the gradient becomes brighter
+- This mimics the premium "edge-lit" card style used by Linear, Vercel, etc.
+
+### 6. Feature Section Icons (`src/components/marketing/Features.tsx`)
+
+- Add a subtle glow behind each feature icon container using `box-shadow` with the primary color at low opacity
+- This makes icons "pop" against the dark background
+
+### 7. Pricing Cards Enhancement (`src/components/marketing/PricingPreview.tsx`)
+
+- Add the top-edge gradient highlight to pricing cards
+- The "Most Popular" card gets a stronger glow border
+
+### 8. Final CTA Section (`src/components/marketing/FinalCTA.tsx`)
+
+- Add a radial glow spotlight behind the CTA section
+- Apply `.btn-glow` to the CTA button
 
 ---
 
@@ -81,19 +77,21 @@ Replace the static enterprise-bg.jpg with a CSS-only animated gradient mesh. Thi
 
 | Action | File |
 |--------|------|
-| Modify | `index.html` -- SEO metadata |
-| Modify | `src/index.css` -- Animated mesh background keyframes |
-| Modify | `src/pages/LandingPage.tsx` -- Animated bg, smooth scroll, mobile nav |
-| Modify | `src/components/marketing/PricingPreview.tsx` -- Fix annual label |
-| Modify | `src/components/marketing/MarketingFooter.tsx` -- Fix dead links |
+| Modify | `src/index.css` -- Enhanced mesh bg, dot grid overlay, noise texture, section divider, btn-glow, card edge-lit effect |
+| Modify | `src/pages/LandingPage.tsx` -- Add section dividers between sections |
+| Modify | `src/components/marketing/Hero.tsx` -- Floating dashboard animation, metric badges, dual spotlights, CTA glow |
+| Modify | `src/components/marketing/Features.tsx` -- Icon glow accents |
+| Modify | `src/components/marketing/PricingPreview.tsx` -- Card edge highlights |
+| Modify | `src/components/marketing/FinalCTA.tsx` -- Radial spotlight, CTA glow |
 
 ---
 
 ## Technical Notes
 
-- The animated mesh uses only CSS `@keyframes` on `background-position` and `background-size` -- zero JS, GPU-composited, no repaints
-- Animation duration is 20-30 seconds with `ease-in-out` for imperceptible motion
-- Smooth scroll uses CSS `scroll-padding-top` to account for the fixed 64px nav
-- Mobile menu uses a simple boolean state toggle with Tailwind visibility classes
+- All effects are CSS-only (box-shadow, pseudo-elements, radial-gradient, SVG filter) -- zero JS overhead
+- The dot grid uses `background-image: radial-gradient(circle, hsl(...) 1px, transparent 1px)` with `background-size: 32px 32px` -- no image files
+- Floating animations use framer-motion `animate` with `repeat: Infinity` and `repeatType: "reverse"` -- GPU-composited transforms only
+- The noise texture uses an inline SVG `<filter>` applied via CSS `filter: url(#noise)` -- renders once, cached by GPU
 - No new dependencies required
+- All hover effects use `will-change: transform, box-shadow` for 60fps
 
