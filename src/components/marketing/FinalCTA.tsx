@@ -15,6 +15,8 @@ interface Props {
 export function FinalCTA({ ctaPath }: Props) {
   return (
     <section className="relative py-24 px-6 md:px-12 lg:px-24">
+      {/* Radial spotlight */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] rounded-full opacity-[0.12] blur-[100px] pointer-events-none" style={{ background: "radial-gradient(circle, hsl(var(--aurora-violet)), transparent 70%)" }} />
       <motion.div
         initial="hidden" whileInView="visible" viewport={{ once: true }}
         variants={{ visible: { transition: { staggerChildren: 0.12 } } }}
@@ -30,7 +32,7 @@ export function FinalCTA({ ctaPath }: Props) {
         </motion.p>
         <motion.div variants={fadeUp}>
           <Link to={ctaPath}>
-            <Button size="lg" className="btn-shine text-base px-10 py-6">
+            <Button size="lg" className="btn-shine btn-glow text-base px-10 py-6">
               Start Your Free Trial <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>

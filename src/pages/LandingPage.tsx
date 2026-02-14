@@ -36,9 +36,10 @@ export default function LandingPage() {
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden" style={{ scrollBehavior: "smooth", scrollPaddingTop: "80px" }}>
       {/* Animated mesh background */}
       <div className="fixed inset-0 -z-10 animated-mesh-bg" />
+      <div className="fixed inset-0 -z-10 dot-grid-overlay" />
       <div className="fixed inset-0 -z-10 pointer-events-none">
-        <div className="absolute -top-60 -right-60 h-[700px] w-[700px] rounded-full opacity-10 blur-[140px]" style={{ background: "hsl(var(--aurora-violet))" }} />
-        <div className="absolute -bottom-60 -left-60 h-[600px] w-[600px] rounded-full opacity-[0.08] blur-[140px]" style={{ background: "hsl(var(--aurora-teal))", animationDelay: "-5s" }} />
+        <div className="absolute -top-60 -right-60 h-[700px] w-[700px] rounded-full opacity-[0.12] blur-[140px]" style={{ background: "hsl(var(--aurora-violet))" }} />
+        <div className="absolute -bottom-60 -left-60 h-[600px] w-[600px] rounded-full opacity-[0.1] blur-[140px]" style={{ background: "hsl(var(--aurora-teal))" }} />
       </div>
 
       {/* Nav */}
@@ -89,14 +90,23 @@ export default function LandingPage() {
 
       {/* Sections */}
       <Hero ctaPath={ctaPath} ctaLabel={ctaLabel} />
+      <div className="section-divider" />
       <OutcomeMetrics />
+      <div className="section-divider" />
       <ProblemSolution />
+      <div className="section-divider" />
       <Differentiation />
+      <div className="section-divider" />
       <HowItWorks />
+      <div className="section-divider" />
       <Features />
+      <div className="section-divider" />
       <ProductDemo />
+      <div className="section-divider" />
       <PricingPreview ctaPath={ctaPath} />
+      <div className="section-divider" />
       <FAQ />
+      <div className="section-divider" />
       <FinalCTA ctaPath={ctaPath} />
       <MarketingFooter />
     </div>

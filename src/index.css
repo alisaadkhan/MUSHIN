@@ -96,7 +96,21 @@
   }
 
   .glass-card-hover {
-    @apply glass-card transition-all duration-300;
+    @apply glass-card transition-all duration-300 relative overflow-hidden;
+  }
+  .glass-card-hover::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, hsl(var(--aurora-violet) / 0.4), hsl(var(--aurora-teal) / 0.3), transparent);
+    opacity: 0.6;
+    transition: opacity 0.3s ease;
+  }
+  .glass-card-hover:hover::before {
+    opacity: 1;
   }
   .glass-card-hover:hover {
     transform: scale(1.02);
@@ -147,18 +161,39 @@
     transform: rotate(45deg) translateX(100%);
   }
 
+  .btn-glow {
+    box-shadow: 0 0 20px -5px hsl(var(--aurora-violet) / 0.35);
+    transition: box-shadow 0.3s ease;
+  }
+  .btn-glow:hover {
+    box-shadow: 0 0 35px -5px hsl(var(--aurora-violet) / 0.5);
+  }
+
   .data-mono {
     font-family: 'JetBrains Mono', monospace;
   }
 
+  .section-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, hsl(var(--aurora-violet) / 0.2), hsl(var(--aurora-teal) / 0.15), transparent);
+    margin: 0 auto;
+    max-width: 80%;
+  }
+
+  .dot-grid-overlay {
+    background-image: radial-gradient(circle, hsl(var(--foreground) / 0.015) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events: none;
+  }
+
   .animated-mesh-bg {
     background:
-      radial-gradient(ellipse 80% 60% at 20% 30%, hsl(263 70% 50% / 0.08), transparent),
-      radial-gradient(ellipse 60% 80% at 80% 70%, hsl(174 83% 46% / 0.06), transparent),
-      radial-gradient(ellipse 90% 50% at 50% 50%, hsl(263 70% 30% / 0.05), transparent),
+      radial-gradient(ellipse 80% 60% at 20% 30%, hsl(263 70% 50% / 0.12), transparent),
+      radial-gradient(ellipse 60% 80% at 80% 70%, hsl(174 83% 46% / 0.09), transparent),
+      radial-gradient(ellipse 90% 50% at 50% 50%, hsl(263 70% 30% / 0.07), transparent),
       linear-gradient(180deg, hsl(240 10% 4%) 0%, hsl(240 10% 6%) 50%, hsl(240 10% 4%) 100%);
     background-size: 200% 200%, 200% 200%, 200% 200%, 100% 100%;
-    animation: meshShift 25s ease-in-out infinite;
+    animation: meshShift 30s ease-in-out infinite;
   }
 
   @keyframes meshShift {
