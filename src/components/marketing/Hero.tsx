@@ -43,7 +43,7 @@ function DashboardPreview() {
           style={{ left: badge.x, top: badge.y, boxShadow: "0 4px 20px -5px hsl(var(--aurora-violet) / 0.3)" }}
         >
           <span className="text-[9px] text-muted-foreground block">{badge.label}</span>
-          <span className="data-mono text-xs font-bold text-accent">{badge.value}</span>
+          <span className="data-mono text-xs font-bold text-primary">{badge.value}</span>
         </motion.div>
       ))}
 
@@ -59,7 +59,7 @@ function DashboardPreview() {
           <div className="flex gap-1.5">
             <div className="w-2.5 h-2.5 rounded-full bg-destructive/60" />
             <div className="w-2.5 h-2.5 rounded-full" style={{ background: "hsl(45 93% 47% / 0.6)" }} />
-            <div className="w-2.5 h-2.5 rounded-full bg-accent/60" />
+            <div className="w-2.5 h-2.5 rounded-full bg-primary/60" />
           </div>
           <span className="text-[10px] text-muted-foreground ml-2 data-mono">InfluenceIQ Dashboard</span>
         </div>
@@ -68,7 +68,7 @@ function DashboardPreview() {
         <div className="grid grid-cols-3 gap-2 p-3">
           {[
             { icon: Search, label: "Searches Today", value: "2,847", color: "primary" },
-            { icon: ShieldCheck, label: "Avg Fraud Score", value: "94.2%", color: "accent" },
+            { icon: ShieldCheck, label: "Avg Fraud Score", value: "94.2%", color: "primary" },
             { icon: TrendingUp, label: "Avg Engagement", value: "4.7%", color: "primary" },
           ].map((stat) => (
             <div key={stat.label} className="aurora-gradient rounded-lg p-2.5 space-y-1">
@@ -96,8 +96,8 @@ function DashboardPreview() {
                 <span className="text-foreground font-medium truncate">{row.name}</span>
                 <span className="text-muted-foreground">{row.platform}</span>
                 <span className="data-mono text-muted-foreground">{row.followers}</span>
-                <span className="data-mono text-accent">{row.engagement}</span>
-                <span className="data-mono text-xs font-semibold text-accent">{row.score}</span>
+                <span className="data-mono text-primary">{row.engagement}</span>
+                <span className="data-mono text-xs font-semibold text-primary">{row.score}</span>
               </div>
             ))}
           </div>

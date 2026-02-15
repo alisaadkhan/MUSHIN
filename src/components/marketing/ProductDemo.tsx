@@ -26,7 +26,7 @@ const WORKFLOW = [
 ];
 
 function ScoreBadge({ score }: { score: number }) {
-  const color = score >= 95 ? "text-accent" : score >= 90 ? "text-primary" : "text-muted-foreground";
+  const color = score >= 95 ? "text-primary" : score >= 90 ? "text-primary/70" : "text-muted-foreground";
   return <span className={`data-mono text-xs font-bold ${color}`}>{score}</span>;
 }
 
@@ -58,7 +58,7 @@ export function ProductDemo() {
             <div className="flex gap-1.5">
               <div className="w-3 h-3 rounded-full bg-destructive/60" />
               <div className="w-3 h-3 rounded-full" style={{ background: "hsl(45 93% 47% / 0.6)" }} />
-              <div className="w-3 h-3 rounded-full bg-accent/60" />
+              <div className="w-3 h-3 rounded-full bg-primary/60" />
             </div>
             <span className="text-xs text-muted-foreground ml-3 data-mono">InfluenceIQ — Creator Discovery</span>
           </div>
@@ -124,9 +124,9 @@ export function ProductDemo() {
                     </div>
                     <div className="flex items-center justify-between text-[10px]">
                       <span className="data-mono text-muted-foreground">{r.followers}</span>
-                      <span className="data-mono text-accent">{r.engagement} eng.</span>
+                      <span className="data-mono text-primary">{r.engagement} eng.</span>
                       <span className="flex items-center gap-1">
-                        <ShieldCheck className="h-3 w-3 text-accent" />
+                        <ShieldCheck className="h-3 w-3 text-primary" />
                         <ScoreBadge score={r.fraud} />
                       </span>
                     </div>

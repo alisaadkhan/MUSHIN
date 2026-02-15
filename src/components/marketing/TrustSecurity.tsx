@@ -41,7 +41,7 @@ export function TrustSecurity() {
         className="max-w-5xl mx-auto text-center space-y-16"
       >
         <div className="space-y-4">
-          <motion.p variants={fadeUp} className="text-sm font-semibold uppercase tracking-widest text-accent">
+          <motion.p variants={fadeUp} className="text-sm font-semibold uppercase tracking-widest text-primary">
             Security & Compliance
           </motion.p>
           <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-bold tracking-tight">
@@ -60,8 +60,8 @@ export function TrustSecurity() {
               className="glass-card-hover p-6 rounded-xl text-center space-y-3 will-change-transform"
             >
               <div
-                className="flex h-12 w-12 mx-auto items-center justify-center rounded-xl aurora-gradient text-accent"
-                style={{ boxShadow: "0 0 20px -5px hsl(var(--aurora-teal) / 0.3)" }}
+                className="flex h-12 w-12 mx-auto items-center justify-center rounded-xl aurora-gradient text-primary"
+                style={{ boxShadow: "0 0 20px -5px hsl(var(--aurora-violet) / 0.3)" }}
               >
                 <Icon className="h-6 w-6" />
               </div>
