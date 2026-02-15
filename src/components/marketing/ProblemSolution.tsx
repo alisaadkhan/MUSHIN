@@ -47,8 +47,8 @@ export function ProblemSolution() {
             <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground mb-2">With InfluenceIQ</p>
             {WITH.map((t) => (
               <div key={t} className="glass-card p-5 rounded-xl flex items-start gap-3"
-                style={{ borderColor: "hsl(var(--aurora-teal) / 0.3)" }}>
-                <CheckCircle2 className="h-5 w-5 text-accent shrink-0 mt-0.5" />
+                style={{ borderColor: "hsl(var(--aurora-violet) / 0.3)" }}>
+                <CheckCircle2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                 <p className="text-foreground">{t}</p>
               </div>
             ))}

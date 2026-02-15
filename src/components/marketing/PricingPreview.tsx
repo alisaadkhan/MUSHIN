@@ -62,7 +62,7 @@ export function PricingPreview({ ctaPath }: Props) {
                   </span>
                 )}
                 {isBusiness && (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-accent/20 text-accent text-xs font-bold px-3 py-1 rounded-full">
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary/20 text-primary text-xs font-bold px-3 py-1 rounded-full">
                     Priority Support
                   </span>
                 )}
@@ -86,7 +86,7 @@ export function PricingPreview({ ctaPath }: Props) {
                     `${plan.team_members} team member${plan.team_members > 1 ? "s" : ""}`,
                   ].map((item) => (
                     <li key={item} className="flex items-center gap-2 text-muted-foreground">
-                      <CheckCircle2 className="h-4 w-4 text-accent shrink-0" />
+                      <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
                       {item}
                     </li>
                   ))}

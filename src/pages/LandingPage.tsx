@@ -12,6 +12,7 @@ import { HowItWorks } from "@/components/marketing/HowItWorks";
 import { Features } from "@/components/marketing/Features";
 import { ProductDemo } from "@/components/marketing/ProductDemo";
 import { TrustSecurity } from "@/components/marketing/TrustSecurity";
+import { Testimonials } from "@/components/marketing/Testimonials";
 import { PricingPreview } from "@/components/marketing/PricingPreview";
 import { FAQ } from "@/components/marketing/FAQ";
 import { FinalCTA } from "@/components/marketing/FinalCTA";
@@ -40,7 +41,7 @@ export default function LandingPage() {
       <div className="fixed inset-0 -z-10 dot-grid-overlay" />
       <div className="fixed inset-0 -z-10 pointer-events-none">
         <div className="absolute -top-60 -right-60 h-[700px] w-[700px] rounded-full opacity-[0.12] blur-[140px]" style={{ background: "hsl(var(--aurora-violet))" }} />
-        <div className="absolute -bottom-60 -left-60 h-[600px] w-[600px] rounded-full opacity-[0.1] blur-[140px]" style={{ background: "hsl(var(--aurora-teal))" }} />
+        <div className="absolute -bottom-60 -left-60 h-[600px] w-[600px] rounded-full opacity-[0.08] blur-[140px]" style={{ background: "hsl(var(--aurora-teal))" }} />
       </div>
 
       {/* Nav */}
@@ -75,7 +76,7 @@ export default function LandingPage() {
         </div>
         {/* Mobile menu */}
         {menuOpen && (
-          <div className="md:hidden border-t px-6 py-4 space-y-3 text-sm" style={{ borderColor: "hsl(var(--glass-border))", background: "hsl(240 10% 4% / 0.95)" }}>
+          <div className="md:hidden border-t px-6 py-4 space-y-3 text-sm" style={{ borderColor: "hsl(var(--glass-border))", background: "hsl(252 22% 12% / 0.95)" }}>
             <button onClick={() => scrollTo("features")} className="block w-full text-left text-muted-foreground hover:text-foreground transition-colors">Features</button>
             <button onClick={() => scrollTo("pricing")} className="block w-full text-left text-muted-foreground hover:text-foreground transition-colors">Pricing</button>
             <button onClick={() => scrollTo("faq")} className="block w-full text-left text-muted-foreground hover:text-foreground transition-colors">FAQ</button>
@@ -105,6 +106,8 @@ export default function LandingPage() {
       <ProductDemo />
       <div className="section-divider" />
       <TrustSecurity />
+      <div className="section-divider" />
+      <Testimonials />
       <div className="section-divider" />
       <PricingPreview ctaPath={ctaPath} />
       <div className="section-divider" />
