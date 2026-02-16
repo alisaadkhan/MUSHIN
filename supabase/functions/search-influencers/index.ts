@@ -6,17 +6,26 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function extractFollowers(text: string): number | null {
+  const match = text.match(/(\d[\d,.]*)\s*([kKmMbB](?:illion)?)?[\s+]*(followers|subs|subscribers)/i);
+  if (!match) return null;
+  let num = parseFloat(match[1].replace(/,/g, ""));
+  const suffix = (match[2] || "").toLowerCase();
+  if (suffix === "k") num *= 1_000;
+  else if (suffix === "m" || suffix === "million") num *= 1_000_000;
+  else if (suffix === "b" || suffix === "billion") num *= 1_000_000_000;
+  return Math.round(num);
+}
+
 function extractUsername(url: string, platform: string): string | null {
   try {
     const u = new URL(url);
     const parts = u.pathname.split("/").filter(Boolean);
     if (platform === "youtube") {
-      // youtube.com/@username or youtube.com/c/username or youtube.com/channel/xxx
       if (parts[0]?.startsWith("@")) return parts[0];
       if (parts[0] === "c" || parts[0] === "channel") return parts[1] || null;
       return parts[0] || null;
     }
-    // instagram.com/username, tiktok.com/@username
     const name = parts[0];
     if (!name || ["p", "reel", "explore", "stories", "video", "tag", "search"].includes(name)) return null;
     return name.startsWith("@") ? name : `@${name}`;
@@ -165,6 +174,7 @@ Deno.serve(async (req) => {
       .map((item: any) => {
         const username = extractUsername(item.link, platform);
         if (!username) return null;
+        const snippetText = (item.title || "") + " " + (item.snippet || "");
         return {
           title: item.title || "",
           link: item.link || "",
@@ -172,6 +182,7 @@ Deno.serve(async (req) => {
           username,
           platform,
           displayUrl: item.link || "",
+          extracted_followers: extractFollowers(snippetText),
         };
       })
       .filter(Boolean);
