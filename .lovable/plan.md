@@ -1,165 +1,118 @@
 
-# Complete UI Redesign: "Deep Velvet" Color Palette
 
-## Overview
+# Phase 10: Remaining Implementation
 
-This redesign replaces the current dark aurora theme with the "Deep Velvet" palette -- a refined purple-based color system that feels more premium, cohesive, and enterprise-grade. The core strategy is to update CSS custom properties at the root level so all existing utility classes (`aurora-text`, `glass-card`, `btn-glow`, etc.) automatically adopt the new palette with minimal component rewrites.
+After reviewing the codebase, many items from the plan are **already implemented**. Here is what remains to be done, organized by batch.
 
-A new **Testimonials** section will also be added.
+## Already Done (No Action Needed)
 
----
-
-## Color Mapping
-
-| Role | Current | New (Deep Velvet) | Hex |
-|------|---------|-------------------|-----|
-| Background (dark) | `240 10% 3.9%` | `252 20% 15%` | #353148 base, slightly lightened for bg |
-| Foreground | `0 0% 95%` | `260 20% 97%` | ~#F8F6FC (Walkie Chalkie) |
-| Primary | `263 70% 58%` | `258 87% 67%` | #8C60F3 (Purple Anemone) |
-| Muted foreground | `240 5% 55%` | `252 10% 57%` | ~#8E8A9C (Gentle Grape) |
-| Accent | `174 83% 46%` (teal) | `258 87% 67%` | Primary purple used as accent too; accent shifts to a lighter lavender for contrast |
-| Border | `240 5% 14%` | `260 15% 20%` | Derived from #E4E0EC adapted for dark |
-| Card | `240 6% 6%` | `252 22% 12%` | Slightly lifted from Deep Velvet |
-
-The light mode `:root` variables will also be updated to match:
-- Background: #F8F6FC (Walkie Chalkie)
-- Borders: #E4E0EC (Homeopathic Lavender)
-- Muted text: #8E8A9C (Gentle Grape)
-- Primary: #8C60F3 (Purple Anemone)
+- `usePlanLimits` is already wired in `CampaignsPage`, `SendEmailDialog`, `CardDetailDialog`, and `AIInsightsPanel`
+- Free-tier blur overlay on search results is already in `SearchPage.tsx`
+- Batch fraud check per stage is already in `KanbanBoard.tsx`
+- `BulkEmailDialog` already exists and is integrated
+- Deep Velvet palette is applied globally
 
 ---
 
-## Changes
+## Batch 10.0 -- Footer Placeholder Pages
 
-### 1. Update CSS Custom Properties (`src/index.css`)
+### New Files (5 pages)
+Create simple static marketing pages that reuse the dark theme layout:
 
-Rewrite both `:root` and `.dark` variable blocks with Deep Velvet palette values. Update `--aurora-violet` and `--aurora-teal` to use purple tones instead of violet+teal. The teal accent is replaced with a lighter purple (#A78BFA) for secondary highlights, keeping a monochromatic palette.
+- `src/pages/AboutPage.tsx` -- Company mission, team placeholder
+- `src/pages/PrivacyPage.tsx` -- Privacy policy text
+- `src/pages/TermsPage.tsx` -- Terms of service text
+- `src/pages/CookiePolicyPage.tsx` -- Cookie policy text
+- `src/pages/BlogPage.tsx` -- "Coming soon" placeholder
 
-Update utility classes:
-- `.aurora-text` gradient shifts from violet-to-teal to deep-purple-to-lavender
-- `.aurora-gradient` becomes a subtle purple gradient
-- `.animated-mesh-bg` uses purple-toned radial gradients instead of violet+teal
-- `.section-divider` uses purple tones
-- `.glass-card` and `.glass-card-hover` keep the same structure but inherit new border/bg colors
-- Shadow values updated to use Deep Velvet rgba (53, 49, 72, 0.08/0.12/0.16)
+Each page will:
+- Force dark mode like `LandingPage.tsx`
+- Include the `MarketingFooter` component
+- Use the animated mesh background
+- Have a simple nav header with back-to-home link
 
-### 2. Update Landing Page Background (`src/pages/LandingPage.tsx`)
+### Modified Files
+- **`src/App.tsx`** -- Add 5 new public routes: `/about`, `/privacy`, `/terms`, `/cookies`, `/blog`
+- **`src/components/marketing/MarketingFooter.tsx`** -- Replace all `href="#"` with `<Link to="/about">`, `<Link to="/blog">`, `<Link to="/privacy">`, `<Link to="/terms">`, `<Link to="/cookies">`
 
-- Replace the teal radial glow with a second purple glow (different opacity/position)
-- Mobile menu background color updated to Deep Velvet tone
-- The `animated-mesh-bg` and `dot-grid-overlay` classes remain but inherit new colors from CSS
+---
 
-### 3. Update Hero Section (`src/components/marketing/Hero.tsx`)
+## Batch 10.1 -- Follower Extraction and Analytics Colors
 
-- Radial spotlights switch from violet+teal to deep-purple+lavender
-- Dashboard mockup accent colors update automatically via CSS vars
-- Floating badges use purple accent instead of teal
-- CTA button retains `btn-shine btn-glow` (inherits new purple glow)
+### 10.1.1 Follower Extraction in Edge Function
+**Modified file:** `supabase/functions/search-influencers/index.ts`
 
-### 4. Update Outcome Metrics (`src/components/marketing/OutcomeMetrics.tsx`)
+Add an `extractFollowers(text: string): number | null` helper that parses follower counts from snippets using regex. Handles formats like:
+- "12k followers" -> 12000
+- "1.2M followers" -> 1200000  
+- "500K+ subscribers" -> 500000
+- "12,000 followers" -> 12000
 
-- Counter color inherits from updated `--foreground`
-- Glass cards inherit new palette automatically
+Include `extracted_followers` in each result object returned to the frontend.
 
-### 5. Update Problem/Solution (`src/components/marketing/ProblemSolution.tsx`)
+### 10.1.2 Follower Badges on Search Results
+**Modified file:** `src/pages/SearchPage.tsx`
 
-- "With" cards: border color changes from `aurora-teal` to primary purple
-- Check icons change from `text-accent` (was teal) to primary purple
+- Update the `SearchResult` interface to include `extracted_followers?: number`
+- Display a `<Badge>` with the follower count (formatted as "12K", "1.2M") on each result card when available
 
-### 6. Update Differentiation (`src/components/marketing/Differentiation.tsx`)
+### 10.1.3 Analytics Color Palette Alignment
+**Modified file:** `src/pages/AnalyticsPage.tsx`
 
-- Icon containers use new `aurora-gradient` (purple tones)
-- No structural changes needed
+Update the hardcoded `COLORS` array from old violet/teal hues to Deep Velvet palette:
+```
+["#8C60F3", "#A78BFA", "#C4B5FD", "#8E8A9C", "#353148", "#E4E0EC"]
+```
 
-### 7. Update How It Works (`src/components/marketing/HowItWorks.tsx`)
+---
 
-- Step numbers and icons inherit new primary color
-- Connecting line gradient updates via CSS vars
+## Batch 10.2 -- CSV Export
 
-### 8. Update Features (`src/components/marketing/Features.tsx`)
+### New File
+- **`src/lib/exportCsv.ts`** -- Utility that converts an array of objects to a CSV string and triggers a browser download
 
-- Icon glow shifts from violet to Deep Velvet purple
-- Cards inherit new glass-card styling
+### Modified File
+- **`src/components/campaigns/KanbanBoard.tsx`** -- Add an "Export CSV" button in the filter toolbar that exports all pipeline cards (username, platform, stage name, agreed_rate, notes, fraud score) as a downloadable CSV file
 
-### 9. Update Product Demo (`src/components/marketing/ProductDemo.tsx`)
+---
 
-- Score badge colors: replace `text-accent` (teal) with primary purple
-- Filter chip active state uses primary purple
-- Shield icons use primary instead of accent
+## Batches 10.3-10.6 -- Deferred
 
-### 10. Update Trust Security (`src/components/marketing/TrustSecurity.tsx`)
+These require external API credentials and significant schema additions:
+- **10.3 AdTruth Fraud Detection** -- Needs AdTruth API key; existing Lovable AI fraud check is functional
+- **10.4 Social Listening / UGC** -- Needs Instagram/TikTok API credentials + 2 new tables
+- **10.5 Shopify Integration** -- Needs Shopify partner account + OAuth flow + 3 new tables
+- **10.6 Creator Marketplace** -- Needs 2 new tables + public creator auth flow
 
-- Icon containers: change `text-accent` to `text-primary`
-- Glow shifts from teal to purple
-
-### 11. Update Pricing (`src/components/marketing/PricingPreview.tsx`)
-
-- Check icons: `text-accent` becomes `text-primary`
-- "Most Popular" badge and ring use primary purple (already do)
-- "Priority Support" badge uses a lavender tone instead of accent/20
-
-### 12. New: Testimonials Section (`src/components/marketing/Testimonials.tsx`)
-
-Create a new component placed between TrustSecurity and PricingPreview. Contains:
-- Section heading: "What Teams Are Saying"
-- 3 testimonial cards in a grid
-- Each card: quote text in italic, author name in bold, role/company below
-- Glass card styling with subtle left-border accent in primary purple
-- Framer Motion staggered fade-in
-
-### 13. Update Final CTA (`src/components/marketing/FinalCTA.tsx`)
-
-- Gradient background shifts from violet to Deep Velvet purple gradient
-- Border and glow use primary purple
-
-### 14. Update Footer (`src/components/marketing/MarketingFooter.tsx`)
-
-- Footer background: use a slightly lighter Deep Velvet tone
-- Trust bar icons inherit new muted-foreground color
-- Logo gradient updates via `aurora-text` CSS class
-
-### 15. Update Landing Page Section Order (`src/pages/LandingPage.tsx`)
-
-Insert Testimonials between TrustSecurity and PricingPreview:
-
-1. Hero
-2. OutcomeMetrics
-3. ProblemSolution
-4. Differentiation
-5. HowItWorks
-6. Features
-7. ProductDemo
-8. TrustSecurity
-9. **Testimonials** (NEW)
-10. PricingPreview
-11. FAQ
-12. FinalCTA
-13. Footer
+These should be planned as individual focused batches.
 
 ---
 
 ## Files Summary
 
-| Action | File |
-|--------|------|
-| Modify | `src/index.css` -- Full palette swap in CSS variables + utility class updates |
-| Modify | `src/pages/LandingPage.tsx` -- Background glows, mobile menu bg, add Testimonials import |
-| Modify | `src/components/marketing/Hero.tsx` -- Spotlight colors, badge accent colors |
-| Modify | `src/components/marketing/ProblemSolution.tsx` -- Border and icon colors |
-| Modify | `src/components/marketing/ProductDemo.tsx` -- Score/shield accent colors |
-| Modify | `src/components/marketing/TrustSecurity.tsx` -- Icon accent colors |
-| Modify | `src/components/marketing/PricingPreview.tsx` -- Check icon and badge colors |
-| Modify | `src/components/marketing/FinalCTA.tsx` -- Gradient and glow colors |
-| Create | `src/components/marketing/Testimonials.tsx` -- New testimonials section |
+| Action | File | Batch |
+|--------|------|-------|
+| Create | `src/pages/AboutPage.tsx` | 10.0 |
+| Create | `src/pages/PrivacyPage.tsx` | 10.0 |
+| Create | `src/pages/TermsPage.tsx` | 10.0 |
+| Create | `src/pages/CookiePolicyPage.tsx` | 10.0 |
+| Create | `src/pages/BlogPage.tsx` | 10.0 |
+| Create | `src/lib/exportCsv.ts` | 10.2 |
+| Modify | `src/App.tsx` | 10.0 |
+| Modify | `src/components/marketing/MarketingFooter.tsx` | 10.0 |
+| Modify | `supabase/functions/search-influencers/index.ts` | 10.1 |
+| Modify | `src/pages/SearchPage.tsx` | 10.1 |
+| Modify | `src/pages/AnalyticsPage.tsx` | 10.1 |
+| Modify | `src/components/campaigns/KanbanBoard.tsx` | 10.2 |
 
 ---
 
 ## Technical Notes
 
-- The palette swap is primarily a CSS variable change -- most components inherit colors through Tailwind's `text-primary`, `text-muted-foreground`, `bg-primary`, etc. and the custom `aurora-*` variables
-- Components that hardcode `text-accent` (teal) need explicit updates to `text-primary` (purple)
-- The monochromatic purple palette eliminates the violet-vs-teal duality for a more cohesive look
+- No database migrations needed for Batches 10.0-10.2
 - No new dependencies required
-- Font stack (Inter + JetBrains Mono) remains unchanged
-- All animations, glass-morphism, and performance optimizations carry over unchanged
-- The light mode palette also updates so the app interior pages look cohesive
+- The follower extraction regex: `/(\d[\d,.]*)\s*([kKmMbB](?:illion)?)?[\s+]*(followers|subs|subscribers)/i`
+- CSV export uses `Blob` + `URL.createObjectURL` for browser-native download
+- Footer pages are simple static components, not behind auth
+- The edge function change (follower extraction) will auto-deploy
+
