@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useMemo } from "react";
+import { exportCsv } from "@/lib/exportCsv";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Users, MoreHorizontal, Trash2, Pencil, GripVertical, Palette, Search, Instagram, Youtube, SlidersHorizontal, CheckSquare, ArrowRight, X, Mail, ShieldCheck, Loader2 } from "lucide-react";
+import { Plus, Users, MoreHorizontal, Trash2, Pencil, GripVertical, Palette, Search, Instagram, Youtube, SlidersHorizontal, CheckSquare, ArrowRight, X, Mail, ShieldCheck, Loader2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -371,7 +372,32 @@ export function KanbanBoard({ campaignId, campaignName, workspaceSettings }: Kan
             {filteredTotal} of {totalCards} influencers
           </span>
         )}
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-2.5 text-xs gap-1"
+            onClick={() => {
+              if (!cards || !stages) return;
+              const rows = cards.map((c) => {
+                const stage = stages.find((s) => s.id === c.stage_id);
+                const d = c.data as any;
+                return {
+                  username: c.username,
+                  platform: c.platform,
+                  stage: stage?.name || "",
+                  agreed_rate: c.agreed_rate ?? "",
+                  notes: c.notes ?? "",
+                  fraud_score: d?.ai_fraud_check?.fraud_score ?? "",
+                };
+              });
+              exportCsv(rows, `${campaignName || "pipeline"}-export.csv`);
+              toast({ title: "CSV exported" });
+            }}
+          >
+            <Download className="h-3 w-3" />
+            Export CSV
+          </Button>
           <Toggle
             size="sm"
             pressed={selectMode}

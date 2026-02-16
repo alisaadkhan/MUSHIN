@@ -57,6 +57,13 @@ interface SearchResult {
   username: string;
   platform: string;
   displayUrl: string;
+  extracted_followers?: number;
+}
+
+function formatFollowers(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
+  if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, "") + "K";
+  return n.toString();
 }
 
 const platformColors: Record<string, string> = {
@@ -346,6 +353,11 @@ export default function SearchPage() {
                       <Badge variant="outline" className={`shrink-0 text-[10px] ${platformColors[r.platform] || ""}`}>
                         {r.platform}
                       </Badge>
+                      {r.extracted_followers && (
+                        <Badge variant="secondary" className="shrink-0 text-[10px]">
+                          {formatFollowers(r.extracted_followers)} followers
+                        </Badge>
+                      )}
                     </div>
                     {r.snippet && (
                       <p className="text-xs text-muted-foreground mt-3 line-clamp-2">{r.snippet}</p>

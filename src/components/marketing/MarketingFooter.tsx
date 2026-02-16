@@ -55,16 +55,15 @@ export function MarketingFooter() {
 
         <div className="space-y-3">
           <h4 className="font-semibold text-foreground text-xs uppercase tracking-[0.15em]">Company</h4>
-          <a href="#" className="block hover:text-foreground transition-colors">About</a>
-          <a href="#" className="block hover:text-foreground transition-colors">Blog</a>
-          <a href="#" className="block hover:text-foreground transition-colors">Careers</a>
+          <Link to="/about" className="block hover:text-foreground transition-colors">About</Link>
+          <Link to="/blog" className="block hover:text-foreground transition-colors">Blog</Link>
         </div>
 
         <div className="space-y-3">
           <h4 className="font-semibold text-foreground text-xs uppercase tracking-[0.15em]">Legal</h4>
-          <a href="#" className="block hover:text-foreground transition-colors">Privacy Policy</a>
-          <a href="#" className="block hover:text-foreground transition-colors">Terms of Service</a>
-          <a href="#" className="block hover:text-foreground transition-colors">Cookie Policy</a>
+          <Link to="/privacy" className="block hover:text-foreground transition-colors">Privacy Policy</Link>
+          <Link to="/terms" className="block hover:text-foreground transition-colors">Terms of Service</Link>
+          <Link to="/cookies" className="block hover:text-foreground transition-colors">Cookie Policy</Link>
         </div>
       </div>
 

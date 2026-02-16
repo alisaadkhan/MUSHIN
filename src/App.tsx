@@ -22,6 +22,11 @@ import Onboarding from "./pages/Onboarding";
 import Settings from "./pages/Settings";
 import BillingPage from "./pages/BillingPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
+import AboutPage from "./pages/AboutPage";
+import PrivacyPage from "./pages/PrivacyPage";
+import TermsPage from "./pages/TermsPage";
+import CookiePolicyPage from "./pages/CookiePolicyPage";
+import BlogPage from "./pages/BlogPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -56,6 +61,11 @@ const App = () => (
             <Route path="/settings" element={<ProtectedPage><Settings /></ProtectedPage>} />
             <Route path="/billing" element={<ProtectedPage><BillingPage /></ProtectedPage>} />
             <Route path="/analytics" element={<ProtectedPage><AnalyticsPage /></ProtectedPage>} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/cookies" element={<CookiePolicyPage />} />
+            <Route path="/blog" element={<BlogPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

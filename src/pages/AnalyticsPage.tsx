@@ -7,7 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-const COLORS = ["hsl(263,70%,50%)", "hsl(174,83%,52%)", "hsl(45,93%,58%)", "hsl(142,71%,45%)", "hsl(340,82%,52%)", "hsl(200,98%,48%)"];
+const COLORS = ["#8C60F3", "#A78BFA", "#C4B5FD", "#8E8A9C", "#353148", "#E4E0EC"];
 
 export default function AnalyticsPage() {
   const { workspace } = useAuth();
