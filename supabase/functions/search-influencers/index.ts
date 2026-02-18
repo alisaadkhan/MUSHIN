@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
     }
 
     // Parse body
-    const { query, platform, location } = await req.json();
+    const { query, platform, location, followerRange } = await req.json();
     if (!query || !platform) {
       return new Response(JSON.stringify({ error: "query and platform are required" }), {
         status: 400,
@@ -196,6 +196,22 @@ Deno.serve(async (req) => {
       return true;
     });
 
+    // Apply follower range filter
+    const rangeMap: Record<string, [number, number]> = {
+      "1k-10k": [1_000, 10_000],
+      "10k-50k": [10_000, 50_000],
+      "50k-100k": [50_000, 100_000],
+      "100k+": [100_000, Infinity],
+    };
+    let filteredResults = uniqueResults;
+    if (followerRange && followerRange !== "any" && rangeMap[followerRange]) {
+      const [min, max] = rangeMap[followerRange];
+      filteredResults = uniqueResults.filter((r: any) => {
+        if (r.extracted_followers == null) return false;
+        return r.extracted_followers >= min && r.extracted_followers <= max;
+      });
+    }
+
     // Use service role for writes
     const serviceClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -239,7 +255,7 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        results: uniqueResults,
+        results: filteredResults,
         credits_remaining: workspace.search_credits_remaining - 1,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

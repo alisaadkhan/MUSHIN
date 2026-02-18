@@ -77,6 +77,7 @@ export default function SearchPage() {
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [platform, setPlatform] = useState(searchParams.get("platform") || "instagram");
   const [city, setCity] = useState(searchParams.get("location") || "All Pakistan");
+  const [followerRange, setFollowerRange] = useState("any");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -116,7 +117,7 @@ export default function SearchPage() {
 
     try {
       const { data, error } = await supabase.functions.invoke("search-influencers", {
-        body: { query: query.trim(), platform, location: city },
+        body: { query: query.trim(), platform, location: city, followerRange },
       });
 
       if (error) throw error;
@@ -233,7 +234,7 @@ export default function SearchPage() {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <Card className="glass-card">
           <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div className="md:col-span-2">
                 <Label htmlFor="niche" className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">
                   Niche / Keyword
@@ -271,6 +272,19 @@ export default function SearchPage() {
                     {PAKISTAN_CITIES.map((c) => (
                       <SelectItem key={c} value={c}>{c}</SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">Followers</Label>
+                <Select value={followerRange} onValueChange={setFollowerRange}>
+                  <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">Any</SelectItem>
+                    <SelectItem value="1k-10k">1K – 10K</SelectItem>
+                    <SelectItem value="10k-50k">10K – 50K</SelectItem>
+                    <SelectItem value="50k-100k">50K – 100K</SelectItem>
+                    <SelectItem value="100k+">100K+</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
