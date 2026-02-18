@@ -1,118 +1,253 @@
+Add Follower Range Filter to Discover Page
 
+&nbsp;
 
-# Phase 10: Remaining Implementation
+What's New
 
-After reviewing the codebase, many items from the plan are **already implemented**. Here is what remains to be done, organized by batch.
+&nbsp;
 
-## Already Done (No Action Needed)
+Everything from the Phase 10 plan is already implemented except the Follower Range filter on the Discover page. This plan adds that single remaining feature.
 
-- `usePlanLimits` is already wired in `CampaignsPage`, `SendEmailDialog`, `CardDetailDialog`, and `AIInsightsPanel`
-- Free-tier blur overlay on search results is already in `SearchPage.tsx`
-- Batch fraud check per stage is already in `KanbanBoard.tsx`
-- `BulkEmailDialog` already exists and is integrated
-- Deep Velvet palette is applied globally
+&nbsp;
 
----
+Changes
 
-## Batch 10.0 -- Footer Placeholder Pages
+&nbsp;
 
-### New Files (5 pages)
-Create simple static marketing pages that reuse the dark theme layout:
+1. Search Page -- Add Follower Range Dropdown
 
-- `src/pages/AboutPage.tsx` -- Company mission, team placeholder
-- `src/pages/PrivacyPage.tsx` -- Privacy policy text
-- `src/pages/TermsPage.tsx` -- Terms of service text
-- `src/pages/CookiePolicyPage.tsx` -- Cookie policy text
-- `src/pages/BlogPage.tsx` -- "Coming soon" placeholder
+&nbsp;
 
-Each page will:
-- Force dark mode like `LandingPage.tsx`
-- Include the `MarketingFooter` component
-- Use the animated mesh background
-- Have a simple nav header with back-to-home link
+File: src/pages/SearchPage.tsx
 
-### Modified Files
-- **`src/App.tsx`** -- Add 5 new public routes: `/about`, `/privacy`, `/terms`, `/cookies`, `/blog`
-- **`src/components/marketing/MarketingFooter.tsx`** -- Replace all `href="#"` with `<Link to="/about">`, `<Link to="/blog">`, `<Link to="/privacy">`, `<Link to="/terms">`, `<Link to="/cookies">`
+&nbsp;
 
----
+&nbsp;
 
-## Batch 10.1 -- Follower Extraction and Analytics Colors
+&nbsp;
 
-### 10.1.1 Follower Extraction in Edge Function
-**Modified file:** `supabase/functions/search-influencers/index.ts`
+&nbsp;
 
-Add an `extractFollowers(text: string): number | null` helper that parses follower counts from snippets using regex. Handles formats like:
-- "12k followers" -> 12000
-- "1.2M followers" -> 1200000  
-- "500K+ subscribers" -> 500000
-- "12,000 followers" -> 12000
+&nbsp;
 
-Include `extracted_followers` in each result object returned to the frontend.
+Add a new state variable followerRange (default: "any")
 
-### 10.1.2 Follower Badges on Search Results
-**Modified file:** `src/pages/SearchPage.tsx`
+&nbsp;
 
-- Update the `SearchResult` interface to include `extracted_followers?: number`
-- Display a `<Badge>` with the follower count (formatted as "12K", "1.2M") on each result card when available
+&nbsp;
 
-### 10.1.3 Analytics Color Palette Alignment
-**Modified file:** `src/pages/AnalyticsPage.tsx`
+&nbsp;
 
-Update the hardcoded `COLORS` array from old violet/teal hues to Deep Velvet palette:
-```
-["#8C60F3", "#A78BFA", "#C4B5FD", "#8E8A9C", "#353148", "#E4E0EC"]
-```
+Add a 5th filter column (or place it in a new row below the existing filters) using the shadcn Select component
 
----
+&nbsp;
 
-## Batch 10.2 -- CSV Export
+&nbsp;
 
-### New File
-- **`src/lib/exportCsv.ts`** -- Utility that converts an array of objects to a CSV string and triggers a browser download
+&nbsp;
 
-### Modified File
-- **`src/components/campaigns/KanbanBoard.tsx`** -- Add an "Export CSV" button in the filter toolbar that exports all pipeline cards (username, platform, stage name, agreed_rate, notes, fraud score) as a downloadable CSV file
+Options: "Any", "1K - 10K", "10K - 50K", "50K - 100K", "100K+"
 
----
+&nbsp;
 
-## Batches 10.3-10.6 -- Deferred
+&nbsp;
 
-These require external API credentials and significant schema additions:
-- **10.3 AdTruth Fraud Detection** -- Needs AdTruth API key; existing Lovable AI fraud check is functional
-- **10.4 Social Listening / UGC** -- Needs Instagram/TikTok API credentials + 2 new tables
-- **10.5 Shopify Integration** -- Needs Shopify partner account + OAuth flow + 3 new tables
-- **10.6 Creator Marketplace** -- Needs 2 new tables + public creator auth flow
+&nbsp;
 
-These should be planned as individual focused batches.
+Pass followerRange to the edge function call alongside query, platform, and location
 
----
+&nbsp;
 
-## Files Summary
+&nbsp;
 
-| Action | File | Batch |
-|--------|------|-------|
-| Create | `src/pages/AboutPage.tsx` | 10.0 |
-| Create | `src/pages/PrivacyPage.tsx` | 10.0 |
-| Create | `src/pages/TermsPage.tsx` | 10.0 |
-| Create | `src/pages/CookiePolicyPage.tsx` | 10.0 |
-| Create | `src/pages/BlogPage.tsx` | 10.0 |
-| Create | `src/lib/exportCsv.ts` | 10.2 |
-| Modify | `src/App.tsx` | 10.0 |
-| Modify | `src/components/marketing/MarketingFooter.tsx` | 10.0 |
-| Modify | `supabase/functions/search-influencers/index.ts` | 10.1 |
-| Modify | `src/pages/SearchPage.tsx` | 10.1 |
-| Modify | `src/pages/AnalyticsPage.tsx` | 10.1 |
-| Modify | `src/components/campaigns/KanbanBoard.tsx` | 10.2 |
+&nbsp;
 
----
+The grid changes from md:grid-cols-4 to md:grid-cols-5 to accommodate the new filter (or wraps to a second row on smaller screens)
 
-## Technical Notes
+&nbsp;
 
-- No database migrations needed for Batches 10.0-10.2
-- No new dependencies required
-- The follower extraction regex: `/(\d[\d,.]*)\s*([kKmMbB](?:illion)?)?[\s+]*(followers|subs|subscribers)/i`
-- CSV export uses `Blob` + `URL.createObjectURL` for browser-native download
-- Footer pages are simple static components, not behind auth
-- The edge function change (follower extraction) will auto-deploy
+2. Edge Function -- Accept and Apply Follower Range Filter
 
+&nbsp;
+
+File: supabase/functions/search-influencers/index.ts
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+Parse the new followerRange field from the request body
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+After deduplication, if followerRange is not "any", filter results:
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+"1k-10k": keep results where extracted_followers is between 1,000 and 10,000
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+"10k-50k": between 10,000 and 50,000
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+"50k-100k": between 50,000 and 100,000
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+"100k+": 100,000 or more
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+Exclude results with no extracted_followers when a specific range is selected
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+Apply this filter before returning results
+
+&nbsp;
+
+Files Summary
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+Action
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+File
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+Modify
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+src/pages/SearchPage.tsx -- Add follower range dropdown and pass to edge function
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+Modify
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+supabase/functions/search-influencers/index.ts -- Accept followerRange param and filter results
+
+&nbsp;
+
+Technical Notes
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+No database changes needed
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+No new dependencies
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+The edge function will be auto-deployed after the change
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+Results with no detectable follower count are excluded when a specific range is selected, since we cannot determine if they match
