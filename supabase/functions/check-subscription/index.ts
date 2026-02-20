@@ -37,7 +37,36 @@ Deno.serve(async (req) => {
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
     const customers = await stripe.customers.list({ email: userData.user.email, limit: 1 });
 
+    // Get workspace ID for this user
+    const { data: memberData } = await supabase
+      .from("workspace_members")
+      .select("workspace_id")
+      .eq("user_id", userData.user.id)
+      .limit(1)
+      .single();
+
     if (customers.data.length === 0) {
+      // Check for manually provisioned subscription (test accounts)
+      if (memberData) {
+        const { data: dbSub } = await supabase
+          .from("subscriptions")
+          .select("*")
+          .eq("workspace_id", memberData.workspace_id)
+          .eq("status", "active")
+          .limit(1)
+          .single();
+
+        if (dbSub && dbSub.plan !== "free") {
+          return new Response(JSON.stringify({
+            subscribed: true,
+            plan: dbSub.plan,
+            subscription_end: dbSub.current_period_end,
+            cancel_at_period_end: dbSub.cancel_at_period_end,
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
       return new Response(JSON.stringify({ subscribed: false, plan: "free" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -51,6 +80,27 @@ Deno.serve(async (req) => {
     });
 
     if (subscriptions.data.length === 0) {
+      // Check DB fallback
+      if (memberData) {
+        const { data: dbSub } = await supabase
+          .from("subscriptions")
+          .select("*")
+          .eq("workspace_id", memberData.workspace_id)
+          .eq("status", "active")
+          .limit(1)
+          .single();
+
+        if (dbSub && dbSub.plan !== "free") {
+          return new Response(JSON.stringify({
+            subscribed: true,
+            plan: dbSub.plan,
+            subscription_end: dbSub.current_period_end,
+            cancel_at_period_end: dbSub.cancel_at_period_end,
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
       return new Response(JSON.stringify({ subscribed: false, plan: "free" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -62,12 +112,6 @@ Deno.serve(async (req) => {
     const subscriptionEnd = new Date(sub.current_period_end * 1000).toISOString();
 
     // Sync to workspace
-    const { data: memberData } = await supabase
-      .from("workspace_members")
-      .select("workspace_id")
-      .eq("user_id", userData.user.id)
-      .limit(1)
-      .single();
 
     if (memberData) {
       // Update workspace plan

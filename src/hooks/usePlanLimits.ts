@@ -7,18 +7,26 @@ export function usePlanLimits() {
   const { data: credits } = useWorkspaceCredits();
   const { data: campaigns } = useCampaigns();
 
+  const isFree = plan === "free";
+
   const canCreateCampaign = () => {
     if (planConfig.campaigns === Infinity) return true;
     return (campaigns?.length ?? 0) < planConfig.campaigns;
   };
 
   const canSendEmail = () => {
+    if (isFree) return false; // Locked for free
     return (credits?.email_sends_remaining ?? 0) > 0;
   };
 
   const canUseAI = () => {
+    if (isFree) return false; // Locked for free
     if (planConfig.ai_credits === Infinity) return true;
     return (credits?.ai_credits_remaining ?? 0) > 0;
+  };
+
+  const canSearch = () => {
+    return (credits?.search_credits_remaining ?? 0) > 0;
   };
 
   const campaignLimit = planConfig.campaigns === Infinity ? "Unlimited" : planConfig.campaigns;
@@ -28,9 +36,11 @@ export function usePlanLimits() {
   return {
     plan,
     planConfig,
+    isFree,
     canCreateCampaign,
     canSendEmail,
     canUseAI,
+    canSearch,
     campaignLimit,
     emailsRemaining,
     aiRemaining,

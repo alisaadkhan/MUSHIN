@@ -71,7 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, fetchProfileAndWorkspace]);
 
   useEffect(() => {
-    // Set up listener BEFORE getSession
+    let refreshInFlight = false;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         if (event === 'SIGNED_OUT') {
@@ -83,7 +84,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        // Deduplicate rapid TOKEN_REFRESHED events
+        if (event === 'TOKEN_REFRESHED' && refreshInFlight) {
+          return;
+        }
+
         if (newSession) {
+          if (event === 'TOKEN_REFRESHED') {
+            refreshInFlight = true;
+            setTimeout(() => { refreshInFlight = false; }, 2000);
+          }
           setSession(newSession);
           setUser(newSession.user);
           if (newSession.user.email_confirmed_at) {

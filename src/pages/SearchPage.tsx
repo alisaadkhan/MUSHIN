@@ -90,6 +90,7 @@ export default function SearchPage() {
   const creditsExhausted = workspaceCredits?.search_credits_remaining === 0;
   const isFreePlan = workspaceCredits?.plan === "free";
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [showCreditsPopup, setShowCreditsPopup] = useState(false);
 
   // Lists
   const { data: lists, createList } = useInfluencerLists();
@@ -112,6 +113,10 @@ export default function SearchPage() {
 
   const handleSearch = async () => {
     if (!query.trim()) return;
+    if (creditsExhausted) {
+      setShowCreditsPopup(true);
+      return;
+    }
     setLoading(true);
     setSearched(true);
 
@@ -491,6 +496,39 @@ export default function SearchPage() {
             <Button variant="outline" onClick={() => setShowSaveSearch(false)}>Cancel</Button>
             <Button onClick={handleSaveSearch} disabled={!saveSearchName.trim() || saveSearch.isPending}>
               {saveSearch.isPending ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Credits Exhausted Popup */}
+      <Dialog open={showCreditsPopup} onOpenChange={setShowCreditsPopup}>
+        <DialogContent className="max-w-sm text-center">
+          <DialogHeader>
+            <DialogTitle className="flex flex-col items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+                <AlertCircle className="h-6 w-6 text-destructive" />
+              </div>
+              Daily Credits Used Up
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            You've used all {isFreePlan ? "3" : "your"} daily search credits.
+            {isFreePlan ? " Upgrade to Pro for 500 credits per month." : " Credits reset daily."}
+          </p>
+          {workspaceCredits?.credits_reset_at && (
+            <p className="text-xs text-muted-foreground">
+              Credits reset on {format(new Date(workspaceCredits.credits_reset_at), "MMMM d, yyyy")}
+            </p>
+          )}
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
+            {isFreePlan && (
+              <Button className="w-full btn-shine" onClick={() => { setShowCreditsPopup(false); navigate("/billing"); }}>
+                Upgrade to Pro
+              </Button>
+            )}
+            <Button variant="outline" className="w-full" onClick={() => setShowCreditsPopup(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
