@@ -1,253 +1,80 @@
-Add Follower Range Filter to Discover Page
 
-&nbsp;
 
-What's New
+# Fix: Onboarding Redirect Loop (Token Refresh Storm)
+
+## Problem
+
+After logging in and reaching the onboarding page, the user gets redirected back to `/auth`. This happens because:
+
+1. Login triggers many concurrent token refresh requests
+2. Some hit the 429 rate limit and fail
+3. Failed refreshes fire `onAuthStateChange` with a null session
+4. The current handler blindly sets `user = null` on any null session
+5. `ProtectedRoute` sees `!user` and redirects to `/auth`
+
+## Root Cause
+
+In `src/contexts/AuthContext.tsx`, the `onAuthStateChange` handler does not check the `_event` parameter. It treats all null sessions the same, including temporary refresh failures.
+
+## Fix
+
+**File:** `src/contexts/AuthContext.tsx`
+
+Update the `onAuthStateChange` callback to:
+- Use the `event` parameter (currently ignored as `_event`)
+- Only clear user/profile/session on an explicit `SIGNED_OUT` event
+- For all other events with a valid session, update normally
+- Ignore null sessions from non-signout events (e.g., failed token refreshes)
+
+```typescript
+// Before (broken):
+async (_event, newSession) => {
+  setSession(newSession);
+  setUser(newSession?.user ?? null);
+  if (newSession?.user && newSession.user.email_confirmed_at) {
+    setTimeout(() => fetchProfileAndWorkspace(newSession.user.id), 0);
+  } else {
+    setProfile(null);
+    setWorkspace(null);
+  }
+  setLoading(false);
+}
+
+// After (fixed):
+async (event, newSession) => {
+  if (event === 'SIGNED_OUT') {
+    setSession(null);
+    setUser(null);
+    setProfile(null);
+    setWorkspace(null);
+    setLoading(false);
+    return;
+  }
+
+  if (newSession) {
+    setSession(newSession);
+    setUser(newSession.user);
+    if (newSession.user.email_confirmed_at) {
+      setTimeout(() => fetchProfileAndWorkspace(newSession.user.id), 0);
+    }
+  }
+  setLoading(false);
+}
+```
+
+This single change prevents token refresh failures (429s) from wiping the user state and causing the redirect loop.
+
+## Files
+
+| Action | File |
+|--------|------|
+| Modify | `src/contexts/AuthContext.tsx` -- Fix onAuthStateChange to only clear state on SIGNED_OUT |
+
+## Testing
+
+After the fix:
+1. Log in with `alisaad75878@gmail.com`
+2. Reach onboarding page
+3. Fill in name, click Continue through all steps
+4. Click "Go to Dashboard" -- should navigate to `/dashboard` without redirecting to `/auth`
 
-&nbsp;
-
-Everything from the Phase 10 plan is already implemented except the Follower Range filter on the Discover page. This plan adds that single remaining feature.
-
-&nbsp;
-
-Changes
-
-&nbsp;
-
-1. Search Page -- Add Follower Range Dropdown
-
-&nbsp;
-
-File: src/pages/SearchPage.tsx
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-Add a new state variable followerRange (default: "any")
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-Add a 5th filter column (or place it in a new row below the existing filters) using the shadcn Select component
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-Options: "Any", "1K - 10K", "10K - 50K", "50K - 100K", "100K+"
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-Pass followerRange to the edge function call alongside query, platform, and location
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-The grid changes from md:grid-cols-4 to md:grid-cols-5 to accommodate the new filter (or wraps to a second row on smaller screens)
-
-&nbsp;
-
-2. Edge Function -- Accept and Apply Follower Range Filter
-
-&nbsp;
-
-File: supabase/functions/search-influencers/index.ts
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-Parse the new followerRange field from the request body
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-After deduplication, if followerRange is not "any", filter results:
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-"1k-10k": keep results where extracted_followers is between 1,000 and 10,000
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-"10k-50k": between 10,000 and 50,000
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-"50k-100k": between 50,000 and 100,000
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-"100k+": 100,000 or more
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-Exclude results with no extracted_followers when a specific range is selected
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-Apply this filter before returning results
-
-&nbsp;
-
-Files Summary
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-Action
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-File
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-Modify
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-src/pages/SearchPage.tsx -- Add follower range dropdown and pass to edge function
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-Modify
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-supabase/functions/search-influencers/index.ts -- Accept followerRange param and filter results
-
-&nbsp;
-
-Technical Notes
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-No database changes needed
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-No new dependencies
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-The edge function will be auto-deployed after the change
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-Results with no detectable follower count are excluded when a specific range is selected, since we cannot determine if they match
