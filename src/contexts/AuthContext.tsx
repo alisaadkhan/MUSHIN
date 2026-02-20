@@ -73,16 +73,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Set up listener BEFORE getSession
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, newSession) => {
-        setSession(newSession);
-        setUser(newSession?.user ?? null);
-
-        if (newSession?.user && newSession.user.email_confirmed_at) {
-          // Defer to avoid Supabase client deadlock
-          setTimeout(() => fetchProfileAndWorkspace(newSession.user.id), 0);
-        } else {
+      async (event, newSession) => {
+        if (event === 'SIGNED_OUT') {
+          setSession(null);
+          setUser(null);
           setProfile(null);
           setWorkspace(null);
+          setLoading(false);
+          return;
+        }
+
+        if (newSession) {
+          setSession(newSession);
+          setUser(newSession.user);
+          if (newSession.user.email_confirmed_at) {
+            setTimeout(() => fetchProfileAndWorkspace(newSession.user.id), 0);
+          }
         }
         setLoading(false);
       }
