@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Search, SlidersHorizontal, Instagram, Youtube, ExternalLink, Loader2, Plus, Bookmark, AlertCircle, Lock } from "lucide-react";
+import { Search, SlidersHorizontal, Instagram, Youtube, ExternalLink, Loader2, Plus, Bookmark, AlertCircle, Lock, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +38,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import { EvaluationScoreBadge } from "@/components/influencer/EvaluationScoreBadge";
+import { useInfluencerEvaluation } from "@/hooks/useInfluencerEvaluation";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
 
 const PAKISTAN_CITIES = [
   "All Pakistan", "Karachi", "Lahore", "Islamabad",
@@ -86,6 +89,10 @@ export default function SearchPage() {
   const queryClient = useQueryClient();
   const { data: workspaceCredits } = useWorkspaceCredits();
   const navigate = useNavigate();
+  const { evaluate: evaluateInfluencer, loading: evalLoading } = useInfluencerEvaluation();
+  const { canUseAI } = usePlanLimits();
+  const [evaluatingUsername, setEvaluatingUsername] = useState<string | null>(null);
+  const [cachedScores, setCachedScores] = useState<Record<string, number>>({});
 
   const creditsExhausted = workspaceCredits?.search_credits_remaining === 0;
   const isFreePlan = workspaceCredits?.plan === "free";
@@ -382,11 +389,43 @@ export default function SearchPage() {
                       <p className="text-xs text-muted-foreground mt-3 line-clamp-2">{r.snippet}</p>
                     )}
                     <div className="mt-3 flex items-center gap-2">
+                      {cachedScores[`${r.platform}-${r.username}`] != null && (
+                        <EvaluationScoreBadge score={cachedScores[`${r.platform}-${r.username}`]} size="sm" />
+                      )}
                       <Button variant="outline" size="sm" className="text-xs gap-1.5" asChild>
                         <a href={r.link} target="_blank" rel="noopener noreferrer">
                           <ExternalLink className="h-3 w-3" />
                           View Profile
                         </a>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs gap-1.5"
+                        disabled={!canUseAI() || (evalLoading && evaluatingUsername === r.username)}
+                        onClick={async () => {
+                          setEvaluatingUsername(r.username);
+                          const result = await evaluateInfluencer({
+                            username: r.username,
+                            platform: r.platform,
+                            followers: r.extracted_followers,
+                            snippet: r.snippet,
+                            title: r.title,
+                            link: r.link,
+                          });
+                          if (result) {
+                            setCachedScores(prev => ({ ...prev, [`${r.platform}-${r.username}`]: result.overall_score }));
+                            navigate(`/influencer/${r.platform}/${r.username}`);
+                          }
+                          setEvaluatingUsername(null);
+                        }}
+                      >
+                        {evalLoading && evaluatingUsername === r.username ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3 w-3" />
+                        )}
+                        Evaluate
                       </Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

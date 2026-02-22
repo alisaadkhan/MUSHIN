@@ -27,6 +27,7 @@ import PrivacyPage from "./pages/PrivacyPage";
 import TermsPage from "./pages/TermsPage";
 import CookiePolicyPage from "./pages/CookiePolicyPage";
 import BlogPage from "./pages/BlogPage";
+import InfluencerProfilePage from "./pages/InfluencerProfilePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -65,6 +66,7 @@ const App = () => (
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/cookies" element={<CookiePolicyPage />} />
+            <Route path="/influencer/:platform/:username" element={<ProtectedPage><InfluencerProfilePage /></ProtectedPage>} />
             <Route path="/blog" element={<BlogPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -216,6 +216,44 @@ export type Database = {
           },
         ]
       }
+      influencer_evaluations: {
+        Row: {
+          evaluated_at: string
+          evaluation: Json
+          id: string
+          overall_score: number
+          platform: string
+          username: string
+          workspace_id: string
+        }
+        Insert: {
+          evaluated_at?: string
+          evaluation?: Json
+          id?: string
+          overall_score?: number
+          platform: string
+          username: string
+          workspace_id: string
+        }
+        Update: {
+          evaluated_at?: string
+          evaluation?: Json
+          id?: string
+          overall_score?: number
+          platform?: string
+          username?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "influencer_evaluations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       influencer_lists: {
         Row: {
           created_at: string
