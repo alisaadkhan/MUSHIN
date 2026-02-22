@@ -683,6 +683,35 @@ export type Database = {
           },
         ]
       }
+      workspace_secrets: {
+        Row: {
+          created_at: string
+          hubspot_api_key: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          hubspot_api_key?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          hubspot_api_key?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_secrets_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspaces: {
         Row: {
           ai_credits_remaining: number
@@ -747,6 +776,10 @@ export type Database = {
       }
       is_workspace_member: { Args: { _workspace_id: string }; Returns: boolean }
       is_workspace_owner: { Args: { _workspace_id: string }; Returns: boolean }
+      update_workspace_settings: {
+        Args: { _name?: string; _settings?: Json; _workspace_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "user"
