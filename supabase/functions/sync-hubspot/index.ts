@@ -17,22 +17,49 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
-    const supabase = createClient(
+    // Validate user auth
+    const userClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } }
     );
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
     if (claimsError || !claimsData?.claims) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
-    const { contacts, hubspot_api_key } = await req.json();
+    const { contacts, workspace_id } = await req.json();
 
-    if (!hubspot_api_key || !contacts?.length) {
-      return new Response(JSON.stringify({ error: "Missing hubspot_api_key or contacts" }), {
+    if (!workspace_id || !contacts?.length) {
+      return new Response(JSON.stringify({ error: "Missing workspace_id or contacts" }), {
+        status: 400,
+        headers: corsHeaders,
+      });
+    }
+
+    // Verify user is a member of the workspace
+    const { data: memberCheck } = await userClient.rpc("is_workspace_member", { _workspace_id: workspace_id });
+    if (!memberCheck) {
+      return new Response(JSON.stringify({ error: "Not a workspace member" }), { status: 403, headers: corsHeaders });
+    }
+
+    // Read the HubSpot API key server-side using service role
+    const serviceClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    const { data: secretsData } = await serviceClient
+      .from("workspace_secrets")
+      .select("hubspot_api_key")
+      .eq("workspace_id", workspace_id)
+      .single();
+
+    const hubspot_api_key = secretsData?.hubspot_api_key;
+    if (!hubspot_api_key) {
+      return new Response(JSON.stringify({ error: "HubSpot API key not configured" }), {
         status: 400,
         headers: corsHeaders,
       });
@@ -69,7 +96,7 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: corsHeaders,
     });

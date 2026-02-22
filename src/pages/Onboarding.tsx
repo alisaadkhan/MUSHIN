@@ -62,10 +62,10 @@ export default function Onboarding() {
           ...(companyName.trim() && { company_name: companyName.trim() }),
         };
 
-        await supabase
-          .from("workspaces")
-          .update({ settings: newSettings })
-          .eq("id", workspace.workspace_id);
+        await supabase.rpc("update_workspace_settings", {
+          _workspace_id: workspace.workspace_id,
+          _settings: newSettings,
+        });
       }
 
       await refreshProfile();

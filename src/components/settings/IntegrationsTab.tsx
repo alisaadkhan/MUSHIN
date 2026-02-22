@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Loader2, Webhook, Sheet, MessageSquare } from "lucide-react";
+import { Loader2, Webhook, Sheet, MessageSquare, CheckCircle2, XCircle } from "lucide-react";
 
 export function IntegrationsTab() {
   const { workspace } = useAuth();
@@ -14,11 +14,14 @@ export function IntegrationsTab() {
   const [zapierUrl, setZapierUrl] = useState("");
   const [sheetsUrl, setSheetsUrl] = useState("");
   const [hubspotKey, setHubspotKey] = useState("");
+  const [hubspotConfigured, setHubspotConfigured] = useState(false);
   const [slackUrl, setSlackUrl] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!workspace?.workspace_id) return;
+
+    // Load non-secret settings from workspaces.settings
     supabase
       .from("workspaces")
       .select("settings")
@@ -29,9 +32,14 @@ export function IntegrationsTab() {
         if (s) {
           setZapierUrl(s.zapier_webhook_url || "");
           setSheetsUrl(s.google_sheets_webhook_url || "");
-          setHubspotKey(s.hubspot_api_key || "");
           setSlackUrl(s.slack_webhook_url || "");
         }
+      });
+
+    // Check if HubSpot key is configured (without exposing the key)
+    supabase.rpc("get_hubspot_configured", { _workspace_id: workspace.workspace_id })
+      .then(({ data }) => {
+        setHubspotConfigured(!!data);
       });
   }, [workspace?.workspace_id]);
 
@@ -39,6 +47,7 @@ export function IntegrationsTab() {
     if (!workspace?.workspace_id) return;
     setSaving(true);
     try {
+      // Save non-secret webhook URLs via RPC
       const { data: current } = await supabase
         .from("workspaces")
         .select("settings")
@@ -46,20 +55,34 @@ export function IntegrationsTab() {
         .single();
 
       const existing = (current?.settings as any) || {};
-      const { error } = await supabase
-        .from("workspaces")
-        .update({
-          settings: {
-            ...existing,
-            zapier_webhook_url: zapierUrl.trim() || null,
-            google_sheets_webhook_url: sheetsUrl.trim() || null,
-            hubspot_api_key: hubspotKey.trim() || null,
-            slack_webhook_url: slackUrl.trim() || null,
-          },
-        })
-        .eq("id", workspace.workspace_id);
+      const newSettings = {
+        ...existing,
+        zapier_webhook_url: zapierUrl.trim() || null,
+        google_sheets_webhook_url: sheetsUrl.trim() || null,
+        slack_webhook_url: slackUrl.trim() || null,
+      };
 
-      if (error) throw error;
+      // Remove hubspot_api_key from settings if it was previously stored there
+      delete newSettings.hubspot_api_key;
+
+      await supabase.rpc("update_workspace_settings", {
+        _workspace_id: workspace.workspace_id,
+        _settings: newSettings,
+      });
+
+      // Save HubSpot key to workspace_secrets if provided
+      if (hubspotKey.trim()) {
+        const { error: upsertError } = await supabase
+          .from("workspace_secrets" as any)
+          .upsert(
+            { workspace_id: workspace.workspace_id, hubspot_api_key: hubspotKey.trim() },
+            { onConflict: "workspace_id" }
+          );
+        if (upsertError) throw upsertError;
+        setHubspotConfigured(true);
+        setHubspotKey(""); // Clear from state after saving
+      }
+
       toast({ title: "Integrations saved" });
     } catch {
       toast({ title: "Error", description: "Failed to save integrations.", variant: "destructive" });
@@ -108,15 +131,28 @@ export function IntegrationsTab() {
           HubSpot
         </h3>
         <div className="space-y-2">
-          <Label htmlFor="hubspotKey">Private App Token</Label>
+          <div className="flex items-center gap-2 mb-2">
+            {hubspotConfigured ? (
+              <span className="flex items-center gap-1 text-xs text-green-500">
+                <CheckCircle2 className="h-3.5 w-3.5" /> API key configured
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <XCircle className="h-3.5 w-3.5" /> Not configured
+              </span>
+            )}
+          </div>
+          <Label htmlFor="hubspotKey">
+            {hubspotConfigured ? "Update Private App Token" : "Private App Token"}
+          </Label>
           <Input
             id="hubspotKey"
             type="password"
             value={hubspotKey}
             onChange={(e) => setHubspotKey(e.target.value)}
-            placeholder="pat-na1-..."
+            placeholder={hubspotConfigured ? "Enter new token to update" : "pat-na1-..."}
           />
-          <p className="text-xs text-muted-foreground">Sync confirmed influencers as HubSpot contacts</p>
+          <p className="text-xs text-muted-foreground">Sync confirmed influencers as HubSpot contacts. Token is stored securely and never exposed.</p>
         </div>
       </div>
 

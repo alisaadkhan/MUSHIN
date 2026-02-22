@@ -99,16 +99,15 @@ export default function Settings() {
         .eq("id", workspace.workspace_id)
         .single();
       const existingSettings = (current?.settings as any) || {};
-      const { error } = await supabase
-        .from("workspaces")
-        .update({
-          settings: {
-            ...existingSettings,
-            default_from_name: defaultFromName.trim() || null,
-            default_reply_to: defaultReplyTo.trim() || null,
-          },
-        })
-        .eq("id", workspace.workspace_id);
+      const newSettings = {
+        ...existingSettings,
+        default_from_name: defaultFromName.trim() || null,
+        default_reply_to: defaultReplyTo.trim() || null,
+      };
+      const { error } = await supabase.rpc("update_workspace_settings", {
+        _workspace_id: workspace.workspace_id,
+        _settings: newSettings,
+      });
       if (error) throw error;
       toast({ title: "Outreach settings saved" });
     } catch {
