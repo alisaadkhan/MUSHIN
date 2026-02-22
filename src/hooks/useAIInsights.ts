@@ -84,9 +84,29 @@ export function useAIInsights() {
     }
   }, [handleError]);
 
+  const [evaluateLoading, setEvaluateLoading] = useState(false);
+
+  const evaluateInfluencer = useCallback(async (influencerData: any): Promise<any | null> => {
+    setEvaluateLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-insights", {
+        body: { type: "evaluate", data: influencerData },
+      });
+      if (error) throw error;
+      if (data?.error) { handleError(data); return null; }
+      return data;
+    } catch (err: any) {
+      handleError(err);
+      return null;
+    } finally {
+      setEvaluateLoading(false);
+    }
+  }, [handleError]);
+
   return {
     generateSummary, summaryLoading,
     runFraudCheck, fraudLoading,
     getCampaignRecommendations, recommendLoading,
+    evaluateInfluencer, evaluateLoading,
   };
 }

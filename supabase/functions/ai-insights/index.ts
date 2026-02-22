@@ -9,6 +9,167 @@ const corsHeaders = {
 const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const MODEL = "google/gemini-3-flash-preview";
 
+function buildSummarizeMessages(data: any) {
+  return {
+    messages: [
+      { role: "system", content: "You are an influencer marketing analyst. Given an influencer's profile data, write a concise 2-3 sentence summary highlighting their strengths, niche, audience size, and engagement quality. Be direct and actionable." },
+      { role: "user", content: `Analyze this influencer profile:\n${JSON.stringify(data)}` },
+    ],
+  };
+}
+
+function buildFraudCheckMessages(data: any) {
+  return {
+    messages: [
+      { role: "system", content: "You are a social media fraud detection expert. Analyze the influencer metrics provided and identify any red flags indicating fake followers, engagement manipulation, or suspicious patterns." },
+      { role: "user", content: `Check this influencer for fraud indicators:\n${JSON.stringify(data)}` },
+    ],
+    tools: [{
+      type: "function",
+      function: {
+        name: "fraud_analysis",
+        description: "Return a fraud risk assessment for the influencer",
+        parameters: {
+          type: "object",
+          properties: {
+            risk: { type: "string", enum: ["low", "medium", "high"] },
+            flags: { type: "array", items: { type: "string" } },
+            summary: { type: "string" },
+          },
+          required: ["risk", "flags", "summary"],
+          additionalProperties: false,
+        },
+      },
+    }],
+    tool_choice: { type: "function", function: { name: "fraud_analysis" } },
+  };
+}
+
+function buildRecommendMessages(data: any) {
+  return {
+    messages: [
+      { role: "system", content: "You are a campaign strategy advisor. Given the current state of an influencer marketing campaign, provide 3-5 actionable recommendations to improve campaign performance." },
+      { role: "user", content: `Analyze this campaign and give recommendations:\n${JSON.stringify(data)}` },
+    ],
+    tools: [{
+      type: "function",
+      function: {
+        name: "campaign_recommendations",
+        description: "Return actionable campaign recommendations",
+        parameters: {
+          type: "object",
+          properties: {
+            recommendations: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  description: { type: "string" },
+                  priority: { type: "string", enum: ["high", "medium", "low"] },
+                  category: { type: "string", enum: ["outreach", "budget", "timeline", "strategy"] },
+                },
+                required: ["title", "description", "priority", "category"],
+                additionalProperties: false,
+              },
+            },
+          },
+          required: ["recommendations"],
+          additionalProperties: false,
+        },
+      },
+    }],
+    tool_choice: { type: "function", function: { name: "campaign_recommendations" } },
+  };
+}
+
+function buildEvaluateMessages(data: any) {
+  const systemPrompt = `You are an expert influencer marketing analyst. Evaluate the influencer based on all available data. Consider:
+
+- Engagement rate benchmarks per platform: Instagram ~1-3%, TikTok ~3-6%, YouTube ~2-5%
+- Authenticity: analyze follower-to-engagement ratios for suspicious patterns
+- Demographics: infer likely audience age range, gender split, and top countries from content niche, language, and bio clues
+- Niche: classify into relevant categories based on bio and content
+- Brand safety: scan bio/snippet for controversial content, profanity, or risky topics
+- Composite score: 40% engagement quality, 30% authenticity, 20% content quality/relevance, 10% growth signals
+
+Be analytical but fair. If data is limited, note that in your assessment and provide best estimates.`;
+
+  return {
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: `Evaluate this influencer comprehensively:\n${JSON.stringify(data)}` },
+    ],
+    tools: [{
+      type: "function",
+      function: {
+        name: "influencer_evaluation",
+        description: "Return a comprehensive influencer evaluation with scores and analysis",
+        parameters: {
+          type: "object",
+          properties: {
+            overall_score: { type: "integer", description: "Composite score 0-100" },
+            engagement_rating: {
+              type: "object",
+              properties: {
+                rate: { type: "number", description: "Engagement rate as percentage" },
+                benchmark_comparison: { type: "string", description: "e.g. 'Above average', 'Below benchmark'" },
+                verdict: { type: "string", description: "Brief assessment of engagement quality" },
+              },
+              required: ["rate", "benchmark_comparison", "verdict"],
+              additionalProperties: false,
+            },
+            authenticity: {
+              type: "object",
+              properties: {
+                score: { type: "integer", description: "Authenticity score 0-100" },
+                risk_level: { type: "string", enum: ["low", "medium", "high"] },
+                flags: { type: "array", items: { type: "string" }, description: "Suspicious pattern flags" },
+                summary: { type: "string" },
+              },
+              required: ["score", "risk_level", "flags", "summary"],
+              additionalProperties: false,
+            },
+            growth_assessment: {
+              type: "object",
+              properties: {
+                pattern: { type: "string", description: "Growth pattern description" },
+                risk_flags: { type: "array", items: { type: "string" } },
+              },
+              required: ["pattern", "risk_flags"],
+              additionalProperties: false,
+            },
+            estimated_demographics: {
+              type: "object",
+              properties: {
+                age_range: { type: "string", description: "e.g. '18-34'" },
+                gender_split: { type: "string", description: "e.g. '60% female, 40% male'" },
+                top_countries: { type: "array", items: { type: "string" }, description: "Top 3-5 likely countries" },
+              },
+              required: ["age_range", "gender_split", "top_countries"],
+              additionalProperties: false,
+            },
+            niche_categories: { type: "array", items: { type: "string" }, description: "2-5 niche categories" },
+            brand_safety: {
+              type: "object",
+              properties: {
+                rating: { type: "string", enum: ["safe", "caution", "risk"] },
+                flags: { type: "array", items: { type: "string" } },
+              },
+              required: ["rating", "flags"],
+              additionalProperties: false,
+            },
+            recommendations: { type: "array", items: { type: "string" }, description: "3-5 actionable recommendations" },
+          },
+          required: ["overall_score", "engagement_rating", "authenticity", "growth_assessment", "estimated_demographics", "niche_categories", "brand_safety", "recommendations"],
+          additionalProperties: false,
+        },
+      },
+    }],
+    tool_choice: { type: "function", function: { name: "influencer_evaluation" } },
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -45,10 +206,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Service-role client for credit checks
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get user's workspace
     const { data: membership } = await adminClient
       .from("workspace_members")
       .select("workspace_id")
@@ -62,7 +221,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check AI credits
     const { data: ws } = await adminClient
       .from("workspaces")
       .select("ai_credits_remaining")
@@ -77,81 +235,25 @@ Deno.serve(async (req) => {
 
     const { type, data } = await req.json();
 
-    let messages: any[];
-    let tools: any[] | undefined;
-    let tool_choice: any | undefined;
+    let config: { messages: any[]; tools?: any[]; tool_choice?: any };
 
     if (type === "summarize") {
-      messages = [
-        { role: "system", content: "You are an influencer marketing analyst. Given an influencer's profile data, write a concise 2-3 sentence summary highlighting their strengths, niche, audience size, and engagement quality. Be direct and actionable." },
-        { role: "user", content: `Analyze this influencer profile:\n${JSON.stringify(data)}` },
-      ];
+      config = buildSummarizeMessages(data);
     } else if (type === "fraud-check") {
-      messages = [
-        { role: "system", content: "You are a social media fraud detection expert. Analyze the influencer metrics provided and identify any red flags indicating fake followers, engagement manipulation, or suspicious patterns. Consider follower-to-engagement ratios, average views vs followers, and any anomalies." },
-        { role: "user", content: `Check this influencer for fraud indicators:\n${JSON.stringify(data)}` },
-      ];
-      tools = [{
-        type: "function",
-        function: {
-          name: "fraud_analysis",
-          description: "Return a fraud risk assessment for the influencer",
-          parameters: {
-            type: "object",
-            properties: {
-              risk: { type: "string", enum: ["low", "medium", "high"], description: "Overall fraud risk level" },
-              flags: { type: "array", items: { type: "string" }, description: "List of specific red flags found" },
-              summary: { type: "string", description: "Brief overall assessment" },
-            },
-            required: ["risk", "flags", "summary"],
-            additionalProperties: false,
-          },
-        },
-      }];
-      tool_choice = { type: "function", function: { name: "fraud_analysis" } };
+      config = buildFraudCheckMessages(data);
     } else if (type === "recommend") {
-      messages = [
-        { role: "system", content: "You are a campaign strategy advisor. Given the current state of an influencer marketing campaign (stages, influencer counts, budget, timeline, outreach stats), provide 3-5 actionable recommendations to improve campaign performance. Be specific and prioritize by impact." },
-        { role: "user", content: `Analyze this campaign and give recommendations:\n${JSON.stringify(data)}` },
-      ];
-      tools = [{
-        type: "function",
-        function: {
-          name: "campaign_recommendations",
-          description: "Return actionable campaign recommendations",
-          parameters: {
-            type: "object",
-            properties: {
-              recommendations: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    title: { type: "string", description: "Short recommendation title" },
-                    description: { type: "string", description: "Detailed explanation" },
-                    priority: { type: "string", enum: ["high", "medium", "low"] },
-                    category: { type: "string", enum: ["outreach", "budget", "timeline", "strategy"] },
-                  },
-                  required: ["title", "description", "priority", "category"],
-                  additionalProperties: false,
-                },
-              },
-            },
-            required: ["recommendations"],
-            additionalProperties: false,
-          },
-        },
-      }];
-      tool_choice = { type: "function", function: { name: "campaign_recommendations" } };
+      config = buildRecommendMessages(data);
+    } else if (type === "evaluate") {
+      config = buildEvaluateMessages(data);
     } else {
-      return new Response(JSON.stringify({ error: "Invalid type. Use: summarize, fraud-check, recommend" }), {
+      return new Response(JSON.stringify({ error: "Invalid type. Use: summarize, fraud-check, recommend, evaluate" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const body: any = { model: MODEL, messages };
-    if (tools) body.tools = tools;
-    if (tool_choice) body.tool_choice = tool_choice;
+    const body: any = { model: MODEL, messages: config.messages };
+    if (config.tools) body.tools = config.tools;
+    if (config.tool_choice) body.tool_choice = config.tool_choice;
 
     const aiRes = await fetch(AI_GATEWAY, {
       method: "POST",
@@ -171,7 +273,7 @@ Deno.serve(async (req) => {
         });
       }
       if (aiRes.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits in Settings → Workspace → Usage." }), {
+        return new Response(JSON.stringify({ error: "AI credits exhausted." }), {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -200,7 +302,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Decrement AI credits after successful response
+    // Decrement AI credits
     await adminClient
       .from("workspaces")
       .update({ ai_credits_remaining: ws.ai_credits_remaining - 1 })

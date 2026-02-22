@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { Instagram, Youtube, SlidersHorizontal, Search, ExternalLink, Trash2, Users, Eye, TrendingUp, Clock, Mail, Send, Sparkles, ShieldCheck, Loader2 } from "lucide-react";
+import { Instagram, Youtube, SlidersHorizontal, Search, ExternalLink, Trash2, Users, Eye, TrendingUp, Clock, Mail, Send, Sparkles, ShieldCheck, Loader2, FileSearch } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -117,6 +118,13 @@ export function CardDetailDialog({ card, open, onOpenChange, onSave, onRemove, s
                 <ExternalLink className="h-3 w-3" /> View Profile
               </a>
             )}
+            <Link
+              to={`/influencer/${card.platform}/${card.username}`}
+              className="flex items-center gap-1 text-xs text-primary hover:underline"
+              onClick={() => onOpenChange(false)}
+            >
+              <FileSearch className="h-3 w-3" /> Full Evaluation
+            </Link>
           </div>
 
           {/* Stats row */}
