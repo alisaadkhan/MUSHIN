@@ -759,6 +759,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_hubspot_configured: {
+        Args: { _workspace_id: string }
+        Returns: boolean
+      }
       get_user_workspace: {
         Args: never
         Returns: {
