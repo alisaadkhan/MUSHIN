@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, Megaphone, Trash2, Users, CalendarIcon, BarChart3 } from "lucide-react";
+import { Plus, Megaphone, Trash2, Users, CalendarIcon, BarChart3, DollarSign } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,12 +33,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
-const statusColors: Record<string, string> = {
-  draft: "bg-muted text-muted-foreground",
-  active: "bg-green-500/10 text-green-500 border-green-500/20",
-  completed: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-  archived: "bg-muted text-muted-foreground",
-};
+type CampaignStatus = "draft" | "active" | "completed";
+
+const KANBAN_COLUMNS: { status: CampaignStatus; label: string }[] = [
+  { status: "draft", label: "Draft" },
+  { status: "active", label: "Active" },
+  { status: "completed", label: "Completed" },
+];
 
 export default function CampaignsPage() {
   const { data: campaigns, isLoading, createCampaign, deleteCampaign } = useCampaigns();
@@ -89,6 +90,16 @@ export default function CampaignsPage() {
     setDeleteId(null);
   };
 
+  const grouped = useMemo(() => {
+    const map: Record<CampaignStatus, typeof campaigns> = { draft: [], active: [], completed: [] };
+    (campaigns || []).forEach(c => {
+      const s = c.status as CampaignStatus;
+      if (map[s]) map[s]!.push(c);
+      else map.draft!.push(c); // archived -> draft column
+    });
+    return map;
+  }, [campaigns]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -120,68 +131,69 @@ export default function CampaignsPage() {
       </div>
 
       {isLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {Array.from({ length: 3 }).map((_, i) => (
             <Card key={i} className="glass-card animate-pulse">
-              <CardContent className="p-6 h-32" />
+              <CardContent className="p-6 h-48" />
             </Card>
           ))}
         </div>
       )}
 
       {!isLoading && campaigns && campaigns.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {campaigns.map((c, i) => (
-            <motion.div
-              key={c.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04 }}
-            >
-              <Link to={`/campaigns/${c.id}`}>
-                <Card className="glass-card hover:border-primary/30 transition-colors cursor-pointer group">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                        <Megaphone className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className={`text-[10px] ${statusColors[c.status] || ""}`}>
-                          {c.status}
-                        </Badge>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
-                          onClick={(e) => { e.preventDefault(); setDeleteId(c.id); }}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                    <h3 className="font-semibold truncate">{c.name}</h3>
-                    {c.description && (
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{c.description}</p>
-                    )}
-                    {(c.start_date || c.end_date) && (
-                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                        <CalendarIcon className="h-3 w-3" />
-                        {c.start_date ? format(new Date(c.start_date), "MMM d") : "—"}
-                        {" – "}
-                        {c.end_date ? format(new Date(c.end_date), "MMM d") : "—"}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Users className="h-3 w-3" />
-                        {(c as any).pipeline_cards?.[0]?.count || 0} influencers
-                      </span>
-                      {c.budget && <span>${Number(c.budget).toLocaleString()} budget</span>}
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            </motion.div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {KANBAN_COLUMNS.map(col => (
+            <div key={col.status} className="space-y-3">
+              <div className="flex items-center gap-2 px-1">
+                <h3 className="text-sm font-semibold">{col.label}</h3>
+                <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
+                  {grouped[col.status]?.length || 0}
+                </Badge>
+              </div>
+              <div className="space-y-3 min-h-[200px] rounded-lg border border-dashed border-border/50 p-2">
+                {(grouped[col.status] || []).map((c, i) => (
+                  <motion.div
+                    key={c.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.04 }}
+                  >
+                    <Link to={`/campaigns/${c.id}`}>
+                      <Card className="glass-card hover:border-primary/30 transition-colors cursor-pointer group">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <h4 className="font-semibold text-sm truncate group-hover:text-primary transition-colors">{c.name}</h4>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                              onClick={(e) => { e.preventDefault(); setDeleteId(c.id); }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Users className="h-3 w-3" />
+                              {(c as any).pipeline_cards?.[0]?.count || 0} creators
+                            </span>
+                            {c.budget && (
+                              <span className="flex items-center gap-1">
+                                <DollarSign className="h-3 w-3" />
+                                ${Number(c.budget).toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  </motion.div>
+                ))}
+                {(!grouped[col.status] || grouped[col.status]!.length === 0) && (
+                  <p className="text-xs text-muted-foreground text-center py-8">No campaigns</p>
+                )}
+              </div>
+            </div>
           ))}
         </div>
       )}

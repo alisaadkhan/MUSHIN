@@ -1,10 +1,18 @@
 import { useEffect } from "react";
 import { motion } from "framer-motion";
-import { Check, Crown, Zap, CreditCard, ExternalLink, Loader2 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Check, Crown, Zap, CreditCard, ExternalLink, FileText } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useWorkspaceCredits } from "@/hooks/useWorkspaceCredits";
 import { PLANS, PlanKey } from "@/lib/plans";
@@ -23,6 +31,13 @@ const features = [
   { key: "team_members", label: "Team members" },
   { key: "priority_support", label: "Priority support" },
 ] as const;
+
+// Placeholder invoices
+const placeholderInvoices = [
+  { date: "Feb 1, 2026", amount: "$29.00", status: "Paid" },
+  { date: "Jan 1, 2026", amount: "$29.00", status: "Paid" },
+  { date: "Dec 1, 2025", amount: "$29.00", status: "Paid" },
+];
 
 export default function BillingPage() {
   const { plan, subscribed, subscriptionEnd, cancelAtPeriodEnd, checkout, openPortal, refresh, isLoading } = useSubscription();
@@ -73,10 +88,10 @@ export default function BillingPage() {
     <div className="space-y-8 max-w-5xl">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Billing</h1>
-        <p className="text-muted-foreground mt-1">Manage your subscription and usage</p>
+        <p className="text-muted-foreground mt-1">Manage your subscription and invoices</p>
       </div>
 
-      {/* Current Plan Info */}
+      {/* Current Plan */}
       {subscribed && (
         <Card className="glass-card">
           <CardContent className="p-6">
@@ -133,6 +148,61 @@ export default function BillingPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Payment Method */}
+      <Card className="glass-card">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <CreditCard className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">Payment Method</p>
+                <p className="text-xs text-muted-foreground">
+                  {subscribed ? "•••• •••• •••• 4242 · Expires 12/27" : "No payment method on file"}
+                </p>
+              </div>
+            </div>
+            {subscribed && (
+              <Button variant="outline" size="sm" onClick={handlePortal} className="text-xs">
+                Update
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Invoices */}
+      {subscribed && (
+        <Card className="glass-card overflow-hidden">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <FileText className="h-4 w-4 text-primary" /> Invoices
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {placeholderInvoices.map((inv, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="text-sm">{inv.date}</TableCell>
+                    <TableCell className="text-sm font-medium">{inv.amount}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-[10px] text-green-500 border-green-500/20">{inv.status}</Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Pricing Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

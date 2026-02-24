@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Users, Trash2, Calendar, ArrowRight } from "lucide-react";
+import { Plus, Users, Trash2, Eye, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,10 +21,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useInfluencerLists } from "@/hooks/useInfluencerLists";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
-import { formatDistanceToNow } from "date-fns";
+import { format } from "date-fns";
 
 export default function ListsPage() {
   const { data: lists, isLoading, createList, deleteList } = useInfluencerLists();
@@ -61,7 +69,7 @@ export default function ListsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Lists</h1>
-          <p className="text-muted-foreground mt-1">Organize influencers into lists for campaigns</p>
+          <p className="text-muted-foreground mt-1">Organize creators into curated lists</p>
         </div>
         <Button className="btn-shine gap-2" onClick={() => setShowCreate(true)}>
           <Plus className="h-4 w-4" />
@@ -70,69 +78,66 @@ export default function ListsPage() {
       </div>
 
       {isLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i} className="glass-card animate-pulse">
-              <CardContent className="p-6 h-32" />
-            </Card>
-          ))}
-        </div>
+        <Card className="glass-card animate-pulse">
+          <CardContent className="p-6 h-48" />
+        </Card>
       )}
 
       {!isLoading && lists && lists.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-        >
-          {lists.map((list, i) => {
-            const itemCount = (list as any).list_items?.[0]?.count ?? 0;
-            return (
-              <motion.div
-                key={list.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-              >
-                <Card className="glass-card hover:border-primary/30 transition-colors group">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <Link to={`/lists/${list.id}`} className="flex-1 min-w-0">
-                        <h3 className="font-semibold truncate group-hover:text-primary transition-colors">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <Card className="glass-card overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="text-center">Creators</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Updated</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {lists.map((list) => {
+                  const itemCount = (list as any).list_items?.[0]?.count ?? 0;
+                  return (
+                    <TableRow key={list.id} className="group">
+                      <TableCell>
+                        <Link to={`/lists/${list.id}`} className="font-medium hover:text-primary transition-colors">
                           {list.name}
-                        </h3>
-                        <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            {itemCount} influencer{itemCount !== 1 ? "s" : ""}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {formatDistanceToNow(new Date(list.created_at), { addSuffix: true })}
-                          </span>
-                        </div>
-                      </Link>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => setDeleteId(list.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                        <Link to={`/lists/${list.id}`}>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <ArrowRight className="h-4 w-4" />
-                          </Button>
                         </Link>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            );
-          })}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className="text-sm">{itemCount}</span>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {format(new Date(list.created_at), "MMM d, yyyy")}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {format(new Date(list.updated_at), "MMM d, yyyy")}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="sm" className="h-7" asChild>
+                            <Link to={`/lists/${list.id}`}>
+                              <Eye className="h-3.5 w-3.5" />
+                            </Link>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-muted-foreground hover:text-destructive"
+                            onClick={() => setDeleteId(list.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </Card>
         </motion.div>
       )}
 
@@ -154,7 +159,6 @@ export default function ListsPage() {
         </Card>
       )}
 
-      {/* Create Dialog */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent>
           <DialogHeader>
@@ -175,7 +179,6 @@ export default function ListsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
