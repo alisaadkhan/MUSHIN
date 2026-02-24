@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Bookmark, Trash2, Search, Play } from "lucide-react";
+import { Bookmark, Trash2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -44,11 +44,19 @@ export default function SavedSearchesPage() {
     navigate(`/search?${params.toString()}`);
   };
 
+  const formatFilterDescription = (filters: any) => {
+    const parts: string[] = [];
+    if (filters?.platform) parts.push(filters.platform.charAt(0).toUpperCase() + filters.platform.slice(1));
+    if (filters?.query) parts.push(filters.query);
+    if (filters?.location && filters.location !== "All Pakistan") parts.push(filters.location);
+    return parts.join(" · ") || "No filters";
+  };
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Saved Searches</h1>
-        <p className="text-muted-foreground mt-1">Re-run your saved search filters</p>
+        <p className="text-muted-foreground mt-1">Quickly re-run your favorite searches</p>
       </div>
 
       {isLoading && (
@@ -76,14 +84,10 @@ export default function SavedSearchesPage() {
                   <CardContent className="p-5 flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold truncate">{s.name}</p>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        {filters?.query && <Badge variant="secondary" className="text-xs">{filters.query}</Badge>}
-                        {filters?.platform && <Badge variant="outline" className="text-xs">{filters.platform}</Badge>}
-                        {filters?.location && <Badge variant="outline" className="text-xs">{filters.location}</Badge>}
-                        <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(s.created_at), { addSuffix: true })}
-                        </span>
-                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{formatFilterDescription(filters)}</p>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(s.created_at), { addSuffix: true })}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => handleRerun(filters)}>
