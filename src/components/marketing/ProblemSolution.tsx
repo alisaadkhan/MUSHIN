@@ -8,14 +8,15 @@ const fadeUp: Variants = {
 const stagger: Variants = { visible: { transition: { staggerChildren: 0.1 } } };
 
 const WITHOUT = [
-  "Wasting budget on influencers with fake followers",
-  "Manually searching across platforms for hours",
-  "Locked into expensive annual contracts with legacy tools",
+  "Wasting budget on Pakistani influences with fake, bot-inflated followers",
+  "Manually browsing hundreds of profiles on Instagram and TikTok for hours",
+  "No way to compare creator ROI in Pakistani Rupees across campaigns",
 ];
+
 const WITH = [
-  "AI fraud scoring catches fakes before you spend",
-  "Live discovery across Instagram, TikTok, YouTube in seconds",
-  "Pay-as-you-go credits with no commitments",
+  "AI fraud scoring catches bots targeting Pakistani audiences before you spend a single rupee",
+  "Live discovery across Instagram, TikTok, and YouTube — filtered by Karachi, Lahore, Islamabad, and more",
+  "Campaign ROI tracking and attribution in PKR with one-click reporting",
 ];
 
 export function ProblemSolution() {
@@ -28,7 +29,7 @@ export function ProblemSolution() {
       >
         <motion.h2 variants={fadeUp}
           className="text-3xl md:text-4xl font-bold text-center mb-16 tracking-tight">
-          Why Agencies Switch to <span className="aurora-text">InfluenceIQ</span>
+          Why Pakistani Brands Switch to <span className="aurora-text">InfluenceIQ</span>
         </motion.h2>
 
         <div className="grid md:grid-cols-2 gap-8">
@@ -44,7 +45,7 @@ export function ProblemSolution() {
           </motion.div>
 
           <motion.div variants={fadeUp} className="space-y-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground mb-2">With InfluenceIQ</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground mb-2">With InfluenceIQ Pakistan</p>
             {WITH.map((t) => (
               <div key={t} className="glass-card p-5 rounded-xl flex items-start gap-3"
                 style={{ borderColor: "hsl(var(--aurora-violet) / 0.3)" }}>

@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Users, Trash2, Eye, ArrowRight } from "lucide-react";
+import { Plus, Users, Trash2, Eye, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -21,18 +20,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { useInfluencerLists } from "@/hooks/useInfluencerLists";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function ListsPage() {
   const { data: lists, isLoading, createList, deleteList } = useInfluencerLists();
@@ -68,99 +60,107 @@ export default function ListsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Lists</h1>
-          <p className="text-muted-foreground mt-1">Organize creators into curated lists</p>
+          <h1 className="font-serif text-2xl font-bold text-foreground">Lists</h1>
+          <p className="text-sm text-muted-foreground mt-1">Organize creators into curated lists</p>
         </div>
-        <Button className="btn-shine gap-2" onClick={() => setShowCreate(true)}>
-          <Plus className="h-4 w-4" />
-          Create List
+        <Button className="rounded-lg btn-shine" onClick={() => setShowCreate(true)}>
+          <Plus size={16} strokeWidth={1.5} className="mr-1" /> Create List
         </Button>
       </div>
 
       {isLoading && (
-        <Card className="glass-card animate-pulse">
-          <CardContent className="p-6 h-48" />
-        </Card>
+        <div className="bg-white/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6 h-48 animate-pulse" />
       )}
 
       {!isLoading && lists && lists.length > 0 && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <Card className="glass-card overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="text-center">Creators</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Updated</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lists.map((list) => {
-                  const itemCount = (list as any).list_items?.[0]?.count ?? 0;
-                  return (
-                    <TableRow key={list.id} className="group">
-                      <TableCell>
-                        <Link to={`/lists/${list.id}`} className="font-medium hover:text-primary transition-colors">
-                          {list.name}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className="text-sm">{itemCount}</span>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {format(new Date(list.created_at), "MMM d, yyyy")}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {format(new Date(list.updated_at), "MMM d, yyyy")}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="sm" className="h-7" asChild>
-                            <Link to={`/lists/${list.id}`}>
-                              <Eye className="h-3.5 w-3.5" />
+          <div className="bg-white/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="sticky top-0 bg-muted/50 border-b border-border">
+                  <tr>
+                    <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <Checkbox className="rounded border-border mr-3 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground" />
+                        Name
+                      </div>
+                    </th>
+                    <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3 whitespace-nowrap">Creators</th>
+                    <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3 hidden md:table-cell whitespace-nowrap">Created</th>
+                    <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3 hidden md:table-cell whitespace-nowrap">Updated</th>
+                    <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3 whitespace-nowrap">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lists.map((list) => {
+                    const itemCount = (list as any).list_items?.[0]?.count ?? 0;
+                    return (
+                      <tr key={list.id} className="border-b border-border hover:bg-muted/30 transition-colors last:border-0">
+                        <td className="px-5 py-4">
+                          <div className="flex items-center">
+                            <Checkbox className="rounded border-border mr-3" />
+                            <Link to={`/lists/${list.id}`} className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+                              {list.name}
                             </Link>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-muted-foreground hover:text-destructive"
-                            onClick={() => setDeleteId(list.id)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </Card>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 text-sm text-muted-foreground">{itemCount}</td>
+                        <td className="px-5 py-4 text-sm text-muted-foreground hidden md:table-cell">
+                          {format(new Date(list.created_at), "MMM d, yyyy")}
+                        </td>
+                        <td className="px-5 py-4 text-sm text-muted-foreground hidden md:table-cell">
+                          {format(new Date(list.updated_at), "MMM d, yyyy")}
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10" asChild>
+                              <Link to={`/lists/${list.id}`}>
+                                <Eye size={14} strokeWidth={1.5} />
+                              </Link>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => setDeleteId(list.id)}
+                            >
+                              <Trash2 size={14} strokeWidth={1.5} />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                              <MoreHorizontal size={14} strokeWidth={1.5} />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </motion.div>
       )}
 
       {!isLoading && (!lists || lists.length === 0) && (
-        <Card className="glass-card">
-          <CardContent className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl aurora-gradient mb-4">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
+          <div className="flex flex-col items-center justify-center py-20 text-center bg-white/50 backdrop-blur-sm border border-white/50 shadow-sm rounded-2xl">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 mb-4">
               <Users className="h-8 w-8 text-primary" />
             </div>
-            <h3 className="text-lg font-semibold mb-1">No Lists Yet</h3>
+            <h3 className="font-serif text-lg font-semibold text-foreground mb-1">No Lists Yet</h3>
             <p className="text-sm text-muted-foreground max-w-md">
               Create your first list to start organizing influencers for campaigns.
             </p>
-            <Button className="mt-4 gap-2" onClick={() => setShowCreate(true)}>
-              <Plus className="h-4 w-4" />
+            <Button className="mt-4 gap-2 rounded-lg btn-shine" onClick={() => setShowCreate(true)}>
+              <Plus size={16} strokeWidth={1.5} />
               Create List
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </motion.div>
       )}
 
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Create New List</DialogTitle>
           </DialogHeader>
@@ -169,6 +169,7 @@ export default function ListsPage() {
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+            className="my-4"
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>

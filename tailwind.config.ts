@@ -8,14 +8,13 @@ export default {
     container: {
       center: true,
       padding: "2rem",
-      screens: {
-        "2xl": "1400px",
-      },
+      screens: { "2xl": "1400px" },
     },
     extend: {
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
-        mono: ["JetBrains Mono", "monospace"],
+        display: ["Plus Jakarta Sans", "system-ui", "sans-serif"],
+        serif: ["Playfair Display", "serif"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -51,6 +50,11 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        copper: "hsl(var(--copper))",
+        ivory: "hsl(var(--ivory))",
+        mint: "hsl(var(--mint))",
+        peach: "hsl(var(--peach))",
+        "purple-glow": "hsl(var(--purple-glow))",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -60,10 +64,6 @@ export default {
           "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
-        },
-        aurora: {
-          violet: "hsl(var(--aurora-violet))",
-          teal: "hsl(var(--aurora-teal))",
         },
       },
       borderRadius: {
@@ -80,16 +80,56 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
-        "aurora-float": {
-          "0%, 100%": { transform: "translate(0, 0) scale(1)" },
-          "33%": { transform: "translate(30px, -20px) scale(1.1)" },
-          "66%": { transform: "translate(-20px, 15px) scale(0.9)" },
+        marquee: {
+          "0%": { transform: "translateX(0%)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
+        // Hero background breathing — imperceptibly slow
+        "hero-breathe": {
+          "0%, 100%": { opacity: "1", transform: "scale(1)" },
+          "50%": { opacity: "0.85", transform: "scale(1.015)" },
+        },
+        // Warm ambient light drift in hero
+        "light-drift": {
+          "0%, 100%": { transform: "translate(0%, 0%)" },
+          "33%": { transform: "translate(1.5%, -1%)" },
+          "66%": { transform: "translate(-1%, 1.5%)" },
+        },
+        // Metric value pulse
+        "value-shimmer": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.75" },
+        },
+        // Icon intelligence glow
+        "icon-glow": {
+          "0%, 100%": { boxShadow: "0 0 0 0 hsl(28 55% 42% / 0)" },
+          "50%": { boxShadow: "0 0 12px 2px hsl(28 55% 42% / 0.18)" },
+        },
+        // CTA button pulse
+        "cta-pulse": {
+          "0%, 100%": { boxShadow: "0 0 0 0 hsl(28 55% 38% / 0.3)" },
+          "50%": { boxShadow: "0 0 0 5px hsl(28 55% 38% / 0)" },
+        },
+        // Chart line draw
+        "chart-draw": {
+          from: { strokeDashoffset: "1000" },
+          to: { strokeDashoffset: "0" },
+        },
+        "fade-up": {
+          from: { opacity: "0", transform: "translateY(12px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "aurora-float": "aurora-float 15s ease-in-out infinite",
+        marquee: "marquee 40s linear infinite",
+        "hero-breathe": "hero-breathe 14s ease-in-out infinite",
+        "light-drift": "light-drift 20s ease-in-out infinite",
+        "value-shimmer": "value-shimmer 3s ease-in-out infinite",
+        "icon-glow": "icon-glow 2.5s ease-in-out infinite",
+        "cta-pulse": "cta-pulse 2.5s ease-in-out infinite",
+        "fade-up": "fade-up 0.55s ease forwards",
       },
     },
   },

@@ -11,6 +11,7 @@ interface EngagementRating {
 interface EngagementPanelProps {
   engagement: EngagementRating;
   platform: string;
+  className?: string;
 }
 
 const benchmarks: Record<string, { low: number; high: number }> = {
@@ -19,7 +20,7 @@ const benchmarks: Record<string, { low: number; high: number }> = {
   youtube: { low: 2, high: 5 },
 };
 
-export function EngagementPanel({ engagement, platform }: EngagementPanelProps) {
+export function EngagementPanel({ engagement, platform, className }: EngagementPanelProps) {
   const bench = benchmarks[platform] || { low: 1, high: 3 };
   const rate = engagement.rate;
 
@@ -29,7 +30,7 @@ export function EngagementPanel({ engagement, platform }: EngagementPanelProps) 
   else if (rate < bench.low) { color = "text-red-500 bg-red-500/10 border-red-500/20"; Icon = TrendingDown; }
 
   return (
-    <Card className="glass-card">
+    <Card className={className || "glass-card"}>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-primary" />

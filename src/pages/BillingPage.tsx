@@ -1,24 +1,17 @@
-import { useEffect } from "react";
-import { motion } from "framer-motion";
-import { Check, Crown, Zap, CreditCard, ExternalLink, FileText } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { Check, CreditCard, ExternalLink, Zap } from "lucide-react";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useWorkspaceCredits } from "@/hooks/useWorkspaceCredits";
 import { PLANS, PlanKey } from "@/lib/plans";
 import { useToast } from "@/hooks/use-toast";
-import { useSearchParams } from "react-router-dom";
-import { format } from "date-fns";
+import { motion } from "framer-motion";
+import { PaymentsPanel, type PaymentRecord } from "@/components/payments/PaymentsPanel";
+import { supabase } from "@/integrations/supabase/client";
 
 const planOrder: PlanKey[] = ["free", "pro", "business"];
 
@@ -33,10 +26,11 @@ const features = [
 ] as const;
 
 // Placeholder invoices
-const placeholderInvoices = [
-  { date: "Feb 1, 2026", amount: "$29.00", status: "Paid" },
-  { date: "Jan 1, 2026", amount: "$29.00", status: "Paid" },
-  { date: "Dec 1, 2025", amount: "$29.00", status: "Paid" },
+const invoices = [
+  { date: "Feb 1, 2026", amount: "$149.00", status: "Paid" },
+  { date: "Jan 1, 2026", amount: "$149.00", status: "Paid" },
+  { date: "Dec 1, 2025", amount: "$149.00", status: "Paid" },
+  { date: "Nov 1, 2025", amount: "$49.00", status: "Paid" },
 ];
 
 export default function BillingPage() {
@@ -44,6 +38,38 @@ export default function BillingPage() {
   const { data: credits } = useWorkspaceCredits();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
+
+  useEffect(() => {
+    // Fetch payments for the workspace
+    const fetchPayments = async () => {
+      const { data: ws } = await (supabase as any).rpc("get_user_workspace_id");
+      if (!ws) return;
+
+      const { data, error } = await (supabase as any)
+        .from("payments")
+        .select(`
+          id, amount, currency, status, due_date,
+          campaigns(name), influencer_profiles(full_name, username)
+        `)
+        .eq("workspace_id", ws)
+        .order("created_at", { ascending: false });
+
+      if (data) {
+        const mapped = data.map(d => ({
+          id: d.id,
+          amount: d.amount,
+          currency: d.currency,
+          status: d.status as any,
+          due_date: d.due_date,
+          campaign_name: d.campaigns?.name || "Unknown",
+          influencer_name: d.influencer_profiles?.full_name || d.influencer_profiles?.username || "Unknown"
+        }));
+        setPayments(mapped);
+      }
+    };
+    fetchPayments();
+  }, []);
 
   useEffect(() => {
     if (searchParams.get("success") === "true") {
@@ -84,191 +110,230 @@ export default function BillingPage() {
   const emailMax = currentPlanConfig.email_sends;
   const aiMax = currentPlanConfig.ai_credits;
 
+  const usageItems = [
+    { label: "Search Credits", used: searchMax - (credits?.search_credits_remaining ?? searchMax), max: searchMax },
+    { label: "Enrichment Credits", used: enrichMax - (credits?.enrichment_credits_remaining ?? enrichMax), max: enrichMax },
+    { label: "Email Sends", used: emailMax - (credits?.email_sends_remaining ?? emailMax), max: emailMax },
+    { label: "AI Insights", used: aiMax === Infinity ? 0 : aiMax - (credits?.ai_credits_remaining ?? aiMax), max: aiMax },
+  ];
+
   return (
-    <div className="space-y-8 max-w-5xl">
+    <div className="space-y-6 max-w-5xl">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Billing</h1>
-        <p className="text-muted-foreground mt-1">Manage your subscription and invoices</p>
+        <h1 className="font-serif text-2xl font-bold text-foreground">Billing</h1>
+        <p className="text-sm text-muted-foreground mt-1">Manage your subscription and billing</p>
       </div>
 
-      {/* Current Plan */}
-      {subscribed && (
-        <Card className="glass-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Crown className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="font-semibold">
-                    {currentPlanConfig.name} Plan
-                    {cancelAtPeriodEnd && (
-                      <Badge variant="outline" className="ml-2 text-destructive border-destructive/30">Cancels at period end</Badge>
-                    )}
-                  </p>
-                  {subscriptionEnd && (
-                    <p className="text-xs text-muted-foreground">
-                      {cancelAtPeriodEnd ? "Access until" : "Renews"} {format(new Date(subscriptionEnd), "MMM d, yyyy")}
-                    </p>
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Left Column: Current Plan & Usage */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-white/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-6 md:p-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div>
+                <p className="text-xs text-muted-foreground font-medium mb-1">Current Plan</p>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-2xl font-bold text-foreground capitalize">{currentPlanConfig.name}</h2>
+                  {cancelAtPeriodEnd && (
+                    <Badge variant="outline" className="text-destructive border-destructive/30 bg-destructive/5 rounded-md text-[10px]">Cancels at period end</Badge>
                   )}
                 </div>
+                {subscriptionEnd && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {cancelAtPeriodEnd ? "Access until" : "Renews"} {format(new Date(subscriptionEnd), "MMM d, yyyy")}
+                  </p>
+                )}
               </div>
-              <Button variant="outline" size="sm" onClick={handlePortal} className="gap-1.5">
-                <ExternalLink className="h-3.5 w-3.5" />
-                Manage Subscription
-              </Button>
+              <div className="flex flex-col sm:items-end">
+                <span className="text-3xl font-bold text-foreground">${currentPlanConfig.price}<span className="text-base font-normal text-muted-foreground">/mo</span></span>
+                {subscribed && (
+                  <Button variant="link" size="sm" onClick={handlePortal} className="h-auto p-0 text-primary mt-1 text-xs">
+                    Manage Subscription <ExternalLink className="h-3 w-3 ml-1" />
+                  </Button>
+                )}
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
 
-      {/* Credit Usage */}
-      <Card className="glass-card">
-        <CardContent className="p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Zap className="h-4 w-4 text-primary" />
-            <h3 className="font-semibold">Current Usage</h3>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              { label: "Searches", used: searchMax - (credits?.search_credits_remaining ?? searchMax), max: searchMax },
-              { label: "Enrichments", used: enrichMax - (credits?.enrichment_credits_remaining ?? enrichMax), max: enrichMax },
-              { label: "Emails", used: emailMax - (credits?.email_sends_remaining ?? emailMax), max: emailMax },
-              { label: "AI Insights", used: aiMax === Infinity ? 0 : aiMax - (credits?.ai_credits_remaining ?? aiMax), max: aiMax },
-            ].map((item) => (
-              <div key={item.label}>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-muted-foreground">{item.label}</span>
-                  <span className="data-mono text-xs">
-                    {item.max === Infinity ? "∞" : `${item.used} / ${item.max}`}
-                  </span>
-                </div>
-                <Progress value={item.max === Infinity ? 0 : (item.used / item.max) * 100} className="h-2" />
+            <div className="pt-6 border-t border-border/50">
+              <div className="flex items-center gap-2 mb-5">
+                <Zap className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">Current Usage</h3>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Payment Method */}
-      <Card className="glass-card">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <CreditCard className="h-5 w-5 text-muted-foreground" />
+              <div className="space-y-4">
+                {usageItems.map((u) => {
+                  const pct = u.max === Infinity ? 0 : (u.used / u.max) * 100;
+                  return (
+                    <div key={u.label}>
+                      <div className="flex justify-between text-sm mb-1.5">
+                        <span className="text-muted-foreground">{u.label}</span>
+                        <span className="text-foreground font-medium text-xs">
+                          {u.max === Infinity ? "Unlimited" : `${u.used.toLocaleString()} / ${u.max.toLocaleString()}`}
+                        </span>
+                      </div>
+                      <div className="w-full h-2 bg-muted/60 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full transition-all duration-500 ${pct > 90 ? "bg-destructive" : pct > 75 ? "bg-amber-500" : "bg-primary"}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Payouts and Invoices (Phase 6) */}
+          <PaymentsPanel payments={payments} className="bg-white/80 backdrop-blur-md shadow-sm border-white/50" />
+
+          {/* Billing history */}
+          {subscribed && (
+            <div className="bg-white/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl overflow-hidden">
+              <div className="px-6 py-4 border-b border-border/50">
+                <h3 className="text-sm font-semibold text-foreground">Billing History</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/30">
+                    <tr>
+                      <th className="text-left font-medium text-muted-foreground px-6 py-3 w-[140px]">Date</th>
+                      <th className="text-left font-medium text-muted-foreground px-6 py-3">Amount</th>
+                      <th className="text-left font-medium text-muted-foreground px-6 py-3">Status</th>
+                      <th className="text-right font-medium text-muted-foreground px-6 py-3">Invoice</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {invoices.map((inv) => (
+                      <tr key={inv.date} className="hover:bg-muted/10 transition-colors hidden sm:table-row">
+                        <td className="px-6 py-3.5 text-foreground">{inv.date}</td>
+                        <td className="px-6 py-3.5 text-foreground">{inv.amount}</td>
+                        <td className="px-6 py-3.5">
+                          <span className="text-[11px] font-medium bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-md px-2 py-0.5">{inv.status}</span>
+                        </td>
+                        <td className="px-6 py-3.5 text-right">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground"><ExternalLink size={14} strokeWidth={1.5} /></Button>
+                        </td>
+                      </tr>
+                    ))}
+                    {/* Mobile optimized rows */}
+                    {invoices.map((inv) => (
+                      <tr key={`mobile-${inv.date}`} className="sm:hidden border-t border-border/50">
+                        <td className="px-4 py-3" colSpan={4}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium">{inv.date}</span>
+                            <span className="font-bold">{inv.amount}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-medium bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-md px-2 py-0.5">{inv.status}</span>
+                            <Button variant="ghost" size="sm" className="h-6 text-xs px-2 text-muted-foreground">Receipt <ExternalLink size={12} className="ml-1" /></Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right Column: Payment & Plans */}
+        <div className="space-y-6">
+          {/* Payment Method */}
+          <div className="bg-white/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-foreground">Payment Method</h3>
+              {subscribed && (
+                <Button variant="outline" size="sm" onClick={handlePortal} className="h-7 text-[11px] rounded-md px-2">
+                  Update
+                </Button>
+              )}
+            </div>
+
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-6 rounded bg-muted flex items-center justify-center border border-border/50 flex-shrink-0 mt-0.5">
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+              </div>
               <div>
-                <p className="text-sm font-medium">Payment Method</p>
-                <p className="text-xs text-muted-foreground">
-                  {subscribed ? "•••• •••• •••• 4242 · Expires 12/27" : "No payment method on file"}
+                <p className="text-sm font-medium text-foreground">
+                  {subscribed ? "•••• •••• •••• 4242" : "No payment method"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {subscribed ? "Expires 12/27" : "Add a card to upgrade your plan."}
                 </p>
               </div>
             </div>
-            {subscribed && (
-              <Button variant="outline" size="sm" onClick={handlePortal} className="text-xs">
-                Update
-              </Button>
-            )}
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Invoices */}
-      {subscribed && (
-        <Card className="glass-card overflow-hidden">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <FileText className="h-4 w-4 text-primary" /> Invoices
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {placeholderInvoices.map((inv, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="text-sm">{inv.date}</TableCell>
-                    <TableCell className="text-sm font-medium">{inv.amount}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-[10px] text-green-500 border-green-500/20">{inv.status}</Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+          {/* Pricing Cards */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-foreground px-1">Available Plans</h3>
 
-      {/* Pricing Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {planOrder.map((key, i) => {
-          const p = PLANS[key];
-          const isCurrent = plan === key;
-          const isUpgrade = planOrder.indexOf(key) > planOrder.indexOf(plan);
+            {planOrder.map((key, i) => {
+              const p = PLANS[key];
+              const isCurrent = plan === key;
+              const isUpgrade = planOrder.indexOf(key) > planOrder.indexOf(plan);
 
-          return (
-            <motion.div
-              key={key}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-            >
-              <Card className={`glass-card relative overflow-hidden ${isCurrent ? "border-primary/50 ring-1 ring-primary/20" : ""}`}>
-                {isCurrent && (
-                  <div className="absolute top-0 right-0 px-3 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-bl-lg">
-                    Current
-                  </div>
-                )}
-                <CardContent className="p-6 space-y-4">
-                  <div>
-                    <h3 className="text-lg font-bold">{p.name}</h3>
-                    <div className="flex items-baseline gap-1 mt-1">
-                      <span className="text-3xl font-bold data-mono">${p.price}</span>
-                      {p.price > 0 && <span className="text-muted-foreground text-sm">/mo</span>}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    {features.map((f) => (
-                      <div key={f.key} className="flex items-center gap-2 text-sm">
-                        <Check className="h-3.5 w-3.5 text-primary shrink-0" />
-                        <span className="text-muted-foreground">{f.label}:</span>
-                        <span className="font-medium data-mono ml-auto">
-                          {formatValue(f.key, (p as any)[f.key])}
-                        </span>
+              return (
+                <motion.div
+                  key={key}
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                >
+                  <div className={`bg-white/80 backdrop-blur-md border shadow-sm rounded-2xl p-5 transition-all duration-300 relative overflow-hidden ${isCurrent ? "border-primary/50 ring-1 ring-primary/20" : "border-white/50 hover:shadow-md"}`}>
+                    {isCurrent && (
+                      <div className="absolute top-0 right-0 px-3 py-1 bg-primary text-primary-foreground text-[10px] uppercase font-bold tracking-wider rounded-bl-lg">
+                        Current
                       </div>
-                    ))}
-                  </div>
+                    )}
 
-                  {isUpgrade && "price_id" in p && (
-                    <Button
-                      className="w-full btn-shine gap-1.5"
-                      onClick={() => handleCheckout((p as any).price_id)}
-                    >
-                      <CreditCard className="h-4 w-4" />
-                      Upgrade to {p.name}
-                    </Button>
-                  )}
-                  {isCurrent && plan !== "free" && (
-                    <Button variant="outline" className="w-full" onClick={handlePortal}>
-                      Manage Plan
-                    </Button>
-                  )}
-                  {isCurrent && plan === "free" && (
-                    <Button variant="outline" className="w-full" disabled>
-                      Current Plan
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
-          );
-        })}
+                    <div className="mb-4">
+                      <h3 className="text-lg font-bold text-foreground mb-1 capitalize">{p.name}</h3>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-2xl font-bold text-foreground">${p.price}</span>
+                        {p.price > 0 && <span className="text-sm text-muted-foreground font-medium">/mo</span>}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 mb-5">
+                      {features.map((f) => {
+                        const val = (p as any)[f.key];
+                        // Only show non-zero/non-false features to save space in sidebar
+                        if (!val) return null;
+
+                        return (
+                          <div key={f.key} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[13px] py-1 border-b border-border/30 last:border-0 last:pb-0">
+                            <span className="text-muted-foreground flex items-center gap-1.5"><Check className="h-3 w-3 text-primary/70" /> {f.label}</span>
+                            <span className="font-medium text-foreground sm:text-right">
+                              {formatValue(f.key, val)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {isUpgrade && "price_id" in p && (
+                      <Button
+                        className="w-full btn-shine rounded-lg"
+                        onClick={() => handleCheckout((p as any).price_id)}
+                      >
+                        Upgrade to {p.name}
+                      </Button>
+                    )}
+                    {isCurrent && plan !== "free" && (
+                      <Button variant="outline" className="w-full rounded-lg" onClick={handlePortal}>
+                        Manage Plan
+                      </Button>
+                    )}
+                    {isCurrent && plan === "free" && (
+                      <Button variant="outline" className="w-full rounded-lg bg-muted/30" disabled>
+                        Selected Space
+                      </Button>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );

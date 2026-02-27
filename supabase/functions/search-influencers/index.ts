@@ -49,15 +49,15 @@ Deno.serve(async (req) => {
       });
     }
 
+    const token = authHeader.replace("Bearer ", "");
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !userData?.user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -201,7 +201,9 @@ Deno.serve(async (req) => {
       "1k-10k": [1_000, 10_000],
       "10k-50k": [10_000, 50_000],
       "50k-100k": [50_000, 100_000],
+      "100k-500k": [100_000, 500_000],
       "100k+": [100_000, Infinity],
+      "500k+": [500_000, Infinity],
     };
     let filteredResults = uniqueResults;
     if (followerRange && followerRange !== "any" && rangeMap[followerRange]) {

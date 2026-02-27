@@ -9,6 +9,7 @@ interface BrandSafetyData {
 
 interface BrandSafetyPanelProps {
   brandSafety: BrandSafetyData;
+  className?: string;
 }
 
 const ratingConfig = {
@@ -17,12 +18,12 @@ const ratingConfig = {
   risk: { icon: AlertCircle, color: "text-red-500 bg-red-500/10 border-red-500/20", label: "High Risk" },
 };
 
-export function BrandSafetyPanel({ brandSafety }: BrandSafetyPanelProps) {
+export function BrandSafetyPanel({ brandSafety, className }: BrandSafetyPanelProps) {
   const config = ratingConfig[brandSafety.rating] || ratingConfig.caution;
   const Icon = config.icon;
 
   return (
-    <Card className="glass-card">
+    <Card className={className || "glass-card"}>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
           <Shield className="h-4 w-4 text-primary" />

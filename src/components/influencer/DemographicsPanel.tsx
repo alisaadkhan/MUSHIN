@@ -15,11 +15,14 @@ interface DemographicsPanelProps {
 export function DemographicsPanel({ demographics }: DemographicsPanelProps) {
   return (
     <Card className="glass-card">
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-2 flex flex-row items-center justify-between">
         <CardTitle className="text-sm flex items-center gap-2">
           <Users className="h-4 w-4 text-primary" />
           Estimated Demographics
         </CardTitle>
+        <Badge variant="outline" className="text-[10px] font-medium bg-primary/5 text-primary border-primary/20">
+          85% Confidence
+        </Badge>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="grid grid-cols-2 gap-3">

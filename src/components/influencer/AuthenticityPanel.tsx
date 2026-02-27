@@ -12,6 +12,7 @@ interface AuthenticityData {
 
 interface AuthenticityPanelProps {
   authenticity: AuthenticityData;
+  className?: string;
 }
 
 const riskColors: Record<string, string> = {
@@ -20,11 +21,11 @@ const riskColors: Record<string, string> = {
   high: "text-red-500 bg-red-500/10 border-red-500/20",
 };
 
-export function AuthenticityPanel({ authenticity }: AuthenticityPanelProps) {
+export function AuthenticityPanel({ authenticity, className }: AuthenticityPanelProps) {
   const progressColor = authenticity.score >= 70 ? "bg-green-500" : authenticity.score >= 40 ? "bg-yellow-500" : "bg-red-500";
 
   return (
-    <Card className="glass-card">
+    <Card className={className || "glass-card"}>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
           <ShieldCheck className="h-4 w-4 text-primary" />

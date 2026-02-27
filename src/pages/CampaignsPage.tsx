@@ -1,11 +1,9 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, Megaphone, Trash2, Users, CalendarIcon, BarChart3, DollarSign } from "lucide-react";
+import { Plus, Megaphone, Trash2, Users, CalendarIcon, BarChart3, DollarSign, MoreHorizontal } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -35,10 +33,10 @@ import { cn } from "@/lib/utils";
 
 type CampaignStatus = "draft" | "active" | "completed";
 
-const KANBAN_COLUMNS: { status: CampaignStatus; label: string }[] = [
-  { status: "draft", label: "Draft" },
-  { status: "active", label: "Active" },
-  { status: "completed", label: "Completed" },
+const KANBAN_COLUMNS: { status: CampaignStatus; label: string; color: string }[] = [
+  { status: "draft", label: "Draft", color: "bg-muted" },
+  { status: "active", label: "Active", color: "bg-primary/50" },
+  { status: "completed", label: "Completed", color: "bg-emerald-500/50" },
 ];
 
 export default function CampaignsPage() {
@@ -104,18 +102,15 @@ export default function CampaignsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Campaigns</h1>
-          <p className="text-muted-foreground mt-1">Manage your influencer campaigns</p>
+          <h1 className="font-serif text-2xl font-bold text-foreground">Campaigns</h1>
+          <p className="text-sm text-muted-foreground mt-1">Manage your influencer campaigns</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Link to="/campaigns/compare">
-            <Button variant="outline" size="sm" className="gap-1.5">
-              <BarChart3 className="h-3.5 w-3.5" />
-              Compare
-            </Button>
-          </Link>
+        <div className="flex gap-2">
+          <Button variant="outline" className="rounded-lg h-9" asChild>
+            <Link to="/campaigns/compare">Compare</Link>
+          </Button>
           <Button
-            className="btn-shine gap-2"
+            className="rounded-lg h-9 btn-shine"
             onClick={() => {
               if (!canCreateCampaign()) {
                 toast({ title: "Campaign limit reached", description: `Your plan allows ${campaignLimit} campaigns. Upgrade to create more.`, variant: "destructive" });
@@ -124,8 +119,7 @@ export default function CampaignsPage() {
               setShowCreate(true);
             }}
           >
-            <Plus className="h-4 w-4" />
-            New Campaign
+            <Plus size={16} strokeWidth={1.5} className="mr-1" /> New Campaign
           </Button>
         </div>
       </div>
@@ -133,9 +127,7 @@ export default function CampaignsPage() {
       {isLoading && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i} className="glass-card animate-pulse">
-              <CardContent className="p-6 h-48" />
-            </Card>
+            <div key={i} className="bg-white/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6 h-48 animate-pulse" />
           ))}
         </div>
       )}
@@ -144,13 +136,13 @@ export default function CampaignsPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {KANBAN_COLUMNS.map(col => (
             <div key={col.status} className="space-y-3">
-              <div className="flex items-center gap-2 px-1">
-                <h3 className="text-sm font-semibold">{col.label}</h3>
-                <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
-                  {grouped[col.status]?.length || 0}
-                </Badge>
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <div className={`w-2 h-2 rounded-full ${col.color}`} />
+                <h3 className="text-sm font-semibold text-foreground">{col.label}</h3>
+                <span className="text-xs text-muted-foreground">({grouped[col.status]?.length || 0})</span>
               </div>
-              <div className="space-y-3 min-h-[200px] rounded-lg border border-dashed border-border/50 p-2">
+
+              <div className="space-y-3 min-h-[200px] rounded-2xl border border-dashed border-border/50 p-3 bg-muted/5">
                 {(grouped[col.status] || []).map((c, i) => (
                   <motion.div
                     key={c.id}
@@ -158,39 +150,35 @@ export default function CampaignsPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.04 }}
                   >
-                    <Link to={`/campaigns/${c.id}`}>
-                      <Card className="glass-card hover:border-primary/30 transition-colors cursor-pointer group">
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between mb-2">
-                            <h4 className="font-semibold text-sm truncate group-hover:text-primary transition-colors">{c.name}</h4>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
-                              onClick={(e) => { e.preventDefault(); setDeleteId(c.id); }}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Users className="h-3 w-3" />
-                              {(c as any).pipeline_cards?.[0]?.count || 0} creators
-                            </span>
-                            {c.budget && (
-                              <span className="flex items-center gap-1">
-                                <DollarSign className="h-3 w-3" />
-                                ${Number(c.budget).toLocaleString()}
-                              </span>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
+                    <Link to={`/campaigns/${c.id}`} className="block bg-white/80 backdrop-blur-md border border-white/50 rounded-xl p-4 shadow-sm hover:-translate-y-1 hover:shadow-md transition-all duration-200 group relative">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-medium text-foreground pr-6 truncate">{c.name}</h4>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 absolute right-2 top-3 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-opacity"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteId(c.id); }}
+                        >
+                          <Trash2 size={14} strokeWidth={1.5} />
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span>
+                          {(c as any).pipeline_cards?.[0]?.count || 0} creators
+                        </span>
+                        {c.budget && (
+                          <span>
+                            · ${Number(c.budget).toLocaleString()}
+                          </span>
+                        )}
+                      </div>
                     </Link>
                   </motion.div>
                 ))}
                 {(!grouped[col.status] || grouped[col.status]!.length === 0) && (
-                  <p className="text-xs text-muted-foreground text-center py-8">No campaigns</p>
+                  <div className="flex flex-col items-center justify-center h-24 text-center">
+                    <p className="text-xs text-muted-foreground">No campaigns</p>
+                  </div>
                 )}
               </div>
             </div>
@@ -199,39 +187,45 @@ export default function CampaignsPage() {
       )}
 
       {!isLoading && (!campaigns || campaigns.length === 0) && (
-        <Card className="glass-card">
-          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <Megaphone className="h-10 w-10 text-muted-foreground mb-3" />
-            <h3 className="text-lg font-semibold mb-1">No Campaigns Yet</h3>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
+          <div className="flex flex-col items-center justify-center py-20 text-center bg-white/50 backdrop-blur-sm border border-white/50 shadow-sm rounded-2xl">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 mb-4">
+              <Megaphone className="h-8 w-8 text-primary" />
+            </div>
+            <h3 className="font-serif text-lg font-semibold text-foreground mb-1">No Campaigns Yet</h3>
             <p className="text-sm text-muted-foreground max-w-md">
               Create a campaign to start managing your influencer pipeline.
             </p>
-          </CardContent>
-        </Card>
+            <Button className="mt-4 gap-2 rounded-lg btn-shine" onClick={() => setShowCreate(true)}>
+              <Plus size={16} strokeWidth={1.5} />
+              Create Campaign
+            </Button>
+          </div>
+        </motion.div>
       )}
 
       <Dialog open={showCreate} onOpenChange={(open) => { if (!open) resetForm(); setShowCreate(open); }}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Create Campaign</DialogTitle></DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-4 my-2">
             <div>
-              <Label className="text-xs">Name</Label>
+              <Label className="text-xs font-medium text-foreground mb-1 block">Name</Label>
               <Input placeholder="Campaign name" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleCreate()} />
             </div>
             <div>
-              <Label className="text-xs">Description</Label>
+              <Label className="text-xs font-medium text-foreground mb-1 block">Description</Label>
               <Textarea placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
             </div>
             <div>
-              <Label className="text-xs">Budget ($)</Label>
+              <Label className="text-xs font-medium text-foreground mb-1 block">Budget ($)</Label>
               <Input type="number" placeholder="e.g. 10000" value={budget} onChange={(e) => setBudget(e.target.value)} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs">Start Date</Label>
+                <Label className="text-xs font-medium text-foreground mb-1 block">Start Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal h-10", !startDate && "text-muted-foreground")}>
+                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal h-10 rounded-lg", !startDate && "text-muted-foreground")}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {startDate ? format(startDate, "MMM d, yyyy") : "Pick date"}
                     </Button>
@@ -242,10 +236,10 @@ export default function CampaignsPage() {
                 </Popover>
               </div>
               <div>
-                <Label className="text-xs">End Date</Label>
+                <Label className="text-xs font-medium text-foreground mb-1 block">End Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal h-10", !endDate && "text-muted-foreground")}>
+                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal h-10 rounded-lg", !endDate && "text-muted-foreground")}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {endDate ? format(endDate, "MMM d, yyyy") : "Pick date"}
                     </Button>

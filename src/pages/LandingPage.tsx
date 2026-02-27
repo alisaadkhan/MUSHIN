@@ -10,6 +10,7 @@ import { ProblemSolution } from "@/components/marketing/ProblemSolution";
 import { Differentiation } from "@/components/marketing/Differentiation";
 import { HowItWorks } from "@/components/marketing/HowItWorks";
 import { Features } from "@/components/marketing/Features";
+import { PakistanStatsSection } from "@/components/marketing/PakistanStatsSection";
 import { ProductDemo } from "@/components/marketing/ProductDemo";
 import { TrustSecurity } from "@/components/marketing/TrustSecurity";
 import { Testimonials } from "@/components/marketing/Testimonials";
@@ -102,6 +103,8 @@ export default function LandingPage() {
       <HowItWorks />
       <div className="section-divider" />
       <Features />
+      <div className="section-divider" />
+      <PakistanStatsSection />
       <div className="section-divider" />
       <ProductDemo />
       <div className="section-divider" />

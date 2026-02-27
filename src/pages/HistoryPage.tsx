@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { Clock, Search, Play, Eye, UserPlus, Megaphone, FileText } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Clock, Search, Play, Eye, ExternalLink, UserPlus, Megaphone, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useSearchHistory } from "@/hooks/useSearchHistory";
@@ -69,7 +68,7 @@ export default function HistoryPage() {
         description: `Searched for '${entry.query}'`,
         icon: Search,
         timestamp: entry.created_at,
-        meta: { query: entry.query, platform: entry.platform, location: entry.location || undefined },
+        meta: { query: entry.query, platform: entry.platform, location: entry.location || undefined }, // Added platform mappings
       });
     });
 
@@ -101,16 +100,14 @@ export default function HistoryPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">History</h1>
-        <p className="text-muted-foreground mt-1">Your recent activity timeline</p>
+        <h1 className="font-serif text-2xl font-bold text-foreground">History</h1>
+        <p className="text-sm text-muted-foreground mt-1">Your recent activity timeline</p>
       </div>
 
       {isLoading && (
         <div className="space-y-3">
           {Array.from({ length: 5 }).map((_, i) => (
-            <Card key={i} className="glass-card animate-pulse">
-              <CardContent className="p-5 h-16" />
-            </Card>
+            <div key={i} className="flex items-start gap-4 p-4 rounded-xl bg-muted/10 animate-pulse h-16" />
           ))}
         </div>
       )}
@@ -125,31 +122,40 @@ export default function HistoryPage() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.02 }}
-                className="flex items-center gap-4 py-3 px-4 rounded-lg hover:bg-muted/30 transition-colors group"
+                className="flex items-start sm:items-center gap-4 p-4 rounded-xl hover:bg-muted/30 transition-colors group relative"
               >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                  <Icon className="h-4 w-4 text-primary" />
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0">
+                  <Icon size={16} className="text-primary" strokeWidth={1.5} />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm truncate">{item.description}</p>
+
+                <div className="flex-1 min-w-0 pr-12 sm:pr-0">
+                  <p className="text-sm font-medium text-foreground truncate">{item.description}</p>
                   {item.meta?.platform && (
-                    <Badge variant="outline" className="text-[10px] mt-1">{item.meta.platform}</Badge>
+                    <p className="text-xs text-muted-foreground truncate capitalize">{item.meta.platform}</p>
                   )}
                 </div>
-                <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
-                  {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
-                </span>
-                {item.type === "search" && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                    onClick={() => handleRerun(item)}
-                  >
-                    <Play className="h-3 w-3" />
-                    Re-run
-                  </Button>
-                )}
+
+                <div className="flex items-center gap-2 flex-shrink-0 absolute right-4 top-4 sm:static sm:right-auto sm:top-auto">
+                  <span className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground">
+                    <Clock size={12} strokeWidth={1.5} />
+                    {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
+                  </span>
+
+                  {item.type === "search" ? (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => handleRerun(item)}
+                    >
+                      <Play size={14} strokeWidth={1.5} className="text-muted-foreground" />
+                    </Button>
+                  ) : (
+                    <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" disabled>
+                      <ExternalLink size={14} strokeWidth={1.5} className="text-muted-foreground" />
+                    </Button>
+                  )}
+                </div>
               </motion.div>
             );
           })}
@@ -157,21 +163,21 @@ export default function HistoryPage() {
       )}
 
       {!isLoading && timeline.length === 0 && (
-        <Card className="glass-card">
-          <CardContent className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl aurora-gradient mb-4">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
+          <div className="flex flex-col items-center justify-center py-20 text-center bg-white/50 backdrop-blur-sm border border-white/50 shadow-sm rounded-2xl">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 mb-4">
               <Clock className="h-8 w-8 text-primary" />
             </div>
-            <h3 className="text-lg font-semibold mb-1">No Activity Yet</h3>
+            <h3 className="font-serif text-lg font-semibold text-foreground mb-1">No Activity Yet</h3>
             <p className="text-sm text-muted-foreground max-w-md">
               Your activity timeline will appear here as you search, create campaigns, and manage lists.
             </p>
-            <Button variant="outline" size="sm" className="mt-4 gap-1.5" onClick={() => navigate("/search")}>
+            <Button variant="outline" size="sm" className="mt-4 gap-1.5 rounded-lg" onClick={() => navigate("/search")}>
               <Search className="h-3.5 w-3.5" />
               Start Searching
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </motion.div>
       )}
     </div>
   );

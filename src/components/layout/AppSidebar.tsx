@@ -1,34 +1,49 @@
 import { Link, useLocation } from "react-router-dom";
-import { cn } from "@/lib/utils";
 import { UserMenu } from "@/components/auth/UserMenu";
 import {
-  LayoutDashboard,
-  Search,
-  Users,
-  Megaphone,
-  Bookmark,
-  History,
-  Settings,
-  Zap,
-  CreditCard,
-  BarChart3,
+  Zap, LayoutDashboard, Search, List, Megaphone, Bookmark, Clock,
+  PieChart, Settings, CreditCard
 } from "lucide-react";
 import { useWorkspaceCredits } from "@/hooks/useWorkspaceCredits";
 import { useSubscription } from "@/hooks/useSubscription";
 
-const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
-  { label: "Discover", icon: Search, path: "/search" },
-  { label: "Lists", icon: Users, path: "/lists" },
-  { label: "Campaigns", icon: Megaphone, path: "/campaigns" },
-  { label: "Saved Searches", icon: Bookmark, path: "/saved-searches" },
-  { label: "History", icon: History, path: "/history" },
-  { label: "Analytics", icon: BarChart3, path: "/analytics" },
-  { label: "Settings", icon: Settings, path: "/settings" },
-  { label: "Billing", icon: CreditCard, path: "/billing" },
+const navGroups = [
+  {
+    label: "Core",
+    items: [
+      { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+      { icon: PieChart, label: "Analytics", path: "/analytics" },
+    ],
+  },
+  {
+    label: "Discovery",
+    items: [
+      { icon: Search, label: "Discover", path: "/search" },
+      { icon: Bookmark, label: "Saved Searches", path: "/saved-searches" },
+      { icon: Clock, label: "History", path: "/history" },
+    ],
+  },
+  {
+    label: "Management",
+    items: [
+      { icon: List, label: "Lists", path: "/lists" },
+      { icon: Megaphone, label: "Campaigns", path: "/campaigns" },
+    ],
+  },
+  {
+    label: "Account",
+    items: [
+      { icon: Settings, label: "Settings", path: "/settings" },
+      { icon: CreditCard, label: "Billing", path: "/billing" },
+    ],
+  },
 ];
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  isOpen?: boolean;
+}
+
+export function AppSidebar({ isOpen = true }: AppSidebarProps) {
   const location = useLocation();
   const { data: credits } = useWorkspaceCredits();
   const { planConfig, plan } = useSubscription();
@@ -38,57 +53,55 @@ export function AppSidebar() {
   const pct = (totalCredits / maxCredits) * 100;
 
   return (
-    <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-border bg-sidebar">
-      {/* Logo */}
-      <div className="flex h-16 items-center gap-2 px-6 border-b border-border">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-          <Zap className="h-4 w-4 text-primary-foreground" />
-        </div>
-        <span className="text-lg font-bold tracking-tight">
-          <span className="aurora-text">Influence</span>
-          <span className="text-foreground">IQ</span>
-        </span>
+    <aside className={`${isOpen ? "w-60" : "w-0 overflow-hidden"} border-r border-border bg-white/80 backdrop-blur-md flex-shrink-0 transition-all duration-200 flex flex-col z-40 fixed left-0 top-0 h-screen sm:relative`}>
+      <div className="flex h-14 items-center gap-2 px-4 border-b border-border">
+        <Zap className="w-5 h-5 text-primary" strokeWidth={1.5} />
+        <span className="font-bold text-foreground">InfluenceIQ</span>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3 py-4">
-        {navItems.map((item) => {
-          const isActive = location.pathname === item.path ||
-            (item.path === "/lists" && location.pathname.startsWith("/lists")) ||
-            (item.path === "/campaigns" && location.pathname.startsWith("/campaigns"));
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              <item.icon className="h-4 w-4" />
-              {item.label}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 overflow-y-auto p-3 space-y-6">
+        {navGroups.map((group) => (
+          <div key={group.label}>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2">{group.label}</p>
+            <ul className="space-y-0.5">
+              {group.items.map((item) => {
+                const active = location.pathname === item.path || location.pathname.startsWith(item.path + "/");
+                return (
+                  <li key={item.path}>
+                    <Link
+                      to={item.path}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${active ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+                    >
+                      <item.icon size={18} strokeWidth={1.5} />
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
 
-      {/* Credits + User */}
-      <div className="border-t border-border p-4 space-y-3">
-        <div className="glass-card rounded-lg p-3">
+      <div className="p-3 border-t border-border space-y-3">
+        {/* Credits */}
+        <div className="glass-card rounded-lg p-3 bg-muted/30 border-border/50">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
             <span>{planConfig.name} Plan</span>
-            <span className="data-mono">{totalCredits} / {maxCredits}</span>
+            <span className="data-mono font-medium text-foreground">{totalCredits} / {maxCredits}</span>
           </div>
           <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all"
+              className="h-full rounded-full bg-primary transition-all"
               style={{ width: `${Math.min(pct, 100)}%` }}
             />
           </div>
         </div>
-        <UserMenu />
+
+        {/* User Menu */}
+        <div className="w-full">
+          <UserMenu />
+        </div>
       </div>
     </aside>
   );

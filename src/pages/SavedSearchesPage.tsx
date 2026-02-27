@@ -1,9 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Bookmark, Trash2, Play } from "lucide-react";
+import { Bookmark, Trash2, Play, Clock, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,16 +53,14 @@ export default function SavedSearchesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Saved Searches</h1>
-        <p className="text-muted-foreground mt-1">Quickly re-run your favorite searches</p>
+        <h1 className="font-serif text-2xl font-bold text-foreground">Saved Searches</h1>
+        <p className="text-sm text-muted-foreground mt-1">Quickly re-run your favorite searches</p>
       </div>
 
       {isLoading && (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i} className="glass-card animate-pulse">
-              <CardContent className="p-5 h-16" />
-            </Card>
+            <div key={i} className="bg-white/50 backdrop-blur-sm border border-border/50 rounded-2xl p-5 h-20 animate-pulse" />
           ))}
         </div>
       )}
@@ -79,32 +75,31 @@ export default function SavedSearchesPage() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.03 }}
+                className="bg-white/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-5 hover:-translate-y-1 hover:shadow-md transition-all duration-300 flex items-center gap-4"
               >
-                <Card className="glass-card hover:border-primary/30 transition-colors">
-                  <CardContent className="p-5 flex items-center justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold truncate">{s.name}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{formatFilterDescription(filters)}</p>
-                      <span className="text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(s.created_at), { addSuffix: true })}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => handleRerun(filters)}>
-                        <Play className="h-3 w-3" />
-                        Run
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => setDeleteId(s.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                <Bookmark size={18} className="text-primary flex-shrink-0" strokeWidth={1.5} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{s.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{formatFilterDescription(filters)}</p>
+                </div>
+                <div className="flex items-center gap-2 lg:gap-4 flex-shrink-0">
+                  <div className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground">
+                    <Clock size={12} strokeWidth={1.5} />
+                    {formatDistanceToNow(new Date(s.created_at), { addSuffix: true })}
+                  </div>
+                  <Button variant="outline" size="sm" className="rounded-lg h-8" onClick={() => handleRerun(filters)}>
+                    <Play size={14} strokeWidth={1.5} className="mr-1 hidden sm:inline-block" />
+                    Run
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => setDeleteId(s.id)}
+                  >
+                    <Trash2 size={14} strokeWidth={1.5} />
+                  </Button>
+                </div>
               </motion.div>
             );
           })}
@@ -112,17 +107,21 @@ export default function SavedSearchesPage() {
       )}
 
       {!isLoading && (!searches || searches.length === 0) && (
-        <Card className="glass-card">
-          <CardContent className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl aurora-gradient mb-4">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
+          <div className="flex flex-col items-center justify-center py-20 text-center bg-white/50 backdrop-blur-sm border border-white/50 shadow-sm rounded-2xl">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 mb-4">
               <Bookmark className="h-8 w-8 text-primary" />
             </div>
-            <h3 className="text-lg font-semibold mb-1">No Saved Searches</h3>
+            <h3 className="font-serif text-lg font-semibold text-foreground mb-1">No Saved Searches</h3>
             <p className="text-sm text-muted-foreground max-w-md">
               After searching for influencers, save your search to quickly re-run it later.
             </p>
-          </CardContent>
-        </Card>
+            <Button variant="outline" size="sm" className="mt-4 gap-1.5 rounded-lg" onClick={() => navigate("/search")}>
+              <Search className="h-3.5 w-3.5" />
+              Start Searching
+            </Button>
+          </div>
+        </motion.div>
       )}
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>

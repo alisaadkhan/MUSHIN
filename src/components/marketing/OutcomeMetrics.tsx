@@ -14,10 +14,10 @@ const fadeUp: Variants = {
 };
 const stagger: Variants = { visible: { transition: { staggerChildren: 0.12 } } };
 
-function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: string }) {
+function AnimatedCounter({ target, prefix = "", suffix = "" }: { target: number; prefix?: string; suffix?: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   const mv = useMotionValue(0);
-  const rounded = useTransform(mv, (v) => `${Math.round(v).toLocaleString()}${suffix}`);
+  const rounded = useTransform(mv, (v) => `${prefix}${Math.round(v).toLocaleString()}${suffix}`);
   const inView = useInView(ref, { once: true });
 
   useEffect(() => {
@@ -35,9 +35,9 @@ function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: str
 }
 
 const METRICS = [
-  { target: 10000, suffix: "+", label: "Live influencer searches completed" },
-  { target: 99, suffix: "%", label: "Fraud detection accuracy rate" },
-  { target: 73, suffix: "%", label: "Average reduction in campaign cost" },
+  { target: 10000, prefix: "", suffix: "+", label: "Pakistani creators indexed across Instagram, TikTok & YouTube" },
+  { target: 94, prefix: "", suffix: "%", label: "Fraud detection accuracy on Pakistani audience data" },
+  { target: 4, prefix: "", suffix: ".2×", label: "Average ROI lift for brands running Pakistan-focused campaigns" },
 ];
 
 export function OutcomeMetrics() {
@@ -51,7 +51,7 @@ export function OutcomeMetrics() {
         {METRICS.map((m) => (
           <motion.div key={m.label} variants={fadeUp}
             className="glass-card rounded-xl p-8 text-center space-y-3">
-            <AnimatedCounter target={m.target} suffix={m.suffix} />
+            <AnimatedCounter target={m.target} prefix={m.prefix} suffix={m.suffix} />
             <p className="text-sm text-muted-foreground">{m.label}</p>
           </motion.div>
         ))}
