@@ -543,8 +543,12 @@ export default function LandingPage() {
             <div className="font-black text-center leading-none select-none" style={{ fontSize: 'clamp(3rem,12vw,10rem)', color: 'rgba(255,255,255,0.06)', letterSpacing: '-0.04em' }}>INFLUENCEIQ</div>
           </motion.div>
 
-          {/* Hero content */}
-          <motion.div style={{ opacity: hOp, y: hY }} className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center px-6 pt-16">
+          {/* Hero content — no opacity transform on wrapper; individual elements animate in.
+              hOp (scroll-driven fade) is intentionally omitted here because framer-motion's
+              useScroll can initialise scrollYProgress > 0 on Vercel before layout settles,
+              which makes the wrapper invisible on first paint. Each child handles its own
+              enter animation; the wrapper only carries the parallax-exit y offset. */}
+          <motion.div style={{ y: hY }} className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center px-6 pt-16">
             <motion.h1 initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .4, duration: .8 }}
               className="font-black tracking-tighter leading-[.85] mb-7 pointer-events-none" style={{ fontSize: 'clamp(3.5rem,9vw,8rem)', textShadow: '0 4px 60px rgba(0,0,0,1), 0 0 120px rgba(0,0,0,0.8)' }}>
               FIND AUTHENTIC<br />PAKISTANI<br />INFLUENCERS.
