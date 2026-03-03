@@ -525,7 +525,7 @@ export default function LandingPage() {
       </nav>
 
       {/* ── VIDEO HERO — 300vh matches Version 2 ── */}
-      <div ref={vwRef} className="relative h-[140vh]">
+      <div ref={vwRef} className="relative h-[100vh]">
         <div className="sticky top-0 h-screen overflow-hidden" style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 30%, #2d0a5e 0%, #0a0114 50%, #060608 100%)' }}>
           <video
             ref={vRef}
