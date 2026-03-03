@@ -5,13 +5,30 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
+// Guard: if env vars are missing (e.g. Vercel deploy without env vars set),
+// log a clear error instead of crashing the entire module with an exception.
+// createClient throws on undefined/empty URL, which kills the whole JS bundle
+// before React can mount — producing a completely blank page with no error UI.
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  console.error(
+    '[MUSHIN] Missing Supabase environment variables.\n' +
+    'Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in your Vercel ' +
+    'project settings (Settings → Environment Variables) and redeploy.\n' +
+    'Get the values from: https://supabase.com/dashboard/project/xfeikbhprbqwzdhyjnou/settings/api'
+  );
+}
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
+export const supabase = createClient<Database>(
+  SUPABASE_URL  || 'https://xfeikbhprbqwzdhyjnou.supabase.co',
+  SUPABASE_PUBLISHABLE_KEY || 'missing-key',
+  {
+    auth: {
+      storage: localStorage,
+      persistSession: true,
+      autoRefreshToken: true,
+    },
   }
-});
+);
