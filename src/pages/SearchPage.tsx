@@ -59,6 +59,11 @@ const FOLLOWER_RANGES = [
 
 
 
+// ─── Cache key for back-navigation result restoration ───────────────────────
+function buildCacheKey(q: string, platform: string, city: string, range: string) {
+  return `iq_sr:${q.toLowerCase()}|${platform}|${city}|${range}`;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 interface SearchResult {
   title: string;
@@ -161,10 +166,26 @@ export default function SearchPage() {
   const toggleNiche = (n: string) =>
     setSelectedNiches(prev => prev.includes(n) ? prev.filter(x => x !== n) : [...prev, n]);
 
-  // Auto-run once on load if q param is present and results not yet cached
+  // Auto-run once on load — restore from session cache first (no credit burn on back-nav)
   useEffect(() => {
     if (searchParams.get("q") && !hasAutoSearched.current && !searched) {
       hasAutoSearched.current = true;
+      const cacheKey = buildCacheKey(
+        searchParams.get("q") || "",
+        searchParams.get("platform") || "instagram",
+        searchParams.get("city") || "All Pakistan",
+        searchParams.get("range") || "any",
+      );
+      try {
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          const { results: cr, creditsRemaining: ccr } = JSON.parse(cached);
+          setResults(cr);
+          setSearched(true);
+          if (ccr != null) setCreditsRemaining(ccr);
+          return; // skip re-fetching
+        }
+      } catch { /* corrupt cache — fall through to live search */ }
       handleSearch();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -197,8 +218,60 @@ export default function SearchPage() {
         return;
       }
 
-      setResults(data.results || []);
+      // ── Merge with existing enriched profiles from DB ────────────────────
+      const rawResults: SearchResult[] = data.results || [];
+      let mergedResults = rawResults;
+      if (rawResults.length > 0) {
+        const usernames = rawResults.map(r => r.username.replace("@", "").toLowerCase());
+        const { data: profiles } = await supabase
+          .from("influencer_profiles")
+          .select("username, platform, follower_count, engagement_rate, enrichment_status, enriched_at, avatar_url, bio, full_name, city, primary_niche")
+          .in("username", usernames);
+        if (profiles && profiles.length > 0) {
+          const profileMap = new Map(
+            profiles.map(p => [`${p.platform.toLowerCase()}_${p.username.toLowerCase()}`, p])
+          );
+          mergedResults = rawResults.map(r => {
+            const key = `${r.platform.toLowerCase()}_${r.username.replace("@", "").toLowerCase()}`;
+            const profile = profileMap.get(key);
+            if (!profile) return r;
+            const enrichedAt = profile.enriched_at ? new Date(profile.enriched_at).getTime() : 0;
+            const ttlMs = (r.enrichment_ttl_days ?? 30) * 86_400_000;
+            return {
+              ...r,
+              extracted_followers: r.extracted_followers ?? profile.follower_count ?? undefined,
+              engagement_rate: r.engagement_rate ?? profile.engagement_rate ?? undefined,
+              is_enriched: profile.enrichment_status === "done",
+              is_stale: profile.enrichment_status === "done" && enrichedAt > 0 && Date.now() - enrichedAt > ttlMs,
+              enrichment_status: profile.enrichment_status ?? undefined,
+              last_enriched_at: profile.enriched_at ?? undefined,
+              imageUrl: r.imageUrl || profile.avatar_url || undefined,
+              bio: r.bio || profile.bio || undefined,
+              full_name: r.full_name || profile.full_name || undefined,
+              city_extracted: r.city_extracted || profile.city || undefined,
+              niche: r.niche || profile.primary_niche || undefined,
+            };
+          });
+        }
+      }
+
+      setResults(mergedResults);
       setCreditsRemaining(data.credits_remaining ?? null);
+
+      // ── Cache for back-navigation (avoids credit spend on re-visit) ────────
+      const cacheKey = buildCacheKey(
+        query.trim(),
+        selectedPlatforms[0] || "instagram",
+        selectedCity,
+        followerRange,
+      );
+      try {
+        sessionStorage.setItem(cacheKey, JSON.stringify({
+          results: mergedResults,
+          creditsRemaining: data.credits_remaining ?? null,
+        }));
+      } catch { /* sessionStorage full — skip caching */ }
+
       queryClient.invalidateQueries({ queryKey: ["workspace-credits"] });
       queryClient.invalidateQueries({ queryKey: ["search-history"] });
 
