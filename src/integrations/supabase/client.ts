@@ -23,7 +23,7 @@ if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
 
 export const supabase = createClient<Database>(
   SUPABASE_URL  || 'https://xfeikbhprbqwzdhyjnou.supabase.co',
-  SUPABASE_PUBLISHABLE_KEY || 'missing-key',
+  SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmZWlrYmhwcmJxd3pkaHlqbm91Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNjk5NDgsImV4cCI6MjA4NTg0NTk0OH0.gpNbABLOxMH5-ryd1JsBuxLiqJj3zHDL5u7knbejxa4',
   {
     auth: {
       storage: localStorage,
