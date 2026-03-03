@@ -548,15 +548,12 @@ export default function LandingPage() {
               useScroll can initialise scrollYProgress > 0 on Vercel before layout settles,
               which makes the wrapper invisible on first paint. Each child handles its own
               enter animation; the wrapper only carries the parallax-exit y offset. */}
-          <motion.div style={{ y: hY }} className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center px-6 pt-16">
-            <motion.h1 initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .4, duration: .8 }}
-              className="font-black tracking-tighter leading-[.85] mb-7 pointer-events-none" style={{ fontSize: 'clamp(3.5rem,9vw,8rem)', textShadow: '0 4px 60px rgba(0,0,0,1), 0 0 120px rgba(0,0,0,0.8)' }}>
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center px-6 pt-16">
+            <h1
+              className="font-black tracking-tighter leading-[.85] mb-7 pointer-events-none" style={{ fontSize: 'clamp(3.5rem,9vw,8rem)', textShadow: '0 4px 60px rgba(0,0,0,1), 0 0 120px rgba(0,0,0,0.8)', color: 'white' }}>
               FIND AUTHENTIC<br />PAKISTANI<br />INFLUENCERS.
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: .65, duration: .9, ease: [0.16, 1, 0.3, 1] }}
+            </h1>
+            <p
               className="text-lg max-w-md font-normal mb-8 leading-relaxed pointer-events-none"
             >
               <span
@@ -570,15 +567,10 @@ export default function LandingPage() {
               >
                 Discover and collaborate with verified creators from Karachi, Lahore, Islamabad and beyond.
               </span>
-            </motion.p>
+            </p>
 
             {/* CTA buttons — fully interactive */}
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: .9, duration: .8, ease: [0.16, 1, 0.3, 1] }}
-              className="flex flex-col sm:flex-row items-center gap-3"
-            >
+            <div className="flex flex-col sm:flex-row items-center gap-3">
               <Link
                 to="/auth"
                 className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 transition-colors text-white font-bold px-7 py-3.5 rounded-full text-sm shadow-[0_0_40px_rgba(168,85,247,0.4)] hover:shadow-[0_0_60px_rgba(168,85,247,0.6)]"
@@ -591,29 +583,19 @@ export default function LandingPage() {
               >
                 See how it works
               </button>
-            </motion.div>
+            </div>
 
             {/* Social proof */}
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1.3, duration: 0.6 }}
-              className="mt-6 text-xs text-white/35 pointer-events-none"
-            >
+            <p className="mt-6 text-xs text-white/35 pointer-events-none">
               Trusted by 2,800+ marketing teams · Free forever plan available
-            </motion.p>
-          </motion.div>
+            </p>
+          </div>
 
           {/* Scroll indicator */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1.8, duration: 0.8 }}
-            className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-2 pointer-events-none"
-          >
+          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-2 pointer-events-none">
             <span className="text-white/30 text-xs tracking-widest uppercase">Scroll</span>
             <div className="w-px h-10 bg-gradient-to-b from-white/30 to-transparent" />
-          </motion.div>
+          </div>
 
           {/* Bottom gradient */}
           <motion.div style={{ opacity: bOp, background: 'linear-gradient(to top, #060608, transparent)' }}
