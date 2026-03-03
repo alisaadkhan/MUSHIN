@@ -502,9 +502,12 @@ Deno.serve(async (req) => {
     ];
     // Indian city/country signals — used to exclude non-Pakistani creators
     const INDIA_SIGNALS = [
-      "india", "indian", "mumbai", "delhi", "bangalore", "bengaluru",
+      "india", "indian", "indians",
+      "mumbai", "delhi", "bangalore", "bengaluru", "hyderabad india",
       "chennai", "kolkata", "pune", "ahmedabad", "jaipur", "surat",
       "bharat", "hindustan", "rupee india",
+      "youtube india", "instagram india", "tiktok india",
+      "indian gamer", "indian creator", "indian influencer",
     ];
 
     const selectedCity = (location && location !== "All Pakistan") ? location.toLowerCase() : null;
@@ -514,12 +517,13 @@ Deno.serve(async (req) => {
     for (const item of platformFiltered) {
       const text = ((item.title || "") + " " + (item.snippet || "")).toLowerCase();
       const hasPakistanSignal = PAKISTAN_KEYWORDS.some(kw => text.includes(kw));
-      // Skip results that explicitly signal India without any Pakistan context
-      const hasIndiaOnly = !hasPakistanSignal && INDIA_SIGNALS.some(kw => text.includes(kw));
-      if (hasIndiaOnly) continue;
+      // Skip results that explicitly signal India
+      const hasIndiaSignal = INDIA_SIGNALS.some(kw => text.includes(kw));
+      if (hasIndiaSignal) continue; // hard reject — even Pakistani mentions won't save an Indian profile
+      // Require a positive Pakistan signal for ALL results — city match alone isn't sufficient
+      if (!hasPakistanSignal) continue;
       if (selectedCity && text.includes(selectedCity)) tier1.push(item);
-      else if (hasPakistanSignal) tier2.push(item);
-      // No tier3 — results without a Pakistan signal are discarded
+      else tier2.push(item);
     }
 
     // Quality score each result before slicing
@@ -625,6 +629,18 @@ Deno.serve(async (req) => {
       seen.add(key);
       return true;
     });
+
+    // Early exit when no results — avoids .in('username', []) Postgres crash
+    if (uniqueResults.length === 0) {
+      await serviceClient.from("search_history").insert({
+        workspace_id: workspaceId, query, platform,
+        location: location || null, result_count: 0, filters: {},
+      }).catch(() => {});
+      return new Response(
+        JSON.stringify({ results: [], credits_remaining: (workspace?.search_credits_remaining || 1) - 1 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const rangeMap: Record<string, [number, number]> = {
       "1k-10k": [1_000, 10_000], "10k-50k": [10_000, 50_000],
