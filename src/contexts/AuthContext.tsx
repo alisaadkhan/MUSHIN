@@ -72,6 +72,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let refreshInFlight = false;
 
+    // Consumer email domains blocked from Google OAuth
+    const CONSUMER_DOMAINS = ['gmail.com','yahoo.com','hotmail.com','outlook.com','live.com',
+      'icloud.com','aol.com','protonmail.com','ymail.com','googlemail.com','yahoo.co.uk',
+      'yahoo.in','yahoo.com.pk','hotmail.co.uk','msn.com','me.com','mail.com','gmx.com'];
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         if (event === 'SIGNED_OUT') {
@@ -81,6 +86,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setWorkspace(null);
           setLoading(false);
           return;
+        }
+
+        // Block consumer email domains for Google OAuth sign-in
+        if (event === 'SIGNED_IN' && newSession) {
+          const provider = newSession.user.app_metadata?.provider;
+          if (provider === 'google') {
+            const email = newSession.user.email || '';
+            const domain = email.split('@')[1]?.toLowerCase() || '';
+            if (CONSUMER_DOMAINS.includes(domain)) {
+              await supabase.auth.signOut();
+              localStorage.setItem('auth_google_blocked', domain);
+              setSession(null); setUser(null); setProfile(null); setWorkspace(null);
+              setLoading(false);
+              return;
+            }
+          }
         }
 
         // Deduplicate rapid TOKEN_REFRESHED events
