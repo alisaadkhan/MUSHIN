@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Search as SearchIcon, Filter, ExternalLink, Loader2, Bookmark,
-  AlertCircle, Lock, Sparkles, Plus, MoreHorizontal, MapPin, Instagram, Youtube, Info, ShieldCheck,
+  AlertCircle, Lock, Sparkles, Plus, MoreHorizontal, MapPin, Instagram, Youtube, ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -255,7 +255,15 @@ export default function SearchPage() {
         }
       }
 
-      setResults(mergedResults);
+      // Sort merged results: real ER first, then by ER descending
+      const sortedResults = mergedResults.sort((a, b) => {
+        const aIsReal = a.engagement_source === "real_eval" || a.engagement_source === "real_enriched";
+        const bIsReal = b.engagement_source === "real_eval" || b.engagement_source === "real_enriched";
+        if (aIsReal !== bIsReal) return aIsReal ? -1 : 1;
+        return (b.engagement_rate ?? 0) - (a.engagement_rate ?? 0);
+      });
+
+      setResults(sortedResults);
       setCreditsRemaining(data.credits_remaining ?? null);
 
       // ── Cache for back-navigation (avoids credit spend on re-visit) ────────
@@ -372,14 +380,6 @@ export default function SearchPage() {
           </AlertDescription>
         </Alert>
       )}
-
-      {/* Compliance Disclaimer */}
-      <Alert className="border-blue-200 bg-blue-50/50 text-blue-800 backdrop-blur-sm">
-        <Info className="h-4 w-4 text-blue-600" />
-        <AlertDescription>
-          Instagram and TikTok data is sourced via Apify. YouTube data comes directly from the official YouTube Data API v3.
-        </AlertDescription>
-      </Alert>
 
       <div className="flex gap-6">
         {/* ── Sidebar Filters ───────────────────────────────────── */}

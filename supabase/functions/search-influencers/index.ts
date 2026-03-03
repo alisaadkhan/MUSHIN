@@ -425,13 +425,14 @@ Deno.serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Only append "Pakistan" if the query doesn't already reference another country/region
+    // Only append Pakistan context if the query doesn't already reference another country/region
     const NON_PAKISTAN_LOCATIONS = ["usa", "uk", "india", "canada", "australia", "europe", "america", "united states", "united kingdom", "uae", "dubai", "us", "global"];
     const queryLower = query.toLowerCase();
     const hasForeignLocation = NON_PAKISTAN_LOCATIONS.some(loc => queryLower.includes(loc));
+    // Use OR clause so Google must find at least one Pakistan location term in the result
     const serperQuery = hasForeignLocation
       ? `${query} ${platform} influencer`.trim()
-      : `${query} ${platform} influencer Pakistan`.trim();
+      : `${query} ${platform} influencer (Pakistani OR Karachi OR Lahore OR Islamabad OR Pakistan)`.trim();
 
     console.log("Serper query:", serperQuery);
 
@@ -499,14 +500,26 @@ Deno.serve(async (req) => {
       "bahawalpur", "paki", "pakistani", "isb", "lhr", "khi",
       "punjab", "sindh", "balochistan", "kpk", "khyber",
     ];
+    // Indian city/country signals — used to exclude non-Pakistani creators
+    const INDIA_SIGNALS = [
+      "india", "indian", "mumbai", "delhi", "bangalore", "bengaluru",
+      "chennai", "kolkata", "pune", "ahmedabad", "jaipur", "surat",
+      "bharat", "hindustan", "rupee india",
+    ];
+
     const selectedCity = (location && location !== "All Pakistan") ? location.toLowerCase() : null;
-    const tier1: any[] = [], tier2: any[] = [], tier3: any[] = [];
+    const tier1: any[] = [], tier2: any[] = [];
+    // tier3 (no Pakistan signal) intentionally dropped — only show verified Pakistani creators
 
     for (const item of platformFiltered) {
       const text = ((item.title || "") + " " + (item.snippet || "")).toLowerCase();
+      const hasPakistanSignal = PAKISTAN_KEYWORDS.some(kw => text.includes(kw));
+      // Skip results that explicitly signal India without any Pakistan context
+      const hasIndiaOnly = !hasPakistanSignal && INDIA_SIGNALS.some(kw => text.includes(kw));
+      if (hasIndiaOnly) continue;
       if (selectedCity && text.includes(selectedCity)) tier1.push(item);
-      else if (PAKISTAN_KEYWORDS.some(kw => text.includes(kw))) tier2.push(item);
-      else tier3.push(item);
+      else if (hasPakistanSignal) tier2.push(item);
+      // No tier3 — results without a Pakistan signal are discarded
     }
 
     // Quality score each result before slicing
@@ -550,8 +563,7 @@ Deno.serve(async (req) => {
     const finalResults = [
       ...sortByQuality(qualityFilter(tier1)),
       ...sortByQuality(qualityFilter(tier2)),
-      ...sortByQuality(qualityFilter(tier3)),
-    ].slice(0, 30);  // Increased from 20 to 30
+    ].slice(0, 50);  // tier3 dropped; keep more tier1+tier2 results
 
     const rawResults = await Promise.all(
       finalResults.map(async (item: any) => {
@@ -683,6 +695,23 @@ Deno.serve(async (req) => {
       };
     });
 
+    // Sort: real high-engagement accounts first, then benchmark; filter suspected bots
+    const sortedResults = enrichedResults
+      .filter((r: any) => {
+        // Exclude accounts with verified real data showing bot-like engagement (< 0.3%)
+        if (r.is_enriched && r.engagement_source !== "benchmark_estimate" &&
+            (r.engagement_rate ?? 100) < 0.3) return false;
+        return true;
+      })
+      .sort((a: any, b: any) => {
+        // Real verified data before benchmarks
+        const aIsReal = a.engagement_source !== "benchmark_estimate";
+        const bIsReal = b.engagement_source !== "benchmark_estimate";
+        if (aIsReal !== bIsReal) return aIsReal ? -1 : 1;
+        // Within the same data-quality group, sort by engagement rate descending
+        return (b.engagement_rate ?? 0) - (a.engagement_rate ?? 0);
+      });
+
     for (const r of uniqueResults) {
       await serviceClient.from("influencers_cache").upsert(
         {
@@ -731,7 +760,7 @@ Deno.serve(async (req) => {
     });
 
     return new Response(
-      JSON.stringify({ results: enrichedResults, credits_remaining: (workspace?.search_credits_remaining || 1) - 1 }),
+      JSON.stringify({ results: sortedResults, credits_remaining: (workspace?.search_credits_remaining || 1) - 1 }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
