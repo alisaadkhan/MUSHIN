@@ -390,17 +390,6 @@ Deno.serve(async (req) => {
       console.warn(`[search-influencers] High velocity anomaly for WS ${workspaceId} (IP: ${ip})`);
     }
 
-    // Deduct credit BEFORE Serper call — prevents free searches if downstream crashes
-    try {
-      await serviceClient.rpc("consume_search_credit", { ws_id: workspaceId });
-    } catch (error: any) {
-      if (error.code === "P0001") {
-        return new Response(JSON.stringify({ error: "Insufficient credits" }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      throw error;
-    }
-
     const { platform, location, followerRange } = requestBody;
 
     const cacheKey = `search:${query.toLowerCase().trim()}:${platform}:${location || "any"}:${followerRange || "any"}`;
@@ -412,11 +401,22 @@ Deno.serve(async (req) => {
           await supabase.from("admin_audit_log").insert({
             action: "search", user_id: userData.user.id,
             details: { query, platform, location, latency_ms: Math.round(t1 - t0), cached: true }
-          });
+          }).catch(() => {});
           return new Response(JSON.stringify({ results: cached, cached: true }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
       } catch (e) { console.warn("Redis Fetch Error", e); }
+    }
+
+    // Deduct credit BEFORE Serper call — prevents free searches if downstream crashes
+    try {
+      await serviceClient.rpc("consume_search_credit", { ws_id: workspaceId });
+    } catch (error: any) {
+      if (error.code === "P0001") {
+        return new Response(JSON.stringify({ error: "Insufficient credits" }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      throw error;
     }
 
     const SERPER_API_KEY = Deno.env.get("SERPER_API_KEY");
@@ -425,46 +425,66 @@ Deno.serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Only append Pakistan context if the query doesn't already reference another country/region
-    const NON_PAKISTAN_LOCATIONS = ["usa", "uk", "india", "canada", "australia", "europe", "america", "united states", "united kingdom", "uae", "dubai", "us", "global"];
+    // Build a safe, plain-text Serper query. Avoid boolean OR syntax — some
+    // Serper configurations reject it, producing non-2xx responses.
+    const NON_PAKISTAN_LOCATIONS = ["usa", "uk", "india", "canada", "australia",
+      "europe", "america", "united states", "united kingdom", "uae", "dubai", "us", "global"];
     const queryLower = query.toLowerCase();
     const hasForeignLocation = NON_PAKISTAN_LOCATIONS.some(loc => queryLower.includes(loc));
-    // Use OR clause so Google must find at least one Pakistan location term in the result
+
+    // City-specific query gets city name appended so Serper returns local results
+    const cityForQuery = (location && location !== "All Pakistan") ? location : "";
     const serperQuery = hasForeignLocation
       ? `${query} ${platform} influencer`.trim()
-      : `${query} ${platform} influencer (Pakistani OR Karachi OR Lahore OR Islamabad OR Pakistan)`.trim();
+      : [query, platform, "influencer", "Pakistani", cityForQuery, "Pakistan"]
+          .filter(Boolean).join(" ").trim();
 
     console.log("Serper query:", serperQuery);
 
-    const [serperRes, imageRes] = await Promise.all([
-      fetch("https://google.serper.dev/search", {
-        method: "POST",
-        headers: { "X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify({ q: serperQuery, num: 100, gl: "pk", hl: "en" }),
-      }),
-      fetch("https://google.serper.dev/images", {
-        method: "POST",
-        headers: { "X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify({ q: `${query} ${platform} Pakistan influencer profile picture`, num: 20, gl: "pk" }),
-      }),
-    ]);
+    let serperData: any = { organic: [], knowledgeGraph: null };
+    let profileImageMap: Map<string, string> = new Map();
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+      const [serperRes, imageRes] = await Promise.all([
+        fetch("https://google.serper.dev/search", {
+          method: "POST",
+          headers: { "X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify({ q: serperQuery, num: 100, gl: "pk", hl: "en" }),
+          signal: controller.signal,
+        }),
+        fetch("https://google.serper.dev/images", {
+          method: "POST",
+          headers: { "X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify({ q: `${query} ${platform} Pakistan influencer profile picture`, num: 20, gl: "pk" }),
+          signal: controller.signal,
+        }),
+      ]);
+      clearTimeout(timeout);
 
-    if (!serperRes.ok) {
-      const errText = await serperRes.text();
-      console.error("Serper API error:", errText);
-      return new Response(JSON.stringify({ error: "Search API error" }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (!serperRes.ok) {
+        const errText = await serperRes.text();
+        console.error("Serper API error:", serperRes.status, errText);
+        // Return empty results instead of propagating 5xx — credit already consumed
+        return new Response(JSON.stringify({ results: [], credits_remaining: (workspace?.search_credits_remaining || 1) - 1 }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      serperData = await serperRes.json();
+      const imageData = imageRes.ok ? await imageRes.json() : { images: [] };
+      for (const img of (imageData.images || [])) {
+        if (img.link && img.imageUrl) profileImageMap.set(img.link, img.imageUrl);
+      }
+    } catch (serperErr: any) {
+      console.error("Serper fetch failed:", serperErr?.message);
+      return new Response(
+        JSON.stringify({ results: [], credits_remaining: (workspace?.search_credits_remaining || 1) - 1 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    const serperData = await serperRes.json();
     const organic = serperData.organic || [];
-    const knowledgeGraph = serperData.knowledgeGraph;
-
-    const imageData = imageRes.ok ? await imageRes.json() : { images: [] };
-    const profileImageMap = new Map();
-    for (const img of (imageData.images || [])) {
-      if (img.link && img.imageUrl) profileImageMap.set(img.link, img.imageUrl);
-    }
+    const knowledgeGraph = serperData.knowledgeGraph ?? null;
 
     const domainMap: Record<string, string> = {
       instagram: "instagram.com",
