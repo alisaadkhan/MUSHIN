@@ -58,7 +58,7 @@ function DashboardPreview() {
             <div className="w-2.5 h-2.5 rounded-full" style={{ background: "hsl(45 93% 47% / 0.6)" }} />
             <div className="w-2.5 h-2.5 rounded-full bg-primary/60" />
           </div>
-          <span className="text-[10px] text-muted-foreground ml-2 data-mono">InfluenceIQ · Pakistan Creator Search</span>
+          <span className="text-[10px] text-muted-foreground ml-2 data-mono">MUSHIN · Pakistan Creator Search</span>
         </div>
 
         <div className="grid grid-cols-3 gap-2 p-3">

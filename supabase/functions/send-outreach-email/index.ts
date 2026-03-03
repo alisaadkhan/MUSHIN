@@ -37,15 +37,15 @@ Deno.serve(async (req) => {
     });
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !userData?.user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const userId = claimsData.claims.sub;
+    const userId = userData.user.id;
 
     // Service-role client for credit checks
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
@@ -89,6 +89,20 @@ Deno.serve(async (req) => {
       );
     }
 
+    // SEC-11: strip CR/LF from from_name to prevent email header injection
+    const safeFromName = (from_name ?? "").replace(/[\r\n]+/g, " ").trim().slice(0, 100);
+
+    // SEC-04: Deduct credit BEFORE sending — prevents double-send race condition.
+    // If email send fails we restore the credit.
+    const { error: creditErr } = await adminClient.rpc("consume_email_credit", { ws_id: membership.workspace_id });
+    if (creditErr) {
+      console.error("[send-outreach-email] Credit deduction failed:", creditErr.message);
+      return new Response(
+        JSON.stringify({ error: "Failed to reserve email credit. Please try again." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Send email via Resend
     const resendRes = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -97,7 +111,7 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: from_name ? `${from_name} <onboarding@resend.dev>` : "onboarding@resend.dev",
+        from: safeFromName ? `${safeFromName} <onboarding@resend.dev>` : "onboarding@resend.dev",
         to: [to],
         subject,
         html: body,
@@ -109,19 +123,15 @@ Deno.serve(async (req) => {
 
     if (!resendRes.ok) {
       console.error("Resend API error:", resendData);
+      // Restore the credit since email failed to send
+      await adminClient.rpc("restore_email_credit", { ws_id: membership.workspace_id }).catch((e: Error) =>
+        console.error("[send-outreach-email] Credit restore failed:", e.message)
+      );
       return new Response(
         JSON.stringify({ error: "Failed to send email", details: resendData }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    // Decrement email credits atomically
-    await adminClient.rpc("", {}).catch(() => {}); // fallback: direct update
-    await adminClient
-      .from("workspaces")
-      .update({ email_sends_remaining: ws.email_sends_remaining - 1 })
-      .eq("id", membership.workspace_id)
-      .gt("email_sends_remaining", 0);
 
     // Log in outreach_log
     const { error: logError } = await supabase.from("outreach_log").insert({

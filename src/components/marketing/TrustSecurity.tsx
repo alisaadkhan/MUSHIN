@@ -36,7 +36,7 @@ export function TrustSecurity() {
             <span className="aurora-text">Leading Pakistani Brands</span>
           </motion.h2>
           <motion.p variants={fadeUp} className="text-muted-foreground max-w-xl mx-auto">
-            From FMCG giants to fast-growing D2C brands — the teams behind Pakistan's most recognized names run their influencer programs on InfluenceIQ.
+            From FMCG giants to fast-growing D2C brands — the teams behind Pakistan's most recognized names run their influencer programs on MUSHIN.
           </motion.p>
         </div>
 

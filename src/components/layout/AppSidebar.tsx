@@ -1,11 +1,13 @@
 import { Link, useLocation } from "react-router-dom";
 import { UserMenu } from "@/components/auth/UserMenu";
 import {
-  Zap, LayoutDashboard, Search, List, Megaphone, Bookmark, Clock,
-  PieChart, Settings, CreditCard
+  LayoutDashboard, Search, List, Megaphone, Bookmark, Clock,
+  PieChart, Settings, CreditCard, ShieldCheck, LifeBuoy,
 } from "lucide-react";
 import { useWorkspaceCredits } from "@/hooks/useWorkspaceCredits";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useAdminPermissions } from "@/hooks/useAdminPermissions";
+import { MushinLogo } from "@/components/mushin-brand";
 
 const navGroups = [
   {
@@ -35,6 +37,7 @@ const navGroups = [
     items: [
       { icon: Settings, label: "Settings", path: "/settings" },
       { icon: CreditCard, label: "Billing", path: "/billing" },
+      { icon: LifeBuoy, label: "Support", path: "/support" },
     ],
   },
 ];
@@ -47,32 +50,70 @@ export function AppSidebar({ isOpen = true }: AppSidebarProps) {
   const location = useLocation();
   const { data: credits } = useWorkspaceCredits();
   const { planConfig, plan } = useSubscription();
+  const { isAnyAdmin } = useAdminPermissions();
 
   const totalCredits = credits?.search_credits_remaining ?? planConfig.search_credits;
   const maxCredits = planConfig.search_credits;
-  const pct = (totalCredits / maxCredits) * 100;
+  const pct = Math.min((totalCredits / maxCredits) * 100, 100);
 
   return (
-    <aside className={`${isOpen ? "w-60" : "w-0 overflow-hidden"} border-r border-border bg-white/80 backdrop-blur-md flex-shrink-0 transition-all duration-200 flex flex-col z-40 fixed left-0 top-0 h-screen sm:relative`}>
-      <div className="flex h-14 items-center gap-2 px-4 border-b border-border">
-        <Zap className="w-5 h-5 text-primary" strokeWidth={1.5} />
-        <span className="font-bold text-foreground">InfluenceIQ</span>
+    <aside
+      className={`${
+        isOpen ? "w-60" : "w-0 overflow-hidden"
+      } border-r border-border bg-[#070707] flex-shrink-0 transition-all duration-200 flex flex-col z-40 fixed left-0 top-0 h-screen sm:relative`}
+    >
+      {/* Brand */}
+      <div className="flex h-14 items-center gap-2.5 px-4 border-b border-border">
+        <MushinLogo size={26} />
+        <span className="font-extrabold tracking-widest text-foreground text-sm uppercase" style={{ fontFamily: "'Syne', sans-serif", letterSpacing: "0.1em" }}>
+          MUSHIN
+        </span>
       </div>
 
       <nav className="flex-1 overflow-y-auto p-3 space-y-6">
+        {/* Admin link */}
+        {isAnyAdmin && (
+          <div>
+            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.12em] px-3 mb-2">Admin</p>
+            <ul className="space-y-0.5">
+              <li>
+                <Link
+                  to="/admin"
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    location.pathname.startsWith("/admin")
+                      ? "bg-primary/10 text-primary font-semibold border border-primary/20 border border-primary/20"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                >
+                  <ShieldCheck size={16} strokeWidth={1.5} />
+                  Admin Panel
+                </Link>
+              </li>
+            </ul>
+          </div>
+        )}
+
         {navGroups.map((group) => (
           <div key={group.label}>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2">{group.label}</p>
+            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.12em] px-3 mb-2">
+              {group.label}
+            </p>
             <ul className="space-y-0.5">
               {group.items.map((item) => {
-                const active = location.pathname === item.path || location.pathname.startsWith(item.path + "/");
+                const active =
+                  location.pathname === item.path ||
+                  location.pathname.startsWith(item.path + "/");
                 return (
                   <li key={item.path}>
                     <Link
                       to={item.path}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${active ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
+                        active
+                          ? "bg-primary/10 text-primary font-semibold border border-primary/20"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      }`}
                     >
-                      <item.icon size={18} strokeWidth={1.5} />
+                      <item.icon size={16} strokeWidth={1.5} />
                       {item.label}
                     </Link>
                   </li>
@@ -84,21 +125,21 @@ export function AppSidebar({ isOpen = true }: AppSidebarProps) {
       </nav>
 
       <div className="p-3 border-t border-border space-y-3">
-        {/* Credits */}
-        <div className="glass-card rounded-lg p-3 bg-muted/30 border-border/50">
+        {/* Credits widget */}
+        <div className="rounded-lg p-3 bg-muted/40 border border-border">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
             <span>{planConfig.name} Plan</span>
-            <span className="data-mono font-medium text-foreground">{totalCredits} / {maxCredits}</span>
+            <span className="data-mono font-semibold text-foreground">
+              {totalCredits} / {maxCredits}
+            </span>
           </div>
-          <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+          <div className="h-1 w-full rounded-full bg-border overflow-hidden">
             <div
               className="h-full rounded-full bg-primary transition-all"
-              style={{ width: `${Math.min(pct, 100)}%` }}
+              style={{ width: `${pct}%`, boxShadow: "0 0 8px rgba(168,85,247,0.5)" }}
             />
           </div>
         </div>
-
-        {/* User Menu */}
         <div className="w-full">
           <UserMenu />
         </div>

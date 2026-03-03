@@ -38,6 +38,8 @@ export function useInfluencerEvaluation() {
       .eq("platform", platform)
       .eq("username", username)
       .eq("workspace_id", workspace.workspace_id)
+      .eq("evaluation_version", 1) // Phase 6: Version validation
+      .gt("expires_at", new Date().toISOString()) // Phase 6: Cache expiry
       .maybeSingle();
     if (data) {
       setEvaluation(data.evaluation as unknown as InfluencerEvaluation);
@@ -81,6 +83,8 @@ export function useInfluencerEvaluation() {
         overall_score: result.overall_score,
         workspace_id: workspace.workspace_id,
         evaluated_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(), // 90-day expiry
+        evaluation_version: 1,
       }, { onConflict: "platform,username,workspace_id" });
 
       return result;
@@ -100,6 +104,8 @@ export function useInfluencerEvaluation() {
       .eq("platform", platform)
       .eq("username", username)
       .eq("workspace_id", workspace.workspace_id)
+      .eq("evaluation_version", 1)
+      .gt("expires_at", new Date().toISOString())
       .maybeSingle();
     return data?.overall_score ?? null;
   }, [workspace]);

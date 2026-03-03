@@ -25,8 +25,8 @@ Deno.serve(async (req) => {
     );
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: userData, error: userError } = await userClient.auth.getUser(token);
+    if (userError || !userData?.user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
@@ -67,12 +67,28 @@ Deno.serve(async (req) => {
 
     const results = [];
 
-    for (const contact of contacts) {
+    // Only sync contacts with real verified email addresses.
+    // Creating HubSpot records with fake/proxy emails causes CRM data pollution
+    // and risks HubSpot account suspension for TOS violation.
+    const syncableContacts = contacts.filter(
+      (c: any) => c.email && typeof c.email === "string" && c.email.includes("@") && !c.email.endsWith(".local") && !c.email.includes("proxy")
+    );
+
+    if (syncableContacts.length === 0) {
+      return new Response(JSON.stringify({
+        results: [],
+        skipped: contacts.length,
+        message: "No contacts had valid email addresses. Collect real emails before syncing to HubSpot.",
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    for (const contact of syncableContacts) {
       const hubspotPayload = {
         properties: {
           firstname: contact.username || "",
           lastname: contact.platform || "",
-          email: contact.email || `${contact.username}@placeholder.local`,
+          // HubSpot rejects invalid domains. Use a dedicated dummy domain that passes validation.
+          email: contact.email || null,
           jobtitle: `${contact.platform} influencer`,
           company: contact.campaign_name || "",
           hs_lead_status: "CONNECTED",

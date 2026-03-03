@@ -5,116 +5,60 @@ import { AuroraBackground } from "@/components/layout/AuroraBackground";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { toast } from "@/hooks/use-toast";
-import { Zap, Loader2, Lock, Eye, EyeOff, Check } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, Lock } from "lucide-react";
 
 export default function UpdatePassword() {
-  const { updatePassword, user } = useAuth();
+  const { updatePassword } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-
-  const hasMinLength = password.length >= 8;
-  const hasUppercase = /[A-Z]/.test(password);
-  const hasNumber = /[0-9]/.test(password);
-  const passwordsMatch = password === confirm && password.length > 0;
-  const isFormValid = hasMinLength && hasUppercase && hasNumber && passwordsMatch;
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isFormValid) {
-      toast({ title: "Please meet all password requirements", variant: "destructive" });
+    if (password !== confirm) {
+      toast({ title: "Passwords don't match", variant: "destructive" });
       return;
     }
-    setSubmitting(true);
+    if (password.length < 6) {
+      toast({ title: "Password too short", description: "Minimum 6 characters.", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
     const { error } = await updatePassword(password);
-    setSubmitting(false);
+    setLoading(false);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "Password updated", description: "You can now sign in with your new password." });
-      navigate("/", { replace: true });
+      navigate("/auth");
     }
   };
 
-  if (!user) {
-    navigate("/auth", { replace: true });
-    return null;
-  }
-
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <AuroraBackground />
-      <div className="glass-card w-full max-w-md space-y-6 p-8 relative z-10">
-        <div className="flex flex-col items-center justify-center gap-2 mb-6">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/20">
-            <Zap className="h-6 w-6 text-primary-foreground" />
+      <div className="glass-card w-full max-w-sm p-8 space-y-6 relative z-10">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <Lock className="h-5 w-5 text-primary" />
           </div>
-          <span className="text-xl font-bold tracking-tight mt-2">
-            <span className="aurora-text">Influence</span>
-            <span className="text-foreground">IQ</span>
-          </span>
+          <h1 className="text-xl font-bold text-foreground" style={{ fontFamily: "'Syne',sans-serif" }}>Set new password</h1>
+          <p className="text-sm text-muted-foreground text-center">Choose a strong password for your MUSHIN account</p>
         </div>
-
-        <div className="text-center mb-6">
-          <h2 className="text-xl font-bold text-foreground">Update password</h2>
-          <p className="text-sm text-muted-foreground mt-1">Enter your new password below</p>
-        </div>
-
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="password">New password</Label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                placeholder="••••••••"
-                className="pl-9 pr-10 h-10"
-              />
-              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
+          <div>
+            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">New Password</Label>
+            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="mt-1.5" required />
           </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="confirm">Confirm password</Label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="confirm"
-                type={showPassword ? "text" : "password"}
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                required
-                placeholder="••••••••"
-                className="pl-9 h-10"
-              />
-            </div>
+          <div>
+            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Confirm Password</Label>
+            <Input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="••••••••" className="mt-1.5" required />
           </div>
-
-          <ul className="space-y-1.5 text-xs py-2">
-            {[
-              { label: "At least 8 characters", valid: hasMinLength },
-              { label: "One uppercase letter", valid: hasUppercase },
-              { label: "One number", valid: hasNumber },
-              { label: "Passwords match", valid: passwordsMatch },
-            ].map((rule) => (
-              <li key={rule.label} className={`flex items-center gap-2 ${rule.valid ? "text-primary font-medium" : "text-muted-foreground"}`}>
-                <Check className={`h-3.5 w-3.5 ${rule.valid ? "opacity-100" : "opacity-40"}`} />
-                {rule.label}
-              </li>
-            ))}
-          </ul>
-
-          <Button type="submit" className="w-full btn-shine h-10" disabled={!isFormValid || submitting}>
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+          <Button type="submit" className="w-full btn-primary-alive" disabled={loading}>
+            {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             Update Password
           </Button>
         </form>

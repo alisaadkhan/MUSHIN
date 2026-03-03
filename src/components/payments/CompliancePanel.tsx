@@ -126,7 +126,7 @@ export function CompliancePanel({ influencerId, existingDocument, className = ""
                                     </Button>
                                 </>
                             ) : (
-                                <div className="flex items-center justify-between bg-white/50 p-3 rounded-lg border border-border">
+                                <div className="flex items-center justify-between bg-card/50 p-3 rounded-lg border border-border">
                                     <span className="text-sm truncate max-w-[200px]">{file.name}</span>
                                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setFile(null)}>
                                         <X className="w-4 h-4" />

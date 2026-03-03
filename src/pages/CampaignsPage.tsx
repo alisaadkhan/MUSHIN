@@ -35,8 +35,8 @@ type CampaignStatus = "draft" | "active" | "completed";
 
 const KANBAN_COLUMNS: { status: CampaignStatus; label: string; color: string }[] = [
   { status: "draft", label: "Draft", color: "bg-muted" },
-  { status: "active", label: "Active", color: "bg-primary/50" },
-  { status: "completed", label: "Completed", color: "bg-emerald-500/50" },
+  { status: "active", label: "Active", color: "bg-primary/20" },
+  { status: "completed", label: "Completed", color: "bg-emerald-500/20" },
 ];
 
 export default function CampaignsPage() {
@@ -127,7 +127,7 @@ export default function CampaignsPage() {
       {isLoading && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="bg-white/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6 h-48 animate-pulse" />
+            <div key={i} className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6 h-48 animate-pulse" />
           ))}
         </div>
       )}
@@ -150,7 +150,7 @@ export default function CampaignsPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.04 }}
                   >
-                    <Link to={`/campaigns/${c.id}`} className="block bg-white/80 backdrop-blur-md border border-white/50 rounded-xl p-4 shadow-sm hover:-translate-y-1 hover:shadow-md transition-all duration-200 group relative">
+                    <Link to={`/campaigns/${c.id}`} className="block bg-background/80 backdrop-blur-md border border-white/50 rounded-xl p-4 shadow-sm hover:-translate-y-1 hover:shadow-md transition-all duration-200 group relative">
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="text-sm font-medium text-foreground pr-6 truncate">{c.name}</h4>
                         <Button
@@ -188,7 +188,7 @@ export default function CampaignsPage() {
 
       {!isLoading && (!campaigns || campaigns.length === 0) && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
-          <div className="flex flex-col items-center justify-center py-20 text-center bg-white/50 backdrop-blur-sm border border-white/50 shadow-sm rounded-2xl">
+          <div className="flex flex-col items-center justify-center py-20 text-center bg-card/50 backdrop-blur-sm border border-white/50 shadow-sm rounded-2xl">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 mb-4">
               <Megaphone className="h-8 w-8 text-primary" />
             </div>

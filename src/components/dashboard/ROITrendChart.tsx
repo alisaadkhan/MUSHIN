@@ -21,7 +21,7 @@ export function ROITrendChart() {
             <XAxis dataKey="day" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
             <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} unit="%" />
             <ChartTooltip content={<ChartTooltipContent />} />
-            <Line type="monotone" dataKey="roi" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="roi" stroke="#A855F7" strokeWidth={2} dot={false} />
           </LineChart>
         </ChartContainer>
       </CardContent>

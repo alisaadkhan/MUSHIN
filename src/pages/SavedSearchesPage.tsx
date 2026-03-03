@@ -60,7 +60,7 @@ export default function SavedSearchesPage() {
       {isLoading && (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="bg-white/50 backdrop-blur-sm border border-border/50 rounded-2xl p-5 h-20 animate-pulse" />
+            <div key={i} className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-5 h-20 animate-pulse" />
           ))}
         </div>
       )}
@@ -75,7 +75,7 @@ export default function SavedSearchesPage() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.03 }}
-                className="bg-white/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-5 hover:-translate-y-1 hover:shadow-md transition-all duration-300 flex items-center gap-4"
+                className="bg-background/80 backdrop-blur-md border border-white/50 shadow-sm glass-card-hover rounded-2xl p-5 transition-all duration-300 flex items-center gap-4"
               >
                 <Bookmark size={18} className="text-primary flex-shrink-0" strokeWidth={1.5} />
                 <div className="flex-1 min-w-0">
@@ -108,7 +108,7 @@ export default function SavedSearchesPage() {
 
       {!isLoading && (!searches || searches.length === 0) && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
-          <div className="flex flex-col items-center justify-center py-20 text-center bg-white/50 backdrop-blur-sm border border-white/50 shadow-sm rounded-2xl">
+          <div className="flex flex-col items-center justify-center py-20 text-center bg-card/50 backdrop-blur-sm border border-white/50 shadow-sm rounded-2xl">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 mb-4">
               <Bookmark className="h-8 w-8 text-primary" />
             </div>

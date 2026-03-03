@@ -135,7 +135,7 @@ export function PricingPreview({ ctaPath }: Props) {
                     </li>
                   ))}
                 </ul>
-                <Link to={plan.key === "business" ? "mailto:sales@influenceiq.pk" : ctaPath} className="block">
+                <Link to={plan.key === "business" ? "mailto:sales@mushin.pk" : ctaPath} className="block">
                   <Button className={`w-full ${plan.highlighted ? "btn-shine" : ""}`} variant={plan.highlighted ? "default" : "outline"}>
                     {plan.cta}
                   </Button>

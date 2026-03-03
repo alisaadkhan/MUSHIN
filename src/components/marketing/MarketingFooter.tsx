@@ -29,10 +29,10 @@ export function MarketingFooter() {
         <div className="col-span-2 sm:col-span-1 space-y-4">
           <Link to="/" className="flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary">
-              <Zap className="h-3.5 w-3.5 text-primary-foreground" />
+              <svg width="14" height="14" viewBox="0 0 32 32" fill="none"><path d="M16 2 L30 16 L16 30 L2 16 Z" stroke="#A855F7" strokeWidth="1.5" fill="rgba(168,85,247,0.15)"/><path d="M16 6 L24 16 L16 16 Z" fill="#C084FC" opacity="0.9"/><circle cx="16" cy="16" r="2" fill="#A855F7"/></svg>
             </div>
             <span className="font-bold text-foreground">
-              <span className="aurora-text">Influence</span>IQ
+              MUSHIN
             </span>
           </Link>
           <p className="text-xs leading-relaxed">
@@ -64,7 +64,7 @@ export function MarketingFooter() {
           <h4 className="font-semibold text-foreground text-xs uppercase tracking-[0.15em]">Company</h4>
           <Link to="/about" className="block hover:text-foreground transition-colors">About</Link>
           <Link to="/blog" className="block hover:text-foreground transition-colors">Blog</Link>
-          <a href="mailto:sales@influenceiq.pk" className="block hover:text-foreground transition-colors">Contact</a>
+          <a href="mailto:sales@mushin.pk" className="block hover:text-foreground transition-colors">Contact</a>
         </div>
 
         {/* Legal */}
@@ -80,7 +80,7 @@ export function MarketingFooter() {
         className="max-w-6xl mx-auto mt-10 pt-6 border-t text-center text-xs text-muted-foreground"
         style={{ borderColor: "hsl(var(--glass-border))" }}
       >
-        © {new Date().getFullYear()} InfluenceIQ Pakistan. All rights reserved. · Registered in Pakistan · Prices shown in PKR
+        © {new Date().getFullYear()} MUSHIN Pakistan. All rights reserved. · Registered in Pakistan · Prices shown in PKR
       </div>
     </footer>
   );

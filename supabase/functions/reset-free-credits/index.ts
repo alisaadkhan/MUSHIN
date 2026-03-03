@@ -14,8 +14,10 @@ Deno.serve(async (req) => {
   try {
     // Validate authorization (anon key from cron or service role)
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    // Only callable by cron jobs or internal services using the service role key
+    if (!authHeader || authHeader !== `Bearer ${serviceKey}`) {
+      return new Response(JSON.stringify({ error: "Unauthorized — internal endpoint" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -23,7 +25,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      serviceKey,
       { auth: { persistSession: false } }
     );
 
@@ -31,6 +33,9 @@ Deno.serve(async (req) => {
       .from("workspaces")
       .update({
         search_credits_remaining: 3,
+        enrichment_credits_remaining: 2,
+        email_sends_remaining: 5,
+        ai_credits_remaining: 0,
         credits_reset_at: new Date().toISOString(),
       })
       .eq("plan", "free")

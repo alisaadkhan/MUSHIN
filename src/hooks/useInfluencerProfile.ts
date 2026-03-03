@@ -16,15 +16,42 @@ export interface InfluencerProfile {
         avg_comments?: number;
         city?: string;
         subscriber_count?: number;
+        following_count?: number;
+        posts_count?: number;
     };
     overall_score: number | null;
     enriched_at: string | null;
     created_at: string;
+    avatar_url?: string | null;
+    follower_count?: number | null;
+    following_count?: number | null;
+    engagement_rate?: number | null;
+    audience_quality_score?: number | null;
+    bot_probability?: number | null;
+    bot_probability_entendre?: number | null;
+    bot_signals?: Array<{
+        name: string;
+        triggered: boolean;
+        weight: number;
+        detail: string;
+        risk: "low" | "medium" | "high";
+    }>;
+    bot_signals_triggered?: number;
+    bot_total_signals_checked?: number;
+    bot_confidence_tier?: string;
+    bot_interpretation?: string;
+    data_source?: string | null;
+    enrichment_status?: string | null;
+    enrichment_error?: string | null;
+    city?: string | null;
+    niche?: string | null;
+    city_extracted?: string | null;
+    audience_analysis?: { signals?: { triggered?: any[], all?: any[] } };
     // From cache fallback
     isCached?: boolean;
+    imageUrl?: string | null;
     link?: string;
     snippet?: string;
-    city_extracted?: string | null;
 }
 
 export interface FollowerHistoryPoint {
@@ -56,6 +83,7 @@ export function useInfluencerProfile(platform: string | undefined, username: str
     const [isEnriched, setIsEnriched] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [daysSinceEnrichment, setDaysSinceEnrichment] = useState<number | null>(null);
 
     const load = useCallback(async () => {
         if (!platform || !username) return;
@@ -63,8 +91,21 @@ export function useInfluencerProfile(platform: string | undefined, username: str
         setError(null);
 
         try {
+            // Direct query for freshness (SEPARATE from cache fetch)
+            const { data: freshnessData } = await supabase
+                .from('influencer_profiles')
+                .select('enriched_at, enrichment_status, enrichment_error')
+                .eq('username', username)
+                .eq('platform', platform)
+                .single();
+
+            const daysSinceThisEnrichment = freshnessData?.enriched_at
+                ? (Date.now() - new Date(freshnessData.enriched_at).getTime()) / (1000 * 60 * 60 * 24)
+                : null;
+            setDaysSinceEnrichment(daysSinceThisEnrichment);
+
             // 1. Try influencer_profiles (enriched)
-            const { data: enriched } = await (supabase as any)
+            const { data: enriched } = await supabase
                 .from("influencer_profiles")
                 .select("*")
                 .eq("platform", platform)
@@ -75,11 +116,11 @@ export function useInfluencerProfile(platform: string | undefined, username: str
                 const secondaryNiches = Array.isArray(enriched.secondary_niches)
                     ? enriched.secondary_niches
                     : [];
-                setProfile({ ...enriched, secondary_niches: secondaryNiches });
+                setProfile({ ...enriched, secondary_niches: secondaryNiches } as unknown as InfluencerProfile);
                 setIsEnriched(true);
 
                 // 2. Follower history
-                const { data: history } = await (supabase as any)
+                const { data: history } = await supabase
                     .from("follower_history")
                     .select("*")
                     .eq("profile_id", enriched.id)
@@ -87,7 +128,7 @@ export function useInfluencerProfile(platform: string | undefined, username: str
                 if (history) setFollowerHistory(history);
 
                 // 3. Posts: count + content-type breakdown
-                const { data: posts } = await (supabase as any)
+                const { data: posts } = await supabase
                     .from("influencer_posts")
                     .select("id, caption, is_sponsored")
                     .eq("profile_id", enriched.id);
@@ -116,6 +157,49 @@ export function useInfluencerProfile(platform: string | undefined, username: str
                     setPostsCount(0);
                     setContentPerformance([]);
                 }
+
+                // 4. Audience Analysis (Phase 6 Bot Signals)
+                const { data: analysis } = await supabase
+                    .from("audience_analysis" as any)
+                    .select("signals")
+                    .eq("profile_id", enriched.id)
+                    .maybeSingle();
+
+                if (analysis) {
+                    setProfile(prev => prev ? { ...prev, audience_analysis: analysis } as InfluencerProfile : null);
+                }
+
+                // 5. Call detect-bot-entendre to get detailed signals (not stored in DB, fetched live)
+                try {
+                    const botResult = await supabase.functions.invoke("detect-bot-entendre", {
+                        body: {
+                            username: enriched.username,
+                            platform: enriched.platform,
+                            follower_count: enriched.follower_count,
+                            following_count: enriched.following_count,
+                            posts_count: enriched.posts_count,
+                            engagement_rate: enriched.engagement_rate,
+                            bio: enriched.bio,
+                        },
+                    });
+
+                    if (botResult.data) {
+                        setProfile(prev => prev ? {
+                            ...prev,
+                            bot_probability_entendre: botResult.data.bot_probability_entendre != null
+                                ? botResult.data.bot_probability_entendre / 100
+                                : prev.bot_probability_entendre,
+                            bot_signals: botResult.data.signals || [],
+                            bot_signals_triggered: botResult.data.signals_triggered,
+                            bot_total_signals_checked: botResult.data.total_signals_checked,
+                            bot_confidence_tier: botResult.data.confidence_tier,
+                            bot_interpretation: botResult.data.interpretation,
+                        } : prev);
+                    }
+                } catch (botErr) {
+                    // Non-critical: bot signals are supplementary, don't block render
+                    console.warn("Bot signal fetch failed:", botErr);
+                }
             } else {
                 // Fallback to influencers_cache
                 const { data: cached } = await supabase
@@ -133,7 +217,7 @@ export function useInfluencerProfile(platform: string | undefined, username: str
                         username: cached.username,
                         full_name: d?.title || username,
                         bio: d?.snippet || null,
-                        primary_niche: null,
+                        primary_niche: d?.niche || null,
                         secondary_niches: [],
                         metrics: {},
                         overall_score: null,
@@ -143,6 +227,9 @@ export function useInfluencerProfile(platform: string | undefined, username: str
                         link: d?.link,
                         snippet: d?.snippet,
                         city_extracted: cached.city_extracted,
+                        // Expose cached image + engagement for profile page
+                        avatar_url: d?.imageUrl || null,
+                        engagement_rate: d?.engagement_rate ?? null,
                     });
                     setIsEnriched(false);
                 }
@@ -158,5 +245,7 @@ export function useInfluencerProfile(platform: string | undefined, username: str
         load();
     }, [load]);
 
-    return { profile, followerHistory, contentPerformance, postsCount, isEnriched, loading, error, reload: load };
+    const isStale = daysSinceEnrichment !== null && daysSinceEnrichment > 30;
+
+    return { profile, followerHistory, contentPerformance, postsCount, isEnriched, loading, error, reload: load, daysSinceEnrichment, isStale };
 }

@@ -190,14 +190,14 @@ Deno.serve(async (req) => {
     });
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const userId = claimsData.claims.sub;
+    const userId = user.id;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -251,6 +251,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Deduct credit BEFORE AI call to prevent race condition double-spend.
+    // We restore the credit if the AI call fails.
+    const { error: creditErr } = await adminClient.rpc("consume_ai_credit", { ws_id: membership.workspace_id });
+    if (creditErr) {
+      console.error("[ai-insights] Pre-deduction failed:", creditErr);
+      // If we can't deduct, reject to prevent free usage
+      return new Response(JSON.stringify({ error: "Credit deduction failed. Please try again." }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const body: any = { model: MODEL, messages: config.messages };
     if (config.tools) body.tools = config.tools;
     if (config.tool_choice) body.tool_choice = config.tool_choice;
@@ -267,6 +278,8 @@ Deno.serve(async (req) => {
     if (!aiRes.ok) {
       const errText = await aiRes.text();
       console.error("AI gateway error:", aiRes.status, errText);
+      // Restore credit on AI failure
+      await adminClient.rpc("restore_ai_credit", { ws_id: membership.workspace_id }).catch(console.error);
       if (aiRes.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -300,15 +313,14 @@ Deno.serve(async (req) => {
       } else {
         result = { content: choice?.message?.content || "No response" };
       }
+
+      // Phase 6: Inject evaluation version for frontend validation
+      if (type === "evaluate" && result && !result.error) {
+        result.evaluation_version = 1;
+      }
     }
 
-    // Decrement AI credits
-    await adminClient
-      .from("workspaces")
-      .update({ ai_credits_remaining: ws.ai_credits_remaining - 1 })
-      .eq("id", membership.workspace_id)
-      .gt("ai_credits_remaining", 0);
-
+    // Credit was already deducted before the AI call (race-condition safe)
     return new Response(JSON.stringify(result), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

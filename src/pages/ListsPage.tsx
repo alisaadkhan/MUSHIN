@@ -69,12 +69,12 @@ export default function ListsPage() {
       </div>
 
       {isLoading && (
-        <div className="bg-white/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6 h-48 animate-pulse" />
+        <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6 h-48 animate-pulse" />
       )}
 
       {!isLoading && lists && lists.length > 0 && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <div className="bg-white/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="sticky top-0 bg-muted/50 border-b border-border">
@@ -143,7 +143,7 @@ export default function ListsPage() {
 
       {!isLoading && (!lists || lists.length === 0) && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
-          <div className="flex flex-col items-center justify-center py-20 text-center bg-white/50 backdrop-blur-sm border border-white/50 shadow-sm rounded-2xl">
+          <div className="flex flex-col items-center justify-center py-20 text-center bg-card/50 backdrop-blur-sm border border-white/50 shadow-sm rounded-2xl">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 mb-4">
               <Users className="h-8 w-8 text-primary" />
             </div>

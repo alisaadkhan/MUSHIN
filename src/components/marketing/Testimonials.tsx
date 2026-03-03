@@ -9,7 +9,7 @@ const stagger: Variants = { visible: { transition: { staggerChildren: 0.12 } } }
 
 const TESTIMONIALS = [
   {
-    quote: "InfluenceIQ helped us find the perfect Karachi-based food bloggers for our Ramadan campaign. The local city-level insights are unmatched — no other tool does this for Pakistan.",
+    quote: "MUSHIN helped us find the perfect Karachi-based food bloggers for our Ramadan campaign. The local city-level insights are unmatched — no other tool does this for Pakistan.",
     name: "Fahad Khan",
     role: "Brand Manager",
     company: "Clearfield Brands PK",
@@ -17,7 +17,7 @@ const TESTIMONIALS = [
     initials: "FK",
   },
   {
-    quote: "We ran three campaigns through InfluenceIQ and the fraud detection literally saved us from paying an influencer with 80% fake followers. Paid for itself in the first week.",
+    quote: "We ran three campaigns through MUSHIN and the fraud detection literally saved us from paying an influencer with 80% fake followers. Paid for itself in the first week.",
     name: "Sana Mirza",
     role: "Marketing Director",
     company: "Khaadi Digital",

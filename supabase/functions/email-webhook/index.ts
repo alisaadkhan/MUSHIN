@@ -1,10 +1,52 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { crypto } from "https://deno.land/std@0.177.0/crypto/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
+
+/**
+ * Verify a Resend/Svix webhook signature.
+ * Svix signs: "{svix-id}.{svix-timestamp}.{raw-body}" with HMAC-SHA256.
+ * The `svix-signature` header contains one or more base64 signatures prefixed with "v1,".
+ */
+async function verifyWebhookSignature(
+  rawBody: string,
+  headers: Headers,
+  secret: string,
+): Promise<boolean> {
+  const msgId = headers.get("svix-id");
+  const msgTimestamp = headers.get("svix-timestamp");
+  const msgSignature = headers.get("svix-signature");
+
+  if (!msgId || !msgTimestamp || !msgSignature) return false;
+
+  // Reject timestamps older than 5 minutes (replay protection)
+  const ts = parseInt(msgTimestamp, 10);
+  if (isNaN(ts) || Math.abs(Date.now() / 1000 - ts) > 300) return false;
+
+  // Strip the base64 prefix used by Svix secrets (whsec_...)
+  const secretBytes = secret.startsWith("whsec_")
+    ? Uint8Array.from(atob(secret.slice(6)), (c) => c.charCodeAt(0))
+    : new TextEncoder().encode(secret);
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    secretBytes,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const toSign = new TextEncoder().encode(`${msgId}.${msgTimestamp}.${rawBody}`);
+  const computed = await crypto.subtle.sign("HMAC", key, toSign);
+  const computedB64 = btoa(String.fromCharCode(...new Uint8Array(computed)));
+
+  // svix-signature may carry multiple space-separated "v1,<sig>" tokens
+  const providedSigs = msgSignature.split(" ").map((s) => s.replace(/^v1,/, ""));
+  return providedSigs.some((sig) => sig === computedB64);
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -19,11 +61,29 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const webhookSecret = Deno.env.get("RESEND_WEBHOOK_SECRET");
+    if (!webhookSecret) {
+      console.error("RESEND_WEBHOOK_SECRET not configured — rejecting webhook");
+      return new Response(JSON.stringify({ error: "Webhook secret not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const rawBody = await req.text();
+    const valid = await verifyWebhookSignature(rawBody, req.headers, webhookSecret);
+    if (!valid) {
+      return new Response(JSON.stringify({ error: "Invalid webhook signature" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
-    const payload = await req.json();
+    const payload = JSON.parse(rawBody);
     const eventType = payload?.type;
     const emailTo = payload?.data?.to?.[0] || payload?.data?.email;
 

@@ -25,14 +25,6 @@ const features = [
   { key: "priority_support", label: "Priority support" },
 ] as const;
 
-// Placeholder invoices
-const invoices = [
-  { date: "Feb 1, 2026", amount: "$149.00", status: "Paid" },
-  { date: "Jan 1, 2026", amount: "$149.00", status: "Paid" },
-  { date: "Dec 1, 2025", amount: "$149.00", status: "Paid" },
-  { date: "Nov 1, 2025", amount: "$49.00", status: "Paid" },
-];
-
 export default function BillingPage() {
   const { plan, subscribed, subscriptionEnd, cancelAtPeriodEnd, checkout, openPortal, refresh, isLoading } = useSubscription();
   const { data: credits } = useWorkspaceCredits();
@@ -127,7 +119,7 @@ export default function BillingPage() {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Left Column: Current Plan & Usage */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-6 md:p-8">
+          <div className="bg-background/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-6 md:p-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <div>
                 <p className="text-xs text-muted-foreground font-medium mb-1">Current Plan</p>
@@ -181,55 +173,17 @@ export default function BillingPage() {
           </div>
 
           {/* Payouts and Invoices (Phase 6) */}
-          <PaymentsPanel payments={payments} className="bg-white/80 backdrop-blur-md shadow-sm border-white/50" />
+          <PaymentsPanel payments={payments} className="bg-background/80 backdrop-blur-md shadow-sm border-white/50" />
 
           {/* Billing history */}
           {subscribed && (
-            <div className="bg-white/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-border/50">
-                <h3 className="text-sm font-semibold text-foreground">Billing History</h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/30">
-                    <tr>
-                      <th className="text-left font-medium text-muted-foreground px-6 py-3 w-[140px]">Date</th>
-                      <th className="text-left font-medium text-muted-foreground px-6 py-3">Amount</th>
-                      <th className="text-left font-medium text-muted-foreground px-6 py-3">Status</th>
-                      <th className="text-right font-medium text-muted-foreground px-6 py-3">Invoice</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/50">
-                    {invoices.map((inv) => (
-                      <tr key={inv.date} className="hover:bg-muted/10 transition-colors hidden sm:table-row">
-                        <td className="px-6 py-3.5 text-foreground">{inv.date}</td>
-                        <td className="px-6 py-3.5 text-foreground">{inv.amount}</td>
-                        <td className="px-6 py-3.5">
-                          <span className="text-[11px] font-medium bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-md px-2 py-0.5">{inv.status}</span>
-                        </td>
-                        <td className="px-6 py-3.5 text-right">
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground"><ExternalLink size={14} strokeWidth={1.5} /></Button>
-                        </td>
-                      </tr>
-                    ))}
-                    {/* Mobile optimized rows */}
-                    {invoices.map((inv) => (
-                      <tr key={`mobile-${inv.date}`} className="sm:hidden border-t border-border/50">
-                        <td className="px-4 py-3" colSpan={4}>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-medium">{inv.date}</span>
-                            <span className="font-bold">{inv.amount}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-medium bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-md px-2 py-0.5">{inv.status}</span>
-                            <Button variant="ghost" size="sm" className="h-6 text-xs px-2 text-muted-foreground">Receipt <ExternalLink size={12} className="ml-1" /></Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            <div className="bg-background/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-6">
+              <h3 className="text-sm font-semibold text-foreground mb-3">Billing History</h3>
+              <p className="text-xs text-muted-foreground mb-4">View and download your past invoices from the Stripe customer portal.</p>
+              <Button variant="outline" size="sm" onClick={handlePortal} className="gap-2">
+                <ExternalLink size={14} />
+                Open Billing Portal
+              </Button>
             </div>
           )}
         </div>
@@ -237,7 +191,7 @@ export default function BillingPage() {
         {/* Right Column: Payment & Plans */}
         <div className="space-y-6">
           {/* Payment Method */}
-          <div className="bg-white/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-6">
+          <div className="bg-background/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-foreground">Payment Method</h3>
               {subscribed && (
@@ -253,10 +207,14 @@ export default function BillingPage() {
               </div>
               <div>
                 <p className="text-sm font-medium text-foreground">
-                  {subscribed ? "•••• •••• •••• 4242" : "No payment method"}
+                  {subscribed ? "Payment method on file" : "No payment method"}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {subscribed ? "Expires 12/27" : "Add a card to upgrade your plan."}
+                  {subscribed && subscriptionEnd
+                    ? `${cancelAtPeriodEnd ? "Access until" : "Renews"} ${new Date(subscriptionEnd).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                    : subscribed
+                    ? "Active subscription"
+                    : "Add a card to upgrade your plan."}
                 </p>
               </div>
             </div>
@@ -278,7 +236,7 @@ export default function BillingPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.1 }}
                 >
-                  <div className={`bg-white/80 backdrop-blur-md border shadow-sm rounded-2xl p-5 transition-all duration-300 relative overflow-hidden ${isCurrent ? "border-primary/50 ring-1 ring-primary/20" : "border-white/50 hover:shadow-md"}`}>
+                  <div className={`bg-background/80 backdrop-blur-md border shadow-sm rounded-2xl p-5 transition-all duration-300 relative overflow-hidden ${isCurrent ? "border-primary/50 ring-1 ring-primary/20" : "border-white/50 hover:shadow-md"}`}>
                     {isCurrent && (
                       <div className="absolute top-0 right-0 px-3 py-1 bg-primary text-primary-foreground text-[10px] uppercase font-bold tracking-wider rounded-bl-lg">
                         Current

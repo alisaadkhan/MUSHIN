@@ -11,7 +11,7 @@ const fadeUp: Variants = {
 const FAQS = [
   {
     q: "Which Pakistani cities do you cover?",
-    a: "InfluenceIQ indexes creators from all major Pakistani cities including Karachi, Lahore, Islamabad, Rawalpindi, Faisalabad, Multan, Peshawar, Quetta, Sialkot, Gujranwala, and more. You can filter search results by specific city or region.",
+    a: "MUSHIN indexes creators from all major Pakistani cities including Karachi, Lahore, Islamabad, Rawalpindi, Faisalabad, Multan, Peshawar, Quetta, Sialkot, Gujranwala, and more. You can filter search results by specific city or region.",
   },
   {
     q: "Can I search for Urdu content creators?",
@@ -23,7 +23,7 @@ const FAQS = [
   },
   {
     q: "Which platforms do you support?",
-    a: "InfluenceIQ supports influencer discovery across Instagram, TikTok, and YouTube — the three platforms with the highest Pakistani creator activity. Additional platforms may be added based on demand.",
+    a: "MUSHIN supports influencer discovery across Instagram, TikTok, and YouTube — the three platforms with the highest Pakistani creator activity. Additional platforms may be added based on demand.",
   },
   {
     q: "How accurate is the fraud detection for Pakistani creators?",
@@ -31,7 +31,7 @@ const FAQS = [
   },
   {
     q: "Can I do WhatsApp outreach through the platform?",
-    a: "Yes. InfluenceIQ has built-in WhatsApp outreach because most Pakistani creators prefer WhatsApp for business inquiries. You can send templated messages, track responses, and manage conversations directly in the app.",
+    a: "Yes. MUSHIN has built-in WhatsApp outreach because most Pakistani creators prefer WhatsApp for business inquiries. You can send templated messages, track responses, and manage conversations directly in the app.",
   },
   {
     q: "Do I need a credit card to start?",
@@ -57,7 +57,7 @@ export function FAQ() {
             Frequently Asked Questions
           </motion.h2>
           <motion.p variants={fadeUp} className="text-muted-foreground text-sm">
-            Everything you need to know about using InfluenceIQ in Pakistan.
+            Everything you need to know about using MUSHIN in Pakistan.
           </motion.p>
         </div>
 

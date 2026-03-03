@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 48" fill="none">
+  <defs>
+    <linearGradient id="blade" x1="24" y1="2" x2="24" y2="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#C084FC"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+    <linearGradient id="tsuba" x1="4" y1="24" x2="44" y2="24" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#A855F7" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#A855F7"/>
+      <stop offset="100%" stop-color="#A855F7" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow-strong" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Icon mark: 48x48 centered at (24,24) -->
+  <!-- Outer diamond frame -->
+  <path d="M24 3 L45 24 L24 45 L3 24 Z"
+        stroke="url(#blade)" stroke-width="1.4"
+        fill="rgba(168,85,247,0.07)"
+        filter="url(#glow)"/>
+
+  <!-- Upper blade (sword tip pointing up — 無 top stroke abstracted) -->
+  <path d="M24 8 L38 24 L24 24 Z"
+        fill="url(#blade)" opacity="0.92"
+        filter="url(#glow)"/>
+
+  <!-- Lower void (mirror reflection —心 below) -->
+  <path d="M24 40 L10 24 L24 24 Z"
+        fill="url(#blade)" opacity="0.32"/>
+
+  <!-- Tsuba: sword guard horizontal line -->
+  <line x1="7" y1="24" x2="41" y2="24"
+        stroke="url(#tsuba)" stroke-width="1.2"
+        filter="url(#glow)"/>
+
+  <!-- Center pupil: the eye of clarity -->
+  <circle cx="24" cy="24" r="2.8"
+          fill="#A855F7"
+          filter="url(#glow-strong)"/>
+
+  <!-- Inner ring on pupil -->
+  <circle cx="24" cy="24" r="2.8"
+          fill="none"
+          stroke="rgba(192,132,252,0.6)"
+          stroke-width="0.8"/>
+
+  <!-- Wordmark: MUSHIN -->
+  <text x="58" y="30"
+        font-family="'Syne', 'Inter', system-ui, sans-serif"
+        font-weight="800"
+        font-size="20"
+        letter-spacing="3"
+        fill="#EBEBEB">MUSHIN</text>
+</svg>

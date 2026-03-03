@@ -16,6 +16,17 @@ Deno.serve(async (req) => {
         if (!authHeader?.startsWith("Bearer ")) {
             return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
         }
+        const supabaseUser = createClient(
+            Deno.env.get("SUPABASE_URL")!,
+            Deno.env.get("SUPABASE_ANON_KEY")!,
+            { global: { headers: { Authorization: authHeader } } }
+        );
+        const { data: { user }, error: authErr } = await supabaseUser.auth.getUser(authHeader.replace("Bearer ", ""));
+        if (authErr || !user) {
+            return new Response(JSON.stringify({ error: "Unauthorized" }), {
+                status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+        }
 
         const { profile_id } = await req.json();
         if (!profile_id) {
@@ -46,7 +57,8 @@ Deno.serve(async (req) => {
 
         // Analyze Niche and Brand Safety
         const systemPrompt = `You are a social media content analyzer. Given a collection of an influencer's recent post captions, analyze them and extract:
-1. 2 to 5 highly specific Niche Categories (e.g., 'Sustainable Fashion', 'Tech Reviews', 'Travel Vlog').
+1. 2 to 5 highly specific Niche Categories from this list: Food, Fashion, Beauty, Tech, Fitness, Travel, Gaming, Music, Education, Comedy, Parenting, Entertainment, Lifestyle, Finance, Health, Sports, News, Photography, Art. 
+   - If the content does not strongly fit any specific category, use 'General'.
 2. Aesthetic/Style tags (e.g., 'Minimalist', 'Vibrant', 'Casual').
 3. Brand Safety Rating: analyze for profanity, extreme politics, adult content, or highly controversial topics.
 4. Extracted Brand Mentions: A list of any brand names explicitly mentioned in the captions.

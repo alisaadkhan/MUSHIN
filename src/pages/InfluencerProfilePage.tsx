@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import {
   ChevronLeft, ExternalLink, Heart, Share2, Instagram, Youtube,
   SlidersHorizontal, Loader2, RefreshCw, Users, Lightbulb,
-  MapPin, Calendar, Plus, Globe, Sparkles, BarChart3,
+  MapPin, Calendar, Plus, Globe, Sparkles, BarChart3, ShieldCheck, ShieldAlert, ShieldX, Info
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +25,20 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid } from "recharts";
 import { GrowthAnalyticsPanel } from "@/components/influencer/GrowthAnalyticsPanel";
 import { BrandAffinityPanel, type BrandMention } from "@/components/influencer/BrandAffinityPanel";
 import { SponsoredVsOrganicPanel } from "@/components/influencer/SponsoredVsOrganicPanel";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+export function DataStalenessBadge({ daysSince, onRefresh, disabled }: { daysSince: number; onRefresh: () => void; disabled?: boolean }) {
+  return (
+    <button
+      onClick={onRefresh}
+      disabled={disabled}
+      className="flex items-center gap-2 text-amber-400 bg-[#353148] hover:bg-[#2a2739] transition-colors px-3 py-2 rounded-lg text-[11px] font-medium border border-[#353148] w-full mt-2 disabled:opacity-50"
+    >
+      <ShieldAlert size={14} className="shrink-0" />
+      Data may be outdated — last enriched {daysSince} days ago
+    </button>
+  );
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const platformIcons: Record<string, any> = {
@@ -86,6 +99,7 @@ export default function InfluencerProfilePage() {
   const navigate = useNavigate();
   const [enriching, setEnriching] = useState(false);
   const [brandMentions] = useState<BrandMention[]>([]);
+  const [botFeedbackSent, setBotFeedbackSent] = useState(false);
 
   // Real data from DB
   const {
@@ -96,6 +110,8 @@ export default function InfluencerProfilePage() {
     isEnriched,
     loading: profileLoading,
     reload,
+    daysSinceEnrichment,
+    isStale,
   } = useInfluencerProfile(platform, username);
 
   const PlatformIcon = platformIcons[platform || ""] || Users;
@@ -112,28 +128,48 @@ export default function InfluencerProfilePage() {
     if (!platform || !username) return;
     setEnriching(true);
     try {
-      // Step 1: Enrich
       const { data: enrichData, error: enrichError } = await supabase.functions.invoke("enrich-influencer", {
         body: {
           username,
           platform,
           full_name: profile?.full_name,
           bio: profile?.bio,
-          extracted_followers: profile?.metrics?.followers || profile?.metrics?.subscriber_count,
+          extracted_followers: profile?.metrics?.followers || profile?.metrics?.subscriber_count || profile?.follower_count,
+          // Pass niche from cache so enrich-influencer doesn't overwrite with Lifestyle
+          primary_niche: profile?.primary_niche || profile?.niche || evaluation?.niche_categories?.[0],
         },
       });
+
+      // Handle 7-day cooldown response
+      if (enrichError?.message?.includes("429") || enrichData?.cooldown_remaining_days) {
+        const days = enrichData?.cooldown_remaining_days ?? 7;
+        toast({
+          title: "Recently Enriched",
+          description: `This profile was enriched recently. Please wait ${days} more day(s) before re-enriching.`,
+          variant: "destructive",
+        });
+        setEnriching(false);
+        return;
+      }
+
       if (enrichError || enrichData?.error) throw new Error(enrichData?.error || enrichError?.message);
       await reload();
-      // Step 2: Evaluate
       const latestMetrics = enrichData.profile?.metrics || {};
-      await evaluate({ username, platform, followers: latestMetrics.followers, engagement_rate: latestMetrics.engagement_rate, bio: enrichData.profile?.bio });
+      await evaluate({
+        username, platform,
+        followers: latestMetrics.followers ?? enrichData.profile?.follower_count,
+        engagement_rate: latestMetrics.engagement_rate ?? enrichData.profile?.engagement_rate,
+        bio: enrichData.profile?.bio,
+      });
     } catch (err: any) {
+      toast({ title: "Enrichment Failed", description: err.message, variant: "destructive" });
+      // Still try to evaluate with available data
       await evaluate({
         username, platform,
         followers: profile?.metrics?.followers,
         engagement_rate: profile?.metrics?.engagement_rate,
         bio: profile?.bio,
-      });
+      }).catch(() => { });
     } finally {
       setEnriching(false);
     }
@@ -145,11 +181,26 @@ export default function InfluencerProfilePage() {
 
   const loading = profileLoading;
   const metrics = profile?.metrics || {};
-  const followers = metrics.followers || metrics.subscriber_count;
-  const engagementRate = metrics.engagement_rate;
-  const city = metrics.city || profile?.city_extracted;
+  const followers = metrics.followers || metrics.subscriber_count || profile?.follower_count;
+  const following = metrics.following_count ?? profile?.following_count ?? null;
+  const engagementRate = metrics.engagement_rate ?? profile?.engagement_rate;
+  const city = metrics.city || profile?.city_extracted || profile?.city;
   const niche = profile?.primary_niche || evaluation?.niche_categories?.[0] || "Creator";
-  const profileLink = (profile as any)?.link;
+  const profileLink = profile?.link;
+  const avatarUrl = profile?.avatar_url || (profile?.isCached ? profile?.imageUrl : null);
+  const avatarInitials = (profile?.full_name || username || "?")
+    .split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase() || "?";
+  // Quality signals from enrichment
+  const audienceQualityScore = profile?.audience_quality_score ?? null;
+  const botProbability = profile?.bot_probability ?? null;
+  const dataSource = profile?.data_source ?? null;
+  const enrichmentStatus = profile?.enrichment_status ?? null;
+  const enrichedAt = profile?.enriched_at ? new Date(profile.enriched_at) : null;
+  // We no longer rely on derived cache staleness, DataStalenessBadge queries the DB directly
+  // Whether the profile is cached-only (never been enriched)
+  const isCacheOnly = !isEnriched && profile?.isCached;
+  const enrichmentFailed = enrichmentStatus === "failed";
+  const enrichmentError = profile?.enrichment_error || "Unknown error during data fetching. Please try again later.";
 
   // Build follower growth chart data
   const growthChartData = followerHistory.map((h) => ({
@@ -192,9 +243,16 @@ export default function InfluencerProfilePage() {
         </Button>
       </div>
 
+      {platform !== "youtube" && (
+        <div className="bg-blue-50/50 border border-blue-200/50 text-blue-800 rounded-lg p-3 text-sm flex items-start gap-2 backdrop-blur-sm">
+          <Info className="h-4 w-4 mt-0.5 shrink-0 text-blue-600" />
+          <p>Instagram and TikTok data is sourced via Apify. YouTube data comes directly from the official YouTube Data API v3.</p>
+        </div>
+      )}
+
       {/* ── Profile Header ─────────────────────────────────────── */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-        <div className="bg-white/80 backdrop-blur-md border border-white/50 rounded-2xl p-6 shadow-sm">
+        <div className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl p-6 shadow-sm">
           {loading ? (
             <div className="flex items-start gap-6">
               <Skeleton className="w-20 h-20 rounded-full shrink-0" />
@@ -209,10 +267,10 @@ export default function InfluencerProfilePage() {
           ) : (
             <div className="flex flex-col sm:flex-row items-start gap-6">
               {/* Avatar */}
-              <div className="w-20 h-20 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 text-2xl font-bold">
-                {profile?.full_name
-                  ? profile.full_name.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase()
-                  : <PlatformIcon className="h-8 w-8" />
+              <div className="w-20 h-20 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 text-2xl font-bold overflow-hidden">
+                {avatarUrl
+                  ? <img src={avatarUrl} alt={profile?.full_name || username} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  : avatarInitials
                 }
               </div>
 
@@ -227,6 +285,27 @@ export default function InfluencerProfilePage() {
                       ? <EvaluationScoreBadge score={profile.overall_score} size="lg" showLabel />
                       : <span className="text-xs bg-muted text-muted-foreground rounded-full px-2.5 py-0.5 font-medium">Unscored</span>
                   }
+                  {/* Data source badge */}
+                  {isCacheOnly && (
+                    <span title="Metrics sourced from Google search results" className="text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5 flex items-center gap-1">
+                      <Globe className="h-2.5 w-2.5" /> Data from Google
+                    </span>
+                  )}
+                  {dataSource === "youtube_api" && (
+                    <span title="Real data verified via official YouTube API" className="text-[10px] font-medium bg-red-50 text-red-700 border border-red-200 rounded-full px-2 py-0.5 flex items-center gap-1">
+                      <ShieldCheck className="h-2.5 w-2.5" /> YouTube Verified
+                    </span>
+                  )}
+                  {(dataSource === "synthetic_ai" || dataSource === "synthetic" || dataSource === "mock") && !isCacheOnly && (
+                    <span title="Data is simulated for demonstration purposes" className="text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200 rounded-full px-2 py-0.5 flex items-center gap-1">
+                      <Sparkles className="h-2.5 w-2.5" /> Simulated Data
+                    </span>
+                  )}
+                  {enrichmentFailed && (
+                    <span className="text-[10px] font-medium bg-red-50 text-red-700 border border-red-200 rounded-full px-2 py-0.5">
+                      Last enrichment failed – try again
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm text-muted-foreground mb-3 truncate">
                   @{username} · <span className="capitalize">{platform}</span> · {niche}
@@ -246,34 +325,49 @@ export default function InfluencerProfilePage() {
                 </div>
 
                 {/* Stats */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-md">
-                  <div>
-                    <p className="text-lg font-bold text-foreground">
-                      {followers ? formatFollowers(followers) : "—"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Followers</p>
-                  </div>
-                  <div>
-                    <p className="text-lg font-bold text-foreground">
-                      {postsCount != null ? postsCount : "—"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Posts</p>
-                  </div>
-                  <div>
-                    <p className="text-lg font-bold text-foreground">—</p>
-                    <p className="text-xs text-muted-foreground">Following</p>
-                  </div>
-                  <div>
-                    <p className="text-lg font-bold text-foreground">
-                      {engagementRate ? `${engagementRate}%` : "—"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Engagement</p>
-                  </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-lg">
+                  {[
+                    { label: "Followers", value: followers != null ? formatFollowers(followers) : "—" },
+                    { label: "Posts", value: postsCount != null ? postsCount.toLocaleString() : "—" },
+                    { label: "Following", value: following != null ? formatFollowers(following) : "—" },
+                    { label: "Engagement", value: engagementRate != null ? `${engagementRate.toFixed(1)}%` : "—" },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="bg-muted/40 border border-border/50 rounded-xl px-3 py-2.5 text-center">
+                      <p className="text-base font-bold text-foreground leading-tight">{value}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{label}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
 
               {/* Actions */}
               <div className="flex flex-col gap-2 shrink-0 w-full sm:w-auto mt-4 sm:mt-0">
+                {/* Audience Quality Score */}
+                {audienceQualityScore != null && (
+                  <div className="flex items-center gap-2 text-xs">
+                    {botProbability != null && botProbability < 30
+                      ? <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                      : botProbability != null && botProbability < 60
+                        ? <ShieldAlert className="h-3.5 w-3.5 text-amber-500" />
+                        : <ShieldX className="h-3.5 w-3.5 text-red-500" />
+                    }
+                    <span className="text-muted-foreground">Audience Quality:</span>
+                    <span className={`font-semibold ${audienceQualityScore >= 70 ? "text-emerald-600" :
+                      audienceQualityScore >= 40 ? "text-amber-600" : "text-red-600"
+                      }`}>{audienceQualityScore}/100</span>
+                    {dataSource === "apify" && (
+                      <span title="Verified by Apify" className="bg-blue-100 text-blue-700 text-[9px] font-semibold px-1.5 py-0.5 rounded-full border border-blue-200">LIVE</span>
+                    )}
+                  </div>
+                )}
+                {/* Data Staleness Badge (DB Source of Truth) */}
+                {isStale && (
+                  <DataStalenessBadge
+                    daysSince={Math.floor(daysSinceEnrichment!)}
+                    onRefresh={handleEnrichAndEvaluate}
+                    disabled={evalLoading || enriching || !canUseAI()}
+                  />
+                )}
                 <div className="flex gap-2">
                   <Button variant="outline" size="icon" className="rounded-lg flex-1 sm:flex-none"><Heart size={16} strokeWidth={1.5} /></Button>
                   <Button variant="outline" size="icon" className="rounded-lg flex-1 sm:flex-none"><Share2 size={16} strokeWidth={1.5} /></Button>
@@ -301,7 +395,7 @@ export default function InfluencerProfilePage() {
       {/* ── Follower Growth Chart (always shown when history exists) ─── */}
       {growthChartData.length > 0 && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <div className="bg-white/80 backdrop-blur-md border border-white/50 rounded-2xl p-5 shadow-sm">
+          <div className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl p-5 shadow-sm">
             <p className="text-sm font-semibold text-foreground mb-4">Follower Growth</p>
             <ChartContainer
               config={{ followers: { label: "Followers", color: "hsl(var(--primary))" } }}
@@ -310,8 +404,8 @@ export default function InfluencerProfilePage() {
               <AreaChart data={growthChartData} margin={{ left: 0, right: 10, top: 5, bottom: 0 }}>
                 <defs>
                   <linearGradient id="follGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#A855F7" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#A855F7" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -322,7 +416,7 @@ export default function InfluencerProfilePage() {
                   tickFormatter={(v) => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1_000 ? `${Math.round(v / 1_000)}K` : v}
                 />
                 <ChartTooltip content={<ChartTooltipContent />} />
-                <Area type="monotone" dataKey="followers" stroke="hsl(var(--primary))" strokeWidth={3} fill="url(#follGrad)" dot={{ strokeWidth: 2, r: 4, fill: "white" }} activeDot={{ r: 6, strokeWidth: 0 }} />
+                <Area type="monotone" dataKey="followers" stroke="#A855F7" strokeWidth={3} fill="url(#follGrad)" dot={{ strokeWidth: 2, r: 4, fill: "white" }} activeDot={{ r: 6, strokeWidth: 0 }} />
               </AreaChart>
             </ChartContainer>
           </div>
@@ -332,7 +426,7 @@ export default function InfluencerProfilePage() {
       {/* ── Content Performance (shown only when posts exist) ─── */}
       {contentPerformance.length > 0 && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <div className="bg-white/80 backdrop-blur-md border border-white/50 rounded-2xl p-5 shadow-sm">
+          <div className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl p-5 shadow-sm">
             <p className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
               <BarChart3 className="h-4 w-4 text-primary" /> Content Performance
             </p>
@@ -362,10 +456,29 @@ export default function InfluencerProfilePage() {
         </motion.div>
       )}
 
-      {/* ── Evaluate CTA ─────────────────────────────────────── */}
-      {!evaluation && !evalLoading && !loading && (
+      {/* ── Enrichment Error State ─────────────────────────────────────── */}
+      {enrichmentFailed && !evalLoading && !loading && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <div className="bg-white/50 backdrop-blur-md border border-primary/20 border-dashed rounded-2xl p-8 text-center flex flex-col items-center">
+          <div className="bg-red-50/50 backdrop-blur-md border border-red-200 border-dashed rounded-2xl p-8 text-center flex flex-col items-center">
+            <div className="w-16 h-16 bg-red-100/50 rounded-full flex items-center justify-center mb-4 text-red-600">
+              <ShieldAlert className="h-8 w-8" />
+            </div>
+            <h3 className="text-xl font-bold text-red-900 mb-2">Enrichment Failed</h3>
+            <p className="text-sm text-red-700/80 max-w-md mb-6 whitespace-pre-line">
+              {enrichmentError}
+            </p>
+            <Button className="bg-red-600 hover:bg-red-700 text-foreground px-8 gap-2 shadow-sm shadow-red-500/20" onClick={handleEnrichAndEvaluate} disabled={enriching}>
+              {enriching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              {enriching ? "Retrying..." : "Retry Enrichment"}
+            </Button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Evaluate CTA ─────────────────────────────────────── */}
+      {!evaluation && !evalLoading && !loading && !enrichmentFailed && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <div className="bg-card/50 backdrop-blur-md border border-primary/20 border-dashed rounded-2xl p-8 text-center flex flex-col items-center">
             <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
               <Lightbulb className="h-8 w-8 text-primary" />
             </div>
@@ -388,7 +501,7 @@ export default function InfluencerProfilePage() {
       {evalLoading && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white/80 backdrop-blur-md border border-white/50 rounded-2xl p-5 space-y-4">
+            <div key={i} className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl p-5 space-y-4">
               <Skeleton className="h-5 w-1/3 rounded-full" />
               <div className="space-y-2">
                 <Skeleton className="h-10 w-full rounded-xl" />
@@ -414,7 +527,7 @@ export default function InfluencerProfilePage() {
             {/* Left column */}
             <div className="space-y-4 sm:space-y-6">
               {/* Demographics — parsed from AI strings */}
-              <div className="bg-white/80 backdrop-blur-md border border-white/50 rounded-2xl p-5 sm:p-6 shadow-sm">
+              <div className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl p-5 sm:p-6 shadow-sm">
                 <p className="text-sm font-semibold text-foreground mb-5 flex justify-between items-center">
                   Audience Demographics
                   <Badge variant="outline" className="text-[10px] font-normal">AI Estimated</Badge>
@@ -456,31 +569,140 @@ export default function InfluencerProfilePage() {
                   </div>
                 </div>
 
-                {/* Top locations */}
+                {/* Top locations — rank only, no fake percentages */}
                 {evaluation.estimated_demographics?.top_countries?.length > 0 && (
                   <div className="mt-6 pt-5 border-t border-border/40">
-                    <p className="text-xs font-medium text-muted-foreground mb-3">Top Locations</p>
-                    <div className="space-y-2">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-medium text-muted-foreground">Top Locations</p>
+                      <span className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                        AI estimated · rank only
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
                       {evaluation.estimated_demographics.top_countries.map((country: string, i: number) => {
-                        const pct = [42, 18, 12, 8, 6][i] ?? 5;
+                        const medals = ["🥇", "🥈", "🥉"];
+                        const icon = medals[i] ?? "📍";
                         return (
-                          <div key={country} className="flex items-center gap-3">
-                            <span className="text-xs text-muted-foreground w-28 truncate font-medium">{country}</span>
-                            <div className="flex-1 h-2.5 bg-muted/60 rounded-full overflow-hidden">
-                              <div className="h-full bg-slate-400 rounded-full" style={{ width: `${pct}%` }} />
-                            </div>
-                            <span className="text-[10px] font-medium text-foreground w-6 text-right">{pct}%</span>
-                          </div>
+                          <span
+                            key={country}
+                            className="inline-flex items-center gap-1.5 text-xs font-medium bg-muted/50 border border-border/40 rounded-full px-3 py-1.5 text-foreground"
+                          >
+                            <span>{icon}</span>
+                            {country}
+                          </span>
                         );
                       })}
                     </div>
+                    <p className="text-[10px] text-muted-foreground mt-2.5 leading-relaxed">
+                      Ranking only — exact audience percentages require Meta Business API access.
+                    </p>
                   </div>
                 )}
               </div>
+              <AuthenticityPanel authenticity={evaluation.authenticity} className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm" />
 
-              <AuthenticityPanel authenticity={evaluation.authenticity} className="bg-white/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm" />
+              {(profile?.bot_probability_entendre !== null && profile?.bot_probability_entendre !== undefined) && (() => {
+                const score = Math.round((profile.bot_probability_entendre ?? 0) * 100);
+                const tier = score < 20 ? { label: "Authentic", color: "text-emerald-600 bg-emerald-50 border-emerald-200" }
+                  : score < 40 ? { label: "Low Risk", color: "text-blue-600 bg-blue-50 border-blue-200" }
+                  : score < 60 ? { label: "Moderate Risk", color: "text-amber-600 bg-amber-50 border-amber-200" }
+                  : score < 80 ? { label: "High Risk", color: "text-orange-600 bg-orange-50 border-orange-200" }
+                  : { label: "Very High Risk", color: "text-red-600 bg-red-50 border-red-200" };
+                const signals: any[] = (profile as any).bot_signals || [];
+                return (
+                  <div className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl p-5 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <ShieldAlert size={16} className="text-muted-foreground" strokeWidth={1.5} />
+                        <p className="text-sm font-semibold text-foreground">Bot Risk Score</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${tier.color}`}>{tier.label}</span>
+                        <span className="text-2xl font-black text-foreground data-mono">{score}</span>
+                        <span className="text-xs text-muted-foreground">/100</span>
+                      </div>
+                    </div>
 
-              <div className="bg-white/80 backdrop-blur-md border border-white/50 rounded-2xl p-5 shadow-sm">
+                    {/* Progress bar */}
+                    <div className="h-2 bg-muted/60 rounded-full overflow-hidden mb-3">
+                      <div
+                        className={`h-full rounded-full transition-all ${score < 40 ? "bg-emerald-500" : score < 60 ? "bg-amber-500" : "bg-red-500"}`}
+                        style={{ width: `${score}%` }}
+                      />
+                    </div>
+
+                    {/* Collapsible signals */}
+                    {signals.length > 0 && (
+                      <details className="group">
+                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none list-none flex items-center gap-1">
+                          <span className="group-open:rotate-90 transition-transform inline-block">▶</span>
+                          Why this score? ({(profile as any).bot_signals_triggered ?? signals.length} of {(profile as any).bot_total_signals_checked ?? "16"} signals triggered)
+                        </summary>
+                        <div className="mt-3 space-y-2 pl-2 border-l-2 border-muted">
+                          {signals.map((s: any, i: number) => (
+                            <div key={i} className="flex items-start gap-2">
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded mt-0.5 flex-shrink-0 uppercase ${
+                                s.risk === "high" ? "bg-red-100 text-red-700"
+                                : s.risk === "medium" ? "bg-amber-100 text-amber-700"
+                                : "bg-slate-100 text-slate-600"
+                              }`}>{s.risk}</span>
+                              <p className="text-xs text-muted-foreground leading-relaxed">{s.detail}</p>
+                            </div>
+                          ))}
+                          {(profile as any).bot_confidence_tier && (
+                            <p className="text-[10px] text-muted-foreground pt-1 italic">
+                              Detection confidence: {(profile as any).bot_confidence_tier}
+                              {(profile as any).bot_interpretation ? ` · ${(profile as any).bot_interpretation}` : ""}
+                            </p>
+                          )}
+                        </div>
+                      </details>
+                    )}
+
+                    {/* Feedback widget */}
+                    {!botFeedbackSent ? (
+                      <div className="mt-3 pt-3 border-t border-border/30">
+                        <p className="text-[10px] text-muted-foreground mb-2">Was this score accurate?</p>
+                        <div className="flex gap-2">
+                          {[
+                            { label: "✓ Yes, a bot", verdict: "bot" },
+                            { label: "✗ No, real", verdict: "authentic" },
+                          ].map(({ label, verdict }) => (
+                            <button
+                              key={verdict}
+                              onClick={async () => {
+                                try {
+                                  await supabase.functions.invoke("detect-bot-entendre", {
+                                    body: {
+                                      action: "feedback",
+                                      username: profile.username,
+                                      platform: profile.platform,
+                                      predicted_score: score,
+                                      verdict,
+                                      signals_triggered: signals.map((s: any) => s.name),
+                                    },
+                                  });
+                                  setBotFeedbackSent(true);
+                                } catch (e) {
+                                  console.warn("Feedback error:", e);
+                                }
+                              }}
+                              className="text-[10px] px-3 py-1.5 rounded-full border border-border/50 text-muted-foreground hover:bg-muted/50 transition-colors"
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-emerald-600 mt-3 pt-3 border-t border-border/30">
+                        ✓ Feedback recorded — improves detection accuracy over time
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+              <div className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl p-5 shadow-sm">
                 <p className="text-sm font-semibold text-foreground mb-3">Growth Assessment</p>
                 <p className="text-sm text-muted-foreground leading-relaxed">{evaluation.growth_assessment.pattern}</p>
                 {evaluation.growth_assessment.risk_flags.length > 0 && (
@@ -493,21 +715,21 @@ export default function InfluencerProfilePage() {
               </div>
 
               {brandMentions.length > 0 && (
-                <BrandAffinityPanel mentions={brandMentions} competitors={["Khaadi", "Sapphire"]} className="bg-white/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm" />
+                <BrandAffinityPanel mentions={brandMentions} competitors={["Khaadi", "Sapphire"]} className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm" />
               )}
             </div>
 
             {/* Right column */}
             <div className="space-y-4 sm:space-y-6">
-              <EngagementPanel engagement={evaluation.engagement_rating} platform={platform} className="bg-white/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm" />
+              <EngagementPanel engagement={evaluation.engagement_rating} platform={platform} className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm" />
 
-              <BrandSafetyPanel brandSafety={evaluation.brand_safety} className="bg-white/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm" />
+              <BrandSafetyPanel brandSafety={evaluation.brand_safety} className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm" />
 
               {followerHistory.length > 0 && (
-                <GrowthAnalyticsPanel history={followerHistory} className="bg-white/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm" />
+                <GrowthAnalyticsPanel history={followerHistory} className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm" />
               )}
 
-              <CompliancePanel influencerId={profile?.id || ""} existingDocument={null} className="bg-white/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm" />
+              <CompliancePanel influencerId={profile?.id || ""} existingDocument={null} className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm" />
 
               {totalPosts > 0 && (
                 <SponsoredVsOrganicPanel
@@ -517,12 +739,12 @@ export default function InfluencerProfilePage() {
                     post_count_sponsored: sponsoredPosts,
                     post_count_organic: organicPosts,
                   }}
-                  className="bg-white/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm"
+                  className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm"
                 />
               )}
 
               {/* Niche & Recommendations */}
-              <div className="bg-white/80 backdrop-blur-md border border-white/50 rounded-2xl p-5 shadow-sm">
+              <div className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl p-5 shadow-sm">
                 <p className="text-sm font-semibold text-foreground mb-3">Niche & Recommendations</p>
                 <div className="mb-4">
                   <NicheTagsDisplay categories={evaluation.niche_categories} />

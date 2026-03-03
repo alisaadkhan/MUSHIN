@@ -7,7 +7,7 @@ export default function CookiePolicyPage() {
   useEffect(() => { document.documentElement.classList.add("dark"); }, []);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <div className="fixed inset-0 -z-10 animated-mesh-bg" />
       <div className="fixed inset-0 -z-10 dot-grid-overlay" />
 
@@ -39,7 +39,7 @@ export default function CookiePolicyPage() {
         <p>You can control cookies through your browser settings. Disabling essential cookies may affect platform functionality.</p>
 
         <h2>4. Contact</h2>
-        <p>Questions about our cookie practices? Reach us at <span className="text-primary">privacy@influenceiq.com</span>.</p>
+        <p>Questions about our cookie practices? Reach us at <span className="text-primary">privacy@mushin.com</span>.</p>
       </main>
 
       <MarketingFooter />

@@ -7,6 +7,15 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Whitelist of valid Stripe Price IDs — any priceId not in this list is rejected
+const VALID_PRICE_IDS = new Set([
+  Deno.env.get("STRIPE_GROWTH_MONTHLY_PRICE_ID") || "",
+  Deno.env.get("STRIPE_GROWTH_ANNUAL_PRICE_ID") || "",
+  Deno.env.get("STRIPE_PRO_MONTHLY_PRICE_ID") || "",
+  Deno.env.get("STRIPE_PRO_ANNUAL_PRICE_ID") || "",
+  Deno.env.get("STRIPE_ENTERPRISE_PRICE_ID") || "",
+].filter(Boolean));
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -31,6 +40,13 @@ Deno.serve(async (req) => {
     const { priceId } = await req.json();
     if (!priceId) throw new Error("priceId is required");
 
+    // Security: reject any priceId not in the explicit whitelist
+    if (VALID_PRICE_IDS.size > 0 && !VALID_PRICE_IDS.has(priceId)) {
+      return new Response(JSON.stringify({ error: "Invalid price ID" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
     // Find or reference existing customer

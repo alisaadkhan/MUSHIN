@@ -99,7 +99,7 @@ export function CampaignTimeline({ campaignId }: CampaignTimelineProps) {
                   className="absolute -left-[31px] top-0.5 h-4 w-4 rounded-full flex items-center justify-center"
                   style={{ backgroundColor: config.color }}
                 >
-                  <Icon className="h-2.5 w-2.5 text-white" />
+                  <Icon className="h-2.5 w-2.5 text-foreground" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm">{config.label(details)}</p>

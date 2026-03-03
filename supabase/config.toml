@@ -1,28 +1,81 @@
-project_id = "klxyrefnqnwjbcigdzmc"
+project_id = "xfeikbhprbqwjbcigdzmc"
 
-[functions.search-influencers]
+# Public endpoints (no auth required)
+[functions.email-webhook]
 verify_jwt = false
+
+[functions.seed-accounts]
+verify_jwt = false
+
+# All other functions require a valid JWT
+[functions.search-influencers]
+verify_jwt = true
 
 [functions.send-outreach-email]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ai-insights]
-verify_jwt = false
+verify_jwt = true
 
 [functions.create-checkout]
-verify_jwt = false
+verify_jwt = true
 
 [functions.customer-portal]
-verify_jwt = false
+verify_jwt = true
 
 [functions.check-subscription]
-verify_jwt = false
+verify_jwt = true
 
 [functions.sync-hubspot]
-verify_jwt = false
+verify_jwt = true
 
 [functions.delete-account]
-verify_jwt = false
+verify_jwt = true
 
-[functions.email-webhook]
+[functions.admin-list-users]
+verify_jwt = true
+
+[functions.admin-suspend-user]
+verify_jwt = true
+
+[functions.admin-adjust-credits]
+verify_jwt = true
+
+[functions.admin-promote-user]
+verify_jwt = true
+
+[functions.admin-audit-log]
+verify_jwt = true
+
+[functions.enrich-influencer]
+verify_jwt = true
+
+[functions.detect-bot-entendre]
+verify_jwt = true
+
+[functions.export-user-data]
+verify_jwt = true
+
+[functions.find-lookalikes]
+verify_jwt = true
+
+[functions.classify-niche]
+verify_jwt = true
+
+[functions.generate-embeddings]
+verify_jwt = true
+
+[functions.generate-invoice]
+verify_jwt = true
+
+[functions.extract-brand-mentions]
+verify_jwt = true
+
+[functions.fetch-campaign-metrics]
+verify_jwt = true
+
+[functions.generate-tracking-link]
+verify_jwt = true
+
+[functions.generate-public-profile]
 verify_jwt = false

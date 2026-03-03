@@ -55,7 +55,7 @@ export function GrowthAnalyticsPanel({ history, className = "" }: GrowthAnalytic
                                 <Line
                                     type="monotone"
                                     dataKey="followers"
-                                    stroke="hsl(var(--primary))"
+                                    stroke="#A855F7"
                                     strokeWidth={2}
                                     dot={{ strokeWidth: 2, r: 3, fill: "white" }}
                                     activeDot={{ r: 5, strokeWidth: 0 }}

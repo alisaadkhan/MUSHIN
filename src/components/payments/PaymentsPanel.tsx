@@ -94,7 +94,7 @@ export function PaymentsPanel({ payments, className = "" }: PaymentsPanelProps) 
                                 </thead>
                                 <tbody className="divide-y divide-border/50">
                                     {payments.map(p => (
-                                        <tr key={p.id} className="bg-white/30 backdrop-blur-sm hover:bg-white/50 transition-colors">
+                                        <tr key={p.id} className="bg-card/30 backdrop-blur-sm hover:bg-card/50 transition-colors">
                                             <td className="px-4 py-3 font-medium text-foreground">{p.influencer_name}</td>
                                             <td className="px-4 py-3 text-muted-foreground truncate max-w-[150px]">{p.campaign_name}</td>
                                             <td className="px-4 py-3 font-semibold">${p.amount.toLocaleString()} {p.currency}</td>

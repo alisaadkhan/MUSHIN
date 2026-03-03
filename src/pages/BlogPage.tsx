@@ -7,7 +7,7 @@ export default function BlogPage() {
   useEffect(() => { document.documentElement.classList.add("dark"); }, []);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <div className="fixed inset-0 -z-10 animated-mesh-bg" />
       <div className="fixed inset-0 -z-10 dot-grid-overlay" />
 

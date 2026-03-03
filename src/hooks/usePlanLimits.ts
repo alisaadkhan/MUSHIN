@@ -4,7 +4,7 @@ import { useCampaigns } from "./useCampaigns";
 
 export function usePlanLimits() {
   const { planConfig, plan } = useSubscription();
-  const { data: credits } = useWorkspaceCredits();
+  const { data: credits, isLoading: creditsLoading } = useWorkspaceCredits();
   const { data: campaigns } = useCampaigns();
 
   const isFree = plan === "free";
@@ -15,17 +15,20 @@ export function usePlanLimits() {
   };
 
   const canSendEmail = () => {
-    if (isFree) return false; // Locked for free
+    // Return true optimistically while credits are still loading to avoid
+    // incorrectly blocking the UI before the first fetch completes.
+    if (creditsLoading && !credits) return true;
     return (credits?.email_sends_remaining ?? 0) > 0;
   };
 
   const canUseAI = () => {
-    if (isFree) return false; // Locked for free
     if (planConfig.ai_credits === Infinity) return true;
+    if (creditsLoading && !credits) return true;
     return (credits?.ai_credits_remaining ?? 0) > 0;
   };
 
   const canSearch = () => {
+    if (creditsLoading && !credits) return true;
     return (credits?.search_credits_remaining ?? 0) > 0;
   };
 

@@ -53,7 +53,7 @@ export function DataManagement() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `influenceiq-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `mushin-data-export-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
       toast({ title: "Data exported successfully" });

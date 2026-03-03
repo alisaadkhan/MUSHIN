@@ -206,7 +206,7 @@ export function CampaignAnalytics({ stages, cards, campaign }: CampaignAnalytics
                     <XAxis dataKey="short" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
                     <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} domain={[0, 100]} unit="%" />
                     <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="rate" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="rate" fill="#A855F7" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ChartContainer>
               </CardContent>
@@ -230,7 +230,7 @@ export function CampaignAnalytics({ stages, cards, campaign }: CampaignAnalytics
                     <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v.toLocaleString()}`} />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Area type="monotone" dataKey="budget" stroke="hsl(var(--muted-foreground))" fill="hsl(var(--muted))" strokeDasharray="5 5" />
-                    <Area type="monotone" dataKey="spent" stroke="hsl(var(--primary))" fill="hsl(var(--primary) / 0.15)" />
+                    <Area type="monotone" dataKey="spent" stroke="#A855F7" fill="hsl(var(--primary) / 0.15)" />
                   </AreaChart>
                 </ChartContainer>
               </CardContent>

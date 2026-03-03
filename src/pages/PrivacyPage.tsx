@@ -7,7 +7,7 @@ export default function PrivacyPage() {
   useEffect(() => { document.documentElement.classList.add("dark"); }, []);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <div className="fixed inset-0 -z-10 animated-mesh-bg" />
       <div className="fixed inset-0 -z-10 dot-grid-overlay" />
 
@@ -41,7 +41,7 @@ export default function PrivacyPage() {
         <p>We implement industry-standard security measures including encryption at rest and in transit, role-based access control, and regular security audits.</p>
 
         <h2>6. Contact</h2>
-        <p>For privacy-related inquiries, contact us at <span className="text-primary">privacy@influenceiq.com</span>.</p>
+        <p>For privacy-related inquiries, contact us at <span className="text-primary">privacy@mushin.com</span>.</p>
       </main>
 
       <MarketingFooter />

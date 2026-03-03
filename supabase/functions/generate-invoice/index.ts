@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { PDFDocument, rgb } from "https://cdn.skypack.dev/pdf-lib";
+import { PDFDocument, rgb } from "https://esm.sh/pdf-lib@1.17.1";
+
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -22,14 +23,27 @@ Deno.serve(async (req) => {
         const { payment_id } = await req.json();
         if (!payment_id) throw new Error("Payment ID is required");
 
-        // Fetch payment details
-        const { data: payment, error: fetchErr } = await supabase
-            .from("payments")
-            .select("*, campaigns(name), influencer_profiles(full_name, username), workspaces(name, billing_email)")
-            .eq("id", payment_id)
+        // Fetch subscription from subscriptions table using payment_id as workspace_id
+        const { data: subscription } = await supabase
+            .from("subscriptions")
+            .select("*, workspaces(name)")
+            .eq("workspace_id", payment_id)  // payment_id used as workspace_id for invoice lookup
             .single();
 
-        if (fetchErr || !payment) throw new Error("Payment not found");
+        if (!subscription) throw new Error("Subscription not found");
+
+        // Use subscription data to populate invoice
+        const payment = {
+            id: payment_id,
+            created_at: new Date().toISOString(),
+            status: 'paid',
+            amount: subscription.plan === 'pro' ? 29 : subscription.plan === 'business' ? 79 : 0,
+            currency: 'USD',
+            plan: subscription.plan,
+            billing_period: `${new Date(subscription.current_period_start).toLocaleDateString()} – ${new Date(subscription.current_period_end).toLocaleDateString()}`,
+            workspace_name: subscription.workspaces?.name || "InfluenceIQ Workspace",
+            invoice_number: `INV-${Date.now()}`,
+        };
 
         // Create a simple PDF Invoice using pdf-lib
         const pdfDoc = await PDFDocument.create();
@@ -41,11 +55,12 @@ Deno.serve(async (req) => {
         page.drawText(`Date: ${new Date(payment.created_at).toLocaleDateString()}`, { x: 50, y: height - 110, size: 12 });
         page.drawText(`Status: ${payment.status.toUpperCase()}`, { x: 50, y: height - 130, size: 12 });
 
-        page.drawText(`To: ${payment.influencer_profiles?.full_name || payment.influencer_profiles?.username}`, { x: 50, y: height - 170, size: 14 });
-        page.drawText(`From: ${payment.workspaces?.name}`, { x: 350, y: height - 170, size: 14 });
+        page.drawText(`To: ${payment.workspace_name}`, { x: 50, y: height - 170, size: 14 });
+        page.drawText(`From: InfluenceIQ Inc.`, { x: 350, y: height - 170, size: 14 });
 
-        page.drawText(`Campaign: ${payment.campaigns?.name}`, { x: 50, y: height - 230, size: 14 });
-        page.drawText(`Amount Due: $${payment.amount} ${payment.currency}`, { x: 50, y: height - 260, size: 18, color: rgb(0.1, 0.6, 0.3) });
+        page.drawText(`Plan: ${payment.plan.toUpperCase()} Plan`, { x: 50, y: height - 230, size: 14 });
+        page.drawText(`Period: ${payment.billing_period}`, { x: 50, y: height - 260, size: 14 });
+        page.drawText(`Amount Due: $${payment.amount} ${payment.currency}`, { x: 50, y: height - 290, size: 18, color: rgb(0.1, 0.6, 0.3) });
 
         const pdfBytes = await pdfDoc.save();
 

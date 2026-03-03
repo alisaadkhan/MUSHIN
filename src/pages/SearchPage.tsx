@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Search as SearchIcon, Filter, ExternalLink, Loader2, Bookmark,
-  AlertCircle, Lock, Sparkles, Plus, MoreHorizontal, MapPin, Instagram, Youtube,
+  AlertCircle, Lock, Sparkles, Plus, MoreHorizontal, MapPin, Instagram, Youtube, Info, ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,8 +42,10 @@ const PK_CITIES = [
 ];
 
 const PK_NICHES = [
-  "Fashion", "Food", "Beauty", "Cricket", "Drama",
-  "Islamic", "Tech", "Education", "Lifestyle", "Gaming",
+  "Fashion", "Food", "Beauty", "Cricket", "Tech",
+  "Fitness", "Travel", "Gaming", "Music", "Education",
+  "Comedy", "Lifestyle", "Finance", "Health",
+  "Automotive", "Photography", "Art", "Sports", "News",
 ];
 
 const FOLLOWER_RANGES = [
@@ -55,15 +57,7 @@ const FOLLOWER_RANGES = [
   { label: "Mega (500k+)", value: "500k+" },
 ];
 
-// ─── Pakistani mock creators shown in empty/initial state ──────────────────
-const PK_SAMPLE_CREATORS = [
-  { name: "Zara Khalid", handle: "zarakhalid", platform: "Instagram", city: "Karachi", niche: "Fashion", followers: "1.2M", engagement: "4.8%", score: 97 },
-  { name: "Hassan Ali", handle: "hassanali_food", platform: "YouTube", city: "Lahore", niche: "Food", followers: "890K", engagement: "6.1%", score: 94 },
-  { name: "Ayesha Noor", handle: "ayeshanoor", platform: "TikTok", city: "Islamabad", niche: "Lifestyle", followers: "2.1M", engagement: "3.9%", score: 91 },
-  { name: "Bilal Chaudhry", handle: "bilalchaudhry", platform: "Instagram", city: "Faisalabad", niche: "Cricket", followers: "540K", engagement: "5.3%", score: 88 },
-  { name: "Sana Javed", handle: "sanajaved_official", platform: "TikTok", city: "Multan", niche: "Drama", followers: "320K", engagement: "7.2%", score: 85 },
-  { name: "Omar Sheikh", handle: "omar_tech", platform: "YouTube", city: "Karachi", niche: "Tech", followers: "410K", engagement: "4.5%", score: 90 },
-];
+
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 interface SearchResult {
@@ -72,9 +66,23 @@ interface SearchResult {
   snippet: string;
   username: string;
   platform: string;
-  displayUrl: string;
+  displayUrl?: string;
   extracted_followers?: number;
+  imageUrl?: string;
+  niche?: string;
   city?: string;
+  city_extracted?: string;
+  engagement_rate?: number;
+  engagement_is_estimated?: boolean;
+  bio?: string;
+  full_name?: string;
+  is_enriched?: boolean;
+  enrichment_status?: string;
+  is_stale?: boolean;
+  last_enriched_at?: string | null;
+  enrichment_ttl_days?: number;
+  engagement_source?: "real_eval" | "real_enriched" | "benchmark_estimate";
+  engagement_benchmark_bucket?: string;
 }
 
 function formatFollowers(n: number): string {
@@ -292,10 +300,18 @@ export default function SearchPage() {
         </Alert>
       )}
 
+      {/* Compliance Disclaimer */}
+      <Alert className="border-blue-200 bg-blue-50/50 text-blue-800 backdrop-blur-sm">
+        <Info className="h-4 w-4 text-blue-600" />
+        <AlertDescription>
+          Instagram and TikTok data is sourced via Apify. YouTube data comes directly from the official YouTube Data API v3.
+        </AlertDescription>
+      </Alert>
+
       <div className="flex gap-6">
         {/* ── Sidebar Filters ───────────────────────────────────── */}
         <aside className="w-64 flex-shrink-0 hidden lg:block space-y-4">
-          <div className="bg-white/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-5 space-y-5">
+          <div className="bg-background/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-5 space-y-5">
             <div className="flex items-center gap-2">
               <Filter size={15} strokeWidth={1.5} className="text-primary" />
               <h3 className="text-sm font-semibold text-foreground">Filters</h3>
@@ -387,13 +403,13 @@ export default function SearchPage() {
                 placeholder={isAiSearch
                   ? "Describe the ideal Pakistani creator (e.g., Urdu food blogger from Lahore)..."
                   : "Search by name, handle, or niche (e.g. Karachi fashion)..."}
-                className={`w-full h-10 pl-9 pr-4 rounded-lg border bg-white/80 backdrop-blur-md text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring ${isAiSearch ? "border-primary/50 placeholder:text-primary/50" : "border-border placeholder:text-muted-foreground"}`}
+                className={`w-full h-10 pl-9 pr-4 rounded-lg border bg-background/80 backdrop-blur-md text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring ${isAiSearch ? "border-primary/50 placeholder:text-primary/50" : "border-border placeholder:text-muted-foreground"}`}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               />
             </div>
-            <div className="flex items-center space-x-2 bg-white/50 border border-white/50 px-3 h-10 rounded-lg shrink-0">
+            <div className="flex items-center space-x-2 bg-card/50 border border-white/50 px-3 h-10 rounded-lg shrink-0">
               <Switch id="ai-mode" checked={isAiSearch} onCheckedChange={setIsAiSearch} className="data-[state=checked]:bg-primary" />
               <Label htmlFor="ai-mode" className="text-xs font-medium cursor-pointer flex items-center gap-1">
                 <Sparkles className="h-3 w-3" /> AI Mode
@@ -428,7 +444,7 @@ export default function SearchPage() {
           {loading && (
             <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="bg-white/50 backdrop-blur-sm border border-border/50 rounded-2xl p-5 space-y-4">
+                <div key={i} className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-5 space-y-4">
                   <div className="flex items-start gap-3">
                     <Skeleton className="h-10 w-10 rounded-full" />
                     <div className="space-y-2 flex-1"><Skeleton className="h-4 w-24" /><Skeleton className="h-3 w-16" /></div>
@@ -442,7 +458,10 @@ export default function SearchPage() {
           {/* Results */}
           {!loading && searched && results.length > 0 && (
             <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-              {results.map((c, i) => (
+              {(selectedNiches.length > 0
+                ? results.filter((r) => !r.niche || selectedNiches.includes(r.niche))
+                : results
+              ).map((c, i) => (
                 <ResultCard
                   key={`${c.platform}-${c.username}-${i}`}
                   c={c}
@@ -465,65 +484,24 @@ export default function SearchPage() {
             </div>
           )}
 
-          {/* Initial / empty state — show Pakistani sample creators */}
+          {/* Initial / empty state */}
           {!loading && !searched && (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-              <div className="space-y-4">
-                <div className="flex flex-col items-center justify-center py-8 text-center bg-white/50 backdrop-blur-sm border border-white/50 shadow-sm rounded-2xl">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 mb-3">
-                    <SearchIcon className="h-7 w-7 text-primary" />
-                  </div>
-                  <h3 className="font-serif text-lg font-semibold text-foreground mb-1">Find Pakistani Creators</h3>
-                  <p className="text-sm text-muted-foreground max-w-md">
-                    Search by name, niche, or city — filter by Karachi, Lahore, Islamabad and 9 more cities. Each search uses 1 credit.
-                  </p>
+              <div className="flex flex-col items-center justify-center py-16 text-center bg-card/50 backdrop-blur-sm border border-white/50 shadow-sm rounded-2xl">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 mb-3">
+                  <SearchIcon className="h-7 w-7 text-primary" />
                 </div>
-
-                {/* Sample Pakistani creators grid */}
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
-                  🇵🇰 Sample Pakistani Creators
+                <h3 className="font-serif text-lg font-semibold text-foreground mb-1">Find Pakistani Creators</h3>
+                <p className="text-sm text-muted-foreground max-w-md">
+                  Search by name, niche, or city — filter by Karachi, Lahore, Islamabad and 9 more cities. Each search uses 1 credit.
                 </p>
-                <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {PK_SAMPLE_CREATORS.map((c) => (
-                    <div key={c.handle}
-                      className="bg-white/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-5 opacity-80">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary uppercase">
-                            {c.name.split(" ").map(n => n[0]).join("")}
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-foreground">{c.name}</p>
-                            <p className="text-xs text-muted-foreground">@{c.handle}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <MapPin className="h-3 w-3" />{c.city}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 mb-4">
-                        <span className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5 flex items-center gap-1">
-                          <PlatformIcon platform={c.platform} />{c.platform}
-                        </span>
-                        <span className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5">{c.niche}</span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 text-center">
-                        <div><p className="text-xs text-muted-foreground">Followers</p><p className="text-sm font-semibold data-mono">{c.followers}</p></div>
-                        <div><p className="text-xs text-muted-foreground">Engagement</p><p className="text-sm font-semibold data-mono">{c.engagement}</p></div>
-                        <div><p className="text-xs text-muted-foreground">IQ Score</p>
-                          <p className="text-sm font-bold data-mono" style={{ color: "hsl(var(--aurora-violet))" }}>{c.score}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
             </motion.div>
           )}
 
           {/* No results */}
           {!loading && searched && results.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 text-center bg-white/50 backdrop-blur-sm border border-white/50 shadow-sm rounded-2xl">
+            <div className="flex flex-col items-center justify-center py-20 text-center bg-card/50 backdrop-blur-sm border border-white/50 shadow-sm rounded-2xl">
               <SearchIcon className="h-10 w-10 text-muted-foreground mb-3" />
               <h3 className="font-serif text-lg font-semibold text-foreground mb-1">No Results Found</h3>
               <p className="text-sm text-muted-foreground max-w-md">
@@ -607,19 +585,36 @@ export default function SearchPage() {
 
 // ─── Result Card sub-component ────────────────────────────────────────────────
 function ResultCard({ c, isFreePlan, lists, cachedScores, evaluatingUsername, evalLoading, canUseAI, selectedNiches, navigate, evaluateInfluencer, setEvaluatingUsername, setCachedScores, handleAddToList, setPendingAddResult, setShowCreateList }: any) {
+  const displayName = c.full_name || c.title || c.username;
+  const initials = displayName.split(" ").map((n: string) => n[0]).slice(0, 2).join("") || "?";
+  const city = c.city_extracted || c.city;
   return (
-    <div className={`bg-white/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-5 hover:-translate-y-1 hover:shadow-md transition-all duration-300 relative ${isFreePlan ? "blur-sm pointer-events-none select-none" : ""}`}>
+    <div className={`bg-background/80 backdrop-blur-md border border-white/50 shadow-sm glass-card-hover rounded-2xl p-5 transition-all duration-300 relative ${isFreePlan ? "blur-sm pointer-events-none select-none" : ""}`}>
+      {c.is_enriched && (
+        <div className="absolute -top-3 -right-2 pointer-events-none">
+          <Badge className="bg-green-500 hover:bg-green-600 shadow-sm gap-1 px-2 py-0.5 pointer-events-none">
+            <ShieldCheck className="h-3 w-3" /> Verified
+          </Badge>
+        </div>
+      )}
+
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3 cursor-pointer"
           onClick={() => navigate(`/influencer/${c.platform.toLowerCase()}/${c.username.replace("@", "")}`)}>
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary uppercase">
-            {(c.title || c.username).split(" ").map((n: string) => n[0]).slice(0, 2).join("") || "?"}
+
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary uppercase overflow-hidden flex-shrink-0 shadow-[0_0_0_2px_hsl(var(--primary)/0.1)]">
+            {c.imageUrl
+              ? <img src={c.imageUrl} alt={displayName} className="w-full h-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              : <span>{initials}</span>
+            }
           </div>
-          <div>
-            <p className="text-sm font-medium text-foreground truncate max-w-[120px]">{c.title}</p>
-            <p className="text-xs text-muted-foreground truncate max-w-[120px]">@{c.username}</p>
+          <div className="overflow-hidden">
+            <p className="text-sm font-medium text-foreground truncate max-w-[120px]">{displayName}</p>
+            <p className="text-xs text-muted-foreground truncate max-w-[120px]">@{c.username.replace("@", "")}</p>
           </div>
         </div>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground">
@@ -649,19 +644,27 @@ function ResultCard({ c, isFreePlan, lists, cachedScores, evaluatingUsername, ev
         </DropdownMenu>
       </div>
 
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
         <span className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5 flex items-center gap-1">
           <PlatformIcon platform={c.platform} /> {c.platform}
         </span>
-        <span className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5">{selectedNiches[0] || "General"}</span>
-        {c.city && (
+        {c.niche && (
+          <span className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5 font-medium">{c.niche}</span>
+        )}
+        {city && (
           <span className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5 flex items-center gap-1">
-            <MapPin className="h-2.5 w-2.5" />{c.city}
+            <MapPin className="h-2.5 w-2.5" />{city}
           </span>
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-2 text-center mt-4">
+      {c.bio && (
+        <div className="mb-3 text-xs text-muted-foreground/80 line-clamp-2">
+          {c.bio}
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-2 text-center mt-4 border-t border-border/50 pt-4">
         <div>
           <p className="text-xs text-muted-foreground">Followers</p>
           <p className="text-sm font-semibold text-foreground data-mono">
@@ -669,14 +672,49 @@ function ResultCard({ c, isFreePlan, lists, cachedScores, evaluatingUsername, ev
           </p>
         </div>
         <div>
-          <p className="text-xs text-muted-foreground">Engagement</p>
-          <p className="text-sm font-semibold text-foreground data-mono">{(Math.random() * 5 + 1).toFixed(1)}%</p>
+          <div className="flex items-center justify-center gap-1">
+            <p className="text-xs text-muted-foreground">Engagement</p>
+          </div>
+          <p className="text-sm font-semibold text-foreground data-mono">
+            {c.engagement_rate != null ? `${c.engagement_rate.toFixed(1)}%` : "—"}
+          </p>
+          <div className="flex justify-center mt-1">
+            {/* Engagement accuracy badge */}
+            {c.is_enriched && (
+              <span
+                title={c.is_stale
+                  ? `Real data from enrichment but over ${c.enrichment_ttl_days ?? 30} days old. Re-enrich for fresh data.`
+                  : `Verified real engagement rate from ${c.last_enriched_at ? new Date(c.last_enriched_at).toLocaleDateString() : "recent"} enrichment`
+                }
+                className={`text-[9px] font-bold px-1.5 py-0.5 rounded cursor-help ${
+                  c.is_stale
+                    ? "bg-amber-100 text-amber-700"
+                    : "bg-emerald-100 text-emerald-700"
+                }`}
+              >
+                {c.is_stale ? "STALE" : "REAL"}
+              </span>
+            )}
+            {!c.is_enriched && c.engagement_source === "benchmark_estimate" && (
+              <span
+                title={`Industry benchmark for ${c.engagement_benchmark_bucket ?? "this"}-tier ${c.platform} accounts. Enrich for real data.`}
+                className="text-[9px] font-bold bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded cursor-help"
+              >
+                BENCHMARK
+              </span>
+            )}
+            {!c.is_enriched && c.engagement_source !== "benchmark_estimate" && (
+              <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                EST
+              </span>
+            )}
+          </div>
         </div>
         <div>
           <p className="text-xs text-muted-foreground">IQ Score</p>
-          {cachedScores[`${c.platform}-${c.username}`] != null ? (
+          {cachedScores[`${c.platform} - ${c.username}`] != null ? (
             <div className="flex justify-center mt-1">
-              <EvaluationScoreBadge score={cachedScores[`${c.platform}-${c.username}`]} size="sm" />
+              <EvaluationScoreBadge score={cachedScores[`${c.platform} - ${c.username}`]} size="sm" />
             </div>
           ) : (
             <Button
@@ -691,7 +729,7 @@ function ResultCard({ c, isFreePlan, lists, cachedScores, evaluatingUsername, ev
                   title: c.title, link: c.link,
                 });
                 if (result) {
-                  setCachedScores((prev: any) => ({ ...prev, [`${c.platform}-${c.username}`]: result.overall_score }));
+                  setCachedScores((prev: any) => ({ ...prev, [`${c.platform} - ${c.username}`]: result.overall_score }));
                 }
                 setEvaluatingUsername(null);
               }}

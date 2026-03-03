@@ -5,64 +5,122 @@ const corsHeaders = {
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-Deno.serve(async (req) => {
+// Campaign metrics aggregation function.
+// Reads from campaign_metrics table (populated by track-click via tracking links).
+// Does NOT generate mock data — only returns real tracked click data.
+// If no real data exists, returns empty metrics with a clear data_available: false flag.
+
+Deno.serve(async (req: Request) => {
     if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
     try {
-        // This endpoint should ideally be triggered by a CRON (e.g. Supabase pg_cron)
-        // We check for a secure service key or a specific cron-secret
         const authHeader = req.headers.get("Authorization");
-        if (!authHeader?.startsWith("Bearer ") && req.headers.get("x-cron-secret") !== Deno.env.get("CRON_SECRET")) {
-            return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+        if (!authHeader?.startsWith("Bearer ")) {
+            return new Response(JSON.stringify({ error: "Unauthorized" }), {
+                status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+        }
+
+        const token = authHeader.replace("Bearer ", "");
+        const supabase = createClient(
+            Deno.env.get("SUPABASE_URL")!,
+            Deno.env.get("SUPABASE_ANON_KEY")!,
+            { global: { headers: { Authorization: authHeader } } }
+        );
+
+        const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+        if (authErr || !user) {
+            return new Response(JSON.stringify({ error: "Unauthorized" }), {
+                status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+        }
+
+        const url = new URL(req.url);
+        const campaign_id = url.searchParams.get("campaign_id");
+        const days = Math.min(parseInt(url.searchParams.get("days") || "30", 10), 90);
+
+        if (!campaign_id) {
+            return new Response(JSON.stringify({ error: "campaign_id required" }), {
+                status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
         }
 
         const serviceClient = createClient(
             Deno.env.get("SUPABASE_URL")!,
-            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+            { auth: { autoRefreshToken: false, persistSession: false } }
         );
 
-        // 1. Get all active tracking links that need metric updates for yesterday
-        // In a real system, you'd integrate with Shopify API, WooCommerce, or Google Analytics 
-        // to map traffic via the UTMs / tracking codes here.
-        const { data: links, error: fetchErr } = await serviceClient
-            .from("tracking_links")
-            .select("id, tracking_code, influencer_id");
+        // Verify user has access to this campaign via RLS
+        const { data: campaign, error: campaignErr } = await supabase
+            .from("campaigns")
+            .select("id, name, workspace_id, status")
+            .eq("id", campaign_id)
+            .single();
 
-        if (fetchErr || !links) throw fetchErr;
-
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const dateStr = yesterday.toISOString().split('T')[0];
-
-        // Simulate fetching from an external provider (like a Shopify GraphQL query)
-        const metricsToUpsert = links.map(link => {
-            // Mock algorithm for daily stats (e.g. an influencer got 150 clicks, 3 sales on average)
-            const mockClicks = Math.floor(Math.random() * 200);
-            const mockConversions = Math.floor(mockClicks * 0.02); // 2% CVR
-            const mockRevenue = mockConversions * 45.99; // $45.99 AOV
-
-            return {
-                tracking_link_id: link.id,
-                influencer_id: link.influencer_id,
-                date: dateStr,
-                clicks: mockClicks,
-                conversions: mockConversions,
-                revenue_generated: mockRevenue
-            };
-        });
-
-        if (metricsToUpsert.length > 0) {
-            const { error: upsertErr } = await serviceClient
-                .from("campaign_metrics")
-                .upsert(metricsToUpsert, { onConflict: "tracking_link_id, date" });
-
-            if (upsertErr) throw upsertErr;
+        if (campaignErr || !campaign) {
+            return new Response(JSON.stringify({ error: "Campaign not found or access denied" }), {
+                status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
         }
 
-        return new Response(JSON.stringify({ success: true, processed: metricsToUpsert.length }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        // Fetch real metric data for this campaign's tracking links
+        const since = new Date(Date.now() - days * 86400000).toISOString().split("T")[0];
+
+        const { data: metrics, error: metricsErr } = await serviceClient
+            .from("campaign_metrics")
+            .select(`
+                date, clicks, conversions, revenue_generated,
+                tracking_links!inner(campaign_id, influencer_id)
+            `)
+            .eq("tracking_links.campaign_id", campaign_id)
+            .gte("date", since)
+            .order("date", { ascending: true });
+
+        if (metricsErr) throw metricsErr;
+
+        // Aggregate real metrics
+        const totalClicks = (metrics || []).reduce((s, m) => s + (m.clicks || 0), 0);
+        const totalConversions = (metrics || []).reduce((s, m) => s + (m.conversions || 0), 0);
+        const totalRevenue = (metrics || []).reduce((s, m) => s + parseFloat(m.revenue_generated || "0"), 0);
+
+        // Daily series for charting
+        const dailySeries = (metrics || []).reduce((acc: Record<string, any>, m) => {
+            if (!acc[m.date]) acc[m.date] = { date: m.date, clicks: 0, conversions: 0, revenue: 0 };
+            acc[m.date].clicks += m.clicks || 0;
+            acc[m.date].conversions += m.conversions || 0;
+            acc[m.date].revenue += parseFloat(m.revenue_generated || "0");
+            return acc;
+        }, {});
+
+        const data_available = totalClicks > 0;
+
+        return new Response(JSON.stringify({
+            campaign_id,
+            campaign_name: campaign.name,
+            period_days: days,
+            data_available,
+            data_source: "tracking_links",
+            warning: !data_available
+                ? "No tracking data yet. Share campaign tracking links to start recording real clicks."
+                : null,
+            summary: {
+                total_clicks: totalClicks,
+                total_conversions: totalConversions,
+                total_revenue_usd: parseFloat(totalRevenue.toFixed(2)),
+                conversion_rate: totalClicks > 0 ? parseFloat(((totalConversions / totalClicks) * 100).toFixed(2)) : 0,
+                avg_order_value: totalConversions > 0 ? parseFloat((totalRevenue / totalConversions).toFixed(2)) : 0,
+                roi_note: "Revenue figures are from tracked link clicks only. Untracked channels are not included."
+            },
+            daily_series: Object.values(dailySeries),
+        }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
 
     } catch (err: any) {
-        console.error("Fetch Metrics Error:", err);
-        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+        console.error("[fetch-campaign-metrics] Error:", err);
+        return new Response(JSON.stringify({ error: err.message }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
     }
 });

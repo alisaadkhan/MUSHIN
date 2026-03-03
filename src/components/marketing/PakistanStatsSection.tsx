@@ -10,7 +10,7 @@ const STATS = [
     { value: "10,000+", label: "Pakistani Creators Indexed" },
     { value: "12", label: "Major Cities Covered" },
     { value: "₨4.2×", label: "Average Campaign ROI" },
-    { value: "80%", label: "Top PK Brands Use InfluenceIQ" },
+    { value: "80%", label: "Top PK Brands Use MUSHIN" },
 ];
 
 // Pakistani creators shown on the map

@@ -10,7 +10,7 @@ export interface WebhookPayload {
  * Fire a no-cors POST to a webhook URL. Fails silently.
  */
 export async function fireWebhook(url: string | null | undefined, payload: WebhookPayload) {
-  if (!url) return;
+  if (!url || !isSafeWebhookUrl(url)) return; // SSRF guard
   try {
     await fetch(url, {
       method: "POST",
@@ -27,7 +27,7 @@ export async function fireWebhook(url: string | null | undefined, payload: Webho
  * Fire a Slack-formatted message to a webhook URL. Fails silently.
  */
 export async function fireSlackWebhook(url: string | null | undefined, text: string) {
-  if (!url) return;
+  if (!url || !isSafeWebhookUrl(url)) return; // SSRF guard
   try {
     await fetch(url, {
       method: "POST",
@@ -41,7 +41,33 @@ export async function fireSlackWebhook(url: string | null | undefined, text: str
 }
 
 /**
+ * Validate that a URL is safe to fire a webhook to (no SSRF).
+ * Only allows https:// and a small set of known webhook domains.
+ */
+function isSafeWebhookUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return false;
+    // Block private/loopback ranges
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host === "localhost" ||
+      host.startsWith("127.") ||
+      host.startsWith("10.") ||
+      host.startsWith("192.168.") ||
+      host.endsWith(".internal") ||
+      host.endsWith(".local")
+    ) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Fetch workspace integration settings from the workspaces table.
+ * NOTE: hubspot_api_key is intentionally NOT returned — it must never reach the frontend.
  */
 export async function getIntegrationSettings(workspaceId: string) {
   const { data } = await supabase
@@ -53,8 +79,8 @@ export async function getIntegrationSettings(workspaceId: string) {
   return {
     zapier_webhook_url: (s?.zapier_webhook_url as string) || null,
     google_sheets_webhook_url: (s?.google_sheets_webhook_url as string) || null,
-    hubspot_api_key: (s?.hubspot_api_key as string) || null,
     slack_webhook_url: (s?.slack_webhook_url as string) || null,
+    // hubspot_api_key intentionally omitted — server-side only
   };
 }
 

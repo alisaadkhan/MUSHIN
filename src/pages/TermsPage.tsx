@@ -7,7 +7,7 @@ export default function TermsPage() {
   useEffect(() => { document.documentElement.classList.add("dark"); }, []);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <div className="fixed inset-0 -z-10 animated-mesh-bg" />
       <div className="fixed inset-0 -z-10 dot-grid-overlay" />
 
@@ -26,10 +26,10 @@ export default function TermsPage() {
         <p className="text-muted-foreground">Last updated: February 2026</p>
 
         <h2>1. Acceptance</h2>
-        <p>By using InfluenceIQ, you agree to these terms. If you do not agree, please do not use the platform.</p>
+        <p>By using MUSHIN, you agree to these terms. If you do not agree, please do not use the platform.</p>
 
         <h2>2. Service Description</h2>
-        <p>InfluenceIQ provides influencer discovery, campaign management, and analytics tools. Features vary by subscription plan.</p>
+        <p>MUSHIN provides influencer discovery, campaign management, and analytics tools. Features vary by subscription plan.</p>
 
         <h2>3. User Responsibilities</h2>
         <p>You are responsible for maintaining the security of your account credentials and for all activity under your account.</p>
@@ -38,7 +38,7 @@ export default function TermsPage() {
         <p>Paid plans are billed monthly or annually. You may cancel at any time; access continues until the end of the billing period.</p>
 
         <h2>5. Limitation of Liability</h2>
-        <p>InfluenceIQ is provided "as is". We are not liable for indirect, incidental, or consequential damages arising from use of the service.</p>
+        <p>MUSHIN is provided "as is". We are not liable for indirect, incidental, or consequential damages arising from use of the service.</p>
 
         <h2>6. Changes to Terms</h2>
         <p>We may update these terms periodically. Continued use of the service constitutes acceptance of the updated terms.</p>

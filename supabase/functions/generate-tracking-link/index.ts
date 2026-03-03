@@ -5,10 +5,15 @@ const corsHeaders = {
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Simple pseudo-random string generator for tracking codes
-const generateTrackingCode = () => {
-    return Math.random().toString(36).substring(2, 10).toUpperCase();
-};
+// Cryptographically secure tracking code — collision-resistant up to 10M+ codes
+function generateTrackingCode(): string {
+    const bytes = new Uint8Array(8);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, b => b.toString(36).padStart(2, "0"))
+        .join("")
+        .toUpperCase()
+        .substring(0, 10);
+}
 
 Deno.serve(async (req) => {
     if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });

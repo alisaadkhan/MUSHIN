@@ -1,2 +1,0 @@
-ALTER TABLE public.outreach_log ADD COLUMN IF NOT EXISTS opened_at TIMESTAMPTZ;
-ALTER TABLE public.outreach_log ADD COLUMN IF NOT EXISTS clicked_at TIMESTAMPTZ;

@@ -19,10 +19,10 @@ interface DashboardStatsProps {
 
 export function DashboardStats({ activeCreators, totalBudget }: DashboardStatsProps) {
   const stats = [
-    { label: "Active Creators", value: activeCreators.toLocaleString(), icon: Users, trend: "+23%" },
-    { label: "Impressions", value: "4.2M", icon: Eye, trend: "+18%" },
-    { label: "Avg. ROI", value: "847%", icon: TrendingUp, trend: "+12%" },
-    { label: "Revenue", value: `$${(totalBudget / 1000).toFixed(0)}K`, icon: DollarSign, trend: "+8%" },
+    { label: "Active Creators", value: activeCreators.toLocaleString(), icon: Users, trend: null },
+    { label: "Impressions", value: "—", icon: Eye, trend: null },
+    { label: "Avg. ROI", value: "—", icon: TrendingUp, trend: null },
+    { label: "Revenue", value: totalBudget > 0 ? `$${(totalBudget / 1000).toFixed(0)}K` : "—", icon: DollarSign, trend: null },
   ];
 
   return (
@@ -37,7 +37,7 @@ export function DashboardStats({ activeCreators, totalBudget }: DashboardStatsPr
               </div>
               <div className="flex items-end gap-2">
                 <p className="text-2xl font-bold data-mono">{stat.value}</p>
-                <span className="text-xs font-medium text-green-500 dark:text-green-400 mb-0.5">{stat.trend}</span>
+                {stat.trend && <span className="text-xs font-medium text-green-500 dark:text-green-400 mb-0.5">{stat.trend}</span>}
               </div>
             </CardContent>
           </Card>

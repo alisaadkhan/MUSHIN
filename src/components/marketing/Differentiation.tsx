@@ -48,7 +48,7 @@ export function Differentiation() {
       >
         <motion.div variants={fadeUp} className="text-center space-y-4">
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
-            Why Teams Choose InfluenceIQ Over{" "}
+            Why Teams Choose MUSHIN Over{" "}
             <span className="aurora-text">Legacy Platforms</span>
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">

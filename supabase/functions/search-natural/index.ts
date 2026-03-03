@@ -44,12 +44,14 @@ Deno.serve(async (req) => {
 
         const { data: ws } = await serviceClient
             .from("workspaces")
-            .select("ai_search_credits_remaining")
+            .select("ai_credits_remaining")
             .eq("id", workspaceId)
             .single();
 
-        if (!ws || ws.ai_search_credits_remaining <= 0) {
-            return new Response(JSON.stringify({ error: "No AI search credits remaining" }), { status: 403, headers: corsHeaders });
+        if (!ws || ws.ai_credits_remaining <= 0) {
+            return new Response(JSON.stringify({ error: "No AI credits remaining" }), {
+                status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
         }
 
         const { query, platform } = await req.json();
@@ -99,11 +101,15 @@ Deno.serve(async (req) => {
 
         if (searchErr) throw searchErr;
 
-        // 3. Deduct Credit
-        await serviceClient
-            .from("workspaces")
-            .update({ ai_search_credits_remaining: ws.ai_search_credits_remaining - 1 })
-            .eq("id", workspaceId);
+        try {
+            await serviceClient.rpc("consume_ai_credit", { ws_id: workspaceId });
+        } catch (creditErr: any) {
+            if (creditErr.code === "P0001") {
+                return new Response(JSON.stringify({ error: "No AI credits remaining" }), {
+                    status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" }
+                });
+            }
+        }
 
         const hydratedResults = influencers || [];
 
@@ -111,13 +117,13 @@ Deno.serve(async (req) => {
         if (redis && hydratedResults.length > 0) {
             try {
                 // Cache results for 1 hour to prevent duplicate expensive LLM calls
-                await redis.setex(cacheKey, 3600, JSON.stringify(hydratedResults));
+                await redis.set(cacheKey, JSON.stringify(hydratedResults), { ex: 3600 });
             } catch (e) { console.warn("Redis Save Error", e); }
         }
 
         return new Response(JSON.stringify({
             results: hydratedResults,
-            credits_remaining: ws.ai_search_credits_remaining - 1
+            credits_remaining: ws.ai_credits_remaining - 1
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     } catch (err: any) {

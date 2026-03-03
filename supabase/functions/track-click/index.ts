@@ -61,7 +61,16 @@ Deno.serve(async (req) => {
             });
         }
 
-        // 3. Redirect
+        // 3. Redirect — validate URL scheme to prevent open redirect to javascript: or data: URIs
+        let parsedUrl: URL;
+        try {
+            parsedUrl = new URL(link.original_url);
+        } catch {
+            return new Response("Invalid redirect target", { status: 400 });
+        }
+        if (parsedUrl.protocol !== "https:" && parsedUrl.protocol !== "http:") {
+            return new Response("Invalid redirect target", { status: 400 });
+        }
         return Response.redirect(link.original_url, 302);
 
     } catch (err: any) {

@@ -7,6 +7,13 @@ const fadeUp: Variants = {
 };
 const stagger: Variants = { visible: { transition: { staggerChildren: 0.1 } } };
 
+// ─── Replace with your video URL ────────────────────────────────────────────
+// YouTube embed:  "https://www.youtube.com/embed/YOUR_VIDEO_ID"
+// Self-hosted:    "/videos/demo.mp4"
+const VIDEO_URL = "https://www.youtube.com/embed/YOUR_VIDEO_ID";
+const IS_YOUTUBE = VIDEO_URL.includes("youtube.com") || VIDEO_URL.includes("youtu.be");
+// ─────────────────────────────────────────────────────────────────────────────
+
 const FILTERS = ["Instagram", "TikTok", "YouTube"];
 const NICHES = ["Fitness", "Beauty", "Tech"];
 
@@ -47,6 +54,29 @@ export function ProductDemo() {
           </p>
         </motion.div>
 
+        {/* ── Video Section ──────────────────────────────────────────── */}
+        <motion.div variants={fadeUp} className="relative rounded-2xl overflow-hidden"
+          style={{ boxShadow: "0 30px 80px -20px hsl(var(--aurora-violet) / 0.25)" }}
+        >
+          {/* Purple glow ring */}
+          <div className="absolute -inset-px rounded-2xl"
+            style={{ background: "linear-gradient(135deg, hsl(var(--aurora-violet)/0.4), transparent 60%)", pointerEvents: "none", zIndex: 1 }}
+          />
+          <div className="relative aspect-video bg-[#0a0a0a] rounded-2xl overflow-hidden">
+            {IS_YOUTUBE ? (
+              <iframe
+                src={VIDEO_URL}
+                title="Product Demo"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="w-full h-full border-0"
+              />
+            ) : (
+              <video src={VIDEO_URL} controls className="w-full h-full object-cover" />
+            )}
+          </div>
+        </motion.div>
+
         {/* Dashboard mockup */}
         <motion.div
           variants={fadeUp}
@@ -60,7 +90,7 @@ export function ProductDemo() {
               <div className="w-3 h-3 rounded-full" style={{ background: "hsl(45 93% 47% / 0.6)" }} />
               <div className="w-3 h-3 rounded-full bg-primary/60" />
             </div>
-            <span className="text-xs text-muted-foreground ml-3 data-mono">InfluenceIQ — Creator Discovery</span>
+            <span className="text-xs text-muted-foreground ml-3 data-mono">MUSHIN — Creator Discovery</span>
           </div>
 
           <div className="grid md:grid-cols-[240px_1fr] divide-x" style={{ borderColor: "hsl(var(--glass-border))" }}>
