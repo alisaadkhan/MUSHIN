@@ -12,6 +12,12 @@ import { MushinLogo } from "@/components/mushin-brand";
 
 type AuthMode = "sign-in" | "sign-up" | "forgot-password" | "verification-notice" | "mfa-challenge";
 
+const CONSUMER_DOMAINS = [
+  "gmail.com","yahoo.com","hotmail.com","outlook.com","live.com","icloud.com",
+  "aol.com","protonmail.com","ymail.com","googlemail.com","yahoo.co.uk","yahoo.in",
+  "yahoo.com.pk","hotmail.co.uk","msn.com","me.com","mail.com","gmx.com",
+];
+
 export default function Auth() {
   const { user, loading, needsEmailVerification, signIn, signUp, signInWithGoogle, resetPassword, resendVerificationEmail } = useAuth();
   const navigate = useNavigate();
@@ -80,6 +86,15 @@ export default function Auth() {
     e.preventDefault();
     if (password !== confirmPassword) {
       toast({ title: "Passwords don't match", variant: "destructive" });
+      return;
+    }
+    const domain = email.split("@")[1]?.toLowerCase();
+    if (!domain || CONSUMER_DOMAINS.includes(domain)) {
+      toast({
+        title: "Business email required",
+        description: `Sign-ups with @${domain ?? "unknown"} are not allowed. Please use your company email address.`,
+        variant: "destructive",
+      });
       return;
     }
     setSubmitting(true);
@@ -314,6 +329,7 @@ export default function Auth() {
                 <div>
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Email</Label>
                   <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@brand.pk" className="mt-1" required />
+                  <p className="text-[11px] text-muted-foreground mt-1">Work / company email only — no Gmail, Yahoo, or Hotmail</p>
                 </div>
                 <div>
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Password</Label>
