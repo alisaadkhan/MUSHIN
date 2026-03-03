@@ -53,7 +53,11 @@ export function useScrollVideoScrub(
             currentRef.current = next;
 
             const el = video as HTMLVideoElement & { fastSeek?: (time: number) => void };
-            el.fastSeek ? el.fastSeek(next) : (video.currentTime = next);
+            if (el.fastSeek) {
+              el.fastSeek(next);
+            } else {
+              video.currentTime = next;
+            }
           }
         }
 

@@ -56,7 +56,7 @@ function formatFollowers(n: number): string {
 /** Parse AI age_range string like "18-34" or "18-34 (65%)" into bar-chart data. */
 function parseAgeBars(ageRange: string): { range: string; pct: number }[] {
   // Try to extract primary range (e.g. "18-34")
-  const rangeMatch = ageRange.match(/(\d+)[–\-](\d+)/);
+  const rangeMatch = ageRange.match(/(\d+)[–-](\d+)/);
   if (rangeMatch) {
     const low = parseInt(rangeMatch[1]);
     const high = parseInt(rangeMatch[2]);
