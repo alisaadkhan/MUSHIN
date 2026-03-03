@@ -31,6 +31,7 @@ export default function Settings() {
   const [lastName, setLastName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || "");
   const [profileSaving, setProfileSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   useEffect(() => {
     if (profile?.full_name) {
@@ -110,11 +111,40 @@ export default function Settings() {
     }
   }, [workspace?.workspace_id]);
 
-  const handleProfileSave = async () => {
-    if (avatarUrl.trim() && !/^https?:\/\/.+/.test(avatarUrl.trim())) {
-      toast({ title: "Invalid URL", description: "Avatar URL must start with http:// or https://", variant: "destructive" });
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    if (file.size > 1024 * 1024) {
+      toast({ title: "File too large", description: "Avatar must be under 1 MB.", variant: "destructive" });
       return;
     }
+    setAvatarUploading(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `${user.id}/avatar.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
+      const cacheBusted = `${publicUrl}?t=${Date.now()}`;
+      const { error: dbErr } = await supabase
+        .from("profiles")
+        .update({ avatar_url: cacheBusted })
+        .eq("id", user.id);
+      if (dbErr) throw dbErr;
+      setAvatarUrl(cacheBusted);
+      await refreshProfile();
+      toast({ title: "Avatar updated" });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setAvatarUploading(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  };
+
+  const handleProfileSave = async () => {
     setProfileSaving(true);
     try {
       const fullName = `${firstName.trim()} ${lastName.trim()}`.trim() || null;
@@ -329,18 +359,24 @@ export default function Settings() {
                   <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-xl font-bold text-primary border-2 border-primary/20">{initials}</div>
                 )}
                 <div>
-                  <Button variant="outline" size="sm" className="rounded-lg h-8 px-3 font-medium mb-1.5"
-                  onClick={() => (document.querySelector('input[placeholder="https://example.com/avatar.jpg"]') as HTMLInputElement)?.focus()}
-                ><Camera size={14} className="mr-1.5" />Change avatar</Button>
-                  <p className="text-xs text-muted-foreground">JPG, GIF or PNG. 1MB max.</p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground block">Avatar URL</label>
-                <div className="relative">
-                  <Globe size={16} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input type="text" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="https://example.com/avatar.jpg" className="w-full h-10 pl-9 pr-3 rounded-lg border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow" />
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    className="hidden"
+                    onChange={handleAvatarFileChange}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-lg h-8 px-3 font-medium mb-1.5"
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={avatarUploading}
+                  >
+                    {avatarUploading ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <Camera size={14} className="mr-1.5" />}
+                    {avatarUploading ? "Uploading…" : "Upload photo"}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">JPG, PNG, GIF or WebP. 1 MB max.</p>
                 </div>
               </div>
 
