@@ -569,32 +569,6 @@ export default function LandingPage() {
               </span>
             </p>
 
-            {/* CTA buttons — fully interactive */}
-            <div className="flex flex-col sm:flex-row items-center gap-3">
-              <Link
-                to="/auth"
-                className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 transition-colors text-white font-bold px-7 py-3.5 rounded-full text-sm shadow-[0_0_40px_rgba(168,85,247,0.4)] hover:shadow-[0_0_60px_rgba(168,85,247,0.6)]"
-              >
-                Start Free — No Card Needed <ArrowRight className="w-4 h-4" />
-              </Link>
-              <button
-                onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
-                className="flex items-center gap-2 text-white/70 hover:text-white transition-colors text-sm font-medium px-5 py-3 rounded-full border border-white/10 hover:border-white/25 backdrop-blur-sm"
-              >
-                See how it works
-              </button>
-            </div>
-
-            {/* Social proof */}
-            <p className="mt-6 text-xs text-white/35 pointer-events-none">
-              Trusted by 2,800+ marketing teams · Free forever plan available
-            </p>
-          </div>
-
-          {/* Scroll indicator */}
-          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-2 pointer-events-none">
-            <span className="text-white/30 text-xs tracking-widest uppercase">Scroll</span>
-            <div className="w-px h-10 bg-gradient-to-b from-white/30 to-transparent" />
           </div>
 
           {/* Bottom gradient */}
