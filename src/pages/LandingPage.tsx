@@ -437,7 +437,9 @@ export default function LandingPage() {
   const [activeNav, setActiveNav]   = useState<string | null>(null);
   const [navScrolled, setNavScrolled] = useState(false);
   const [pricePeriod, setPricePeriod] = useState<'m' | 'a'>('m');
-  const [heroComplete, setHeroComplete] = useState(false);
+  // heroComplete starts true — sections are in DOM immediately but naturally
+  // hidden below the 300vh hero. The scroll event updates it for the fade-in.
+  const [heroComplete, setHeroComplete] = useState(true);
 
   // ── VIDEO SCRUB REFS ──────────────────────────────────────────────────────
   const targetRef      = useRef(0);
@@ -529,7 +531,7 @@ export default function LandingPage() {
             ref={vRef}
             aria-hidden="true"
             src="/A_seamless_cinematic_transition_from_a_dark_obsidian_c.mp4"
-            playsInline muted preload="auto"
+            autoPlay playsInline muted preload="auto" loop
             className="absolute inset-0 w-full h-full object-cover opacity-80"
             style={{ willChange: 'contents', transform: 'translateZ(0)' }}
           />
