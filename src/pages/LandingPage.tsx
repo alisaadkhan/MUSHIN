@@ -430,103 +430,37 @@ const Ticker = ({ v, s = '' }: { v: number; s?: string }) => {
   return <span ref={r}>0{s}</span>;
 };
 
-/* ─── Canvas Frame Hook (MP4 source) ────────────────────────────────────────── */
-const VIDEO_SRC = '/A_seamless_cinematic_transition_from_a_dark_obsidian_c.mp4';
-
-function drawVideoFrame(canvas: HTMLCanvasElement, video: HTMLVideoElement) {
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-  const dpr = window.devicePixelRatio || 1;
-  const cw  = canvas.offsetWidth;
-  const ch  = canvas.offsetHeight;
-  canvas.width  = cw * dpr;
-  canvas.height = ch * dpr;
-  ctx.scale(dpr, dpr);
-  const vw = video.videoWidth  || cw;
-  const vh = video.videoHeight || ch;
-  const scale = Math.max(cw / vw, ch / vh);
-  const dx = (cw - vw * scale) / 2;
-  const dy = (ch - vh * scale) / 2;
-  ctx.clearRect(0, 0, cw, ch);
-  ctx.drawImage(video, dx, dy, vw * scale, vh * scale);
-}
-
-function useCanvasScrub(
-  canvasRef: React.RefObject<HTMLCanvasElement>,
-  scrollYProgress: ReturnType<typeof useScroll>['scrollYProgress']
-) {
-  const videoRef   = useRef<HTMLVideoElement | null>(null);
-  const seekingRef = useRef(false);
-
-  useEffect(() => {
-    const video = document.createElement('video');
-    video.src       = VIDEO_SRC;
-    video.muted     = true;
-    video.preload   = 'auto';
-    video.playsInline = true;
-    // Keep paused — we control currentTime manually via scroll
-    const keepPaused = () => video.pause();
-    video.addEventListener('play', keepPaused);
-    video.load();
-    videoRef.current = video;
-
-    // Draw first frame once data is ready
-    video.addEventListener('loadeddata', () => { video.currentTime = 0; }, { once: true });
-
-    // Draw to canvas whenever a seek completes
-    const onSeeked = () => {
-      if (canvasRef.current) drawVideoFrame(canvasRef.current, video);
-      seekingRef.current = false;
-    };
-    video.addEventListener('seeked', onSeeked);
-
-    return () => {
-      video.removeEventListener('play', keepPaused);
-      video.removeEventListener('seeked', onSeeked);
-      video.src = '';
-    };
-  }, [canvasRef]);
-
-  // Map scroll 0→1 to video time and seek
-  useMotionValueEvent(scrollYProgress, 'change', (progress) => {
-    const video  = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas || !video.duration) return;
-    if (seekingRef.current) return; // skip if seek in flight
-    seekingRef.current = true;
-    video.currentTime  = progress * video.duration;
-  });
-}
-
 /* ─── Main ───────────────────────────────────────────────────────────────────── */
 export default function LandingPage() {
-  const vwRef     = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const vwRef = useRef<HTMLDivElement>(null);
+  const vRef  = useRef<HTMLVideoElement>(null);
   const [activeNav, setActiveNav]   = useState<string | null>(null);
   const [navScrolled, setNavScrolled] = useState(false);
   const [pricePeriod, setPricePeriod] = useState<'m' | 'a'>('m');
+  // heroComplete starts true — sections are in DOM immediately but naturally
+  // hidden below the 300vh hero. The scroll event updates it for the fade-in.
   const [heroComplete, setHeroComplete] = useState(true);
+
+  // ── VIDEO SCRUB REFS ──────────────────────────────────────────────────────
+  const targetRef      = useRef(0);
+  const currentRef     = useRef(0);
+  const rafRef         = useRef<number>(0);
+  const isScrollingRef = useRef(false);
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const { scrollYProgress } = useScroll({ target: vwRef, offset: ['start start', 'end end'] });
 
-  // Gate sections after hero scroll completes
+  // Gate sections: appear only once hero scrub is fully scrolled through
   useMotionValueEvent(scrollYProgress, 'change', (v) => {
     if (v >= 0.98) setHeroComplete(true);
   });
 
-  // Canvas frame scrubbing
-  useCanvasScrub(canvasRef, scrollYProgress);
-
-  // ── 3-Stage typographic transforms ───────────────────────────────────────
-  // Phase 1: visible 0→0.25, fades+scales out 0.20→0.28
-  const p1Op    = useTransform(scrollYProgress, [0, 0.05, 0.20, 0.28], [1, 1, 1, 0]);
-  const p1Scale = useTransform(scrollYProgress, [0.18, 0.28], [1, 1.06]);
-  // Phase 2: fades in 0.32→0.40, holds, fades out 0.52→0.60
-  const p2Op    = useTransform(scrollYProgress, [0.32, 0.40, 0.52, 0.60], [0, 1, 1, 0]);
-  // Phase 3: fades in 0.65→0.72, holds, fades out 0.82→0.90
-  const p3Op    = useTransform(scrollYProgress, [0.65, 0.72, 0.82, 0.90], [0, 1, 1, 0]);
-  // Bottom gradient
-  const bOp     = useTransform(scrollYProgress, [0.85, 1], [0, 1]);
+  // ── Scroll transforms — identical to Version 2 ────────────────────────────
+  const hOp       = useTransform(scrollYProgress, [0, 0.12], [1, 0]);
+  const hY        = useTransform(scrollYProgress, [0, 0.12], [0, -50]);
+  const textScale = useTransform(scrollYProgress, [0, 0.5],  [1, 1.4]);
+  const textOp    = useTransform(scrollYProgress, [0.1, 0.4, 0.8, 1], [0, 1, 1, 0]);
+  const bOp       = useTransform(scrollYProgress, [0.7, 1],  [0, 1]);
 
   useEffect(() => {
     const onScroll = () => setNavScrolled(window.scrollY > 40);
@@ -590,66 +524,54 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* ── CANVAS HERO — 400vh for 3-phase typography choreography ── */}
-      <div ref={vwRef} className="relative h-[400vh]">
-        <div className="sticky top-0 h-screen overflow-hidden" style={{ background: '#060608' }}>
-
-          {/* Canvas: frame-by-frame scroll scrubbing */}
-          <canvas
-            ref={canvasRef}
+      {/* ── VIDEO HERO — 300vh matches Version 2 ── */}
+      <div ref={vwRef} className="relative h-[140vh]">
+        <div className="sticky top-0 h-screen overflow-hidden" style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 30%, #2d0a5e 0%, #0a0114 50%, #060608 100%)' }}>
+          <video
+            ref={vRef}
             aria-hidden="true"
-            className="absolute inset-0 w-full h-full"
-            style={{ opacity: 0.72 }}
+            src="/A_seamless_cinematic_transition_from_a_dark_obsidian_c.mp4"
+            autoPlay playsInline muted preload="auto" loop
+            className="absolute inset-0 w-full h-full object-cover opacity-40"
+            style={{ willChange: 'contents', transform: 'translateZ(0)' }}
           />
+          {/* Purple ambient overlay — ensures page never looks fully black */}
+          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 70% 55% at 50% 40%, rgba(109,40,217,0.35) 0%, rgba(88,28,135,0.15) 45%, transparent 75%)' }} />
 
-          {/* Purple ambient overlay — always on top of canvas */}
-          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 70% 55% at 50% 40%, rgba(88,28,135,0.30) 0%, rgba(15,5,30,0.20) 55%, transparent 80%)' }} />
+          {/* Watermark */}
+          <motion.div style={{ scale: textScale, opacity: textOp }} className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+            <div className="font-black text-center leading-none select-none" style={{ fontSize: 'clamp(3rem,12vw,10rem)', color: 'rgba(255,255,255,0.06)', letterSpacing: '-0.04em' }}>INFLUENCEIQ</div>
+          </motion.div>
 
-          {/* ── Phase 1 ─────────────────────────────────────────────────────── */}
-          <motion.div
-            style={{ opacity: p1Op, scale: p1Scale }}
-            className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 pointer-events-none z-20"
-          >
-            <h1 className="font-black tracking-tighter leading-[.88] mb-6"
-              style={{ fontSize: 'clamp(3.2rem,8.5vw,7.5rem)', textShadow: '0 4px 60px rgba(0,0,0,0.9)' }}>
+          {/* Hero content — no opacity transform on wrapper; individual elements animate in.
+              hOp (scroll-driven fade) is intentionally omitted here because framer-motion's
+              useScroll can initialise scrollYProgress > 0 on Vercel before layout settles,
+              which makes the wrapper invisible on first paint. Each child handles its own
+              enter animation; the wrapper only carries the parallax-exit y offset. */}
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center px-6 pt-16">
+            <h1
+              className="font-black tracking-tighter leading-[.85] mb-7 pointer-events-none" style={{ fontSize: 'clamp(3.5rem,9vw,8rem)', textShadow: '0 4px 60px rgba(0,0,0,1), 0 0 120px rgba(0,0,0,0.8)', color: 'white' }}>
               FIND AUTHENTIC<br />PAKISTANI<br />INFLUENCERS.
             </h1>
-            <p className="text-lg max-w-md leading-relaxed" style={{ color: 'rgba(255,255,255,0.65)' }}>
-              Discover and collaborate with verified creators from Karachi,<br />Lahore, Islamabad and beyond.
+            <p
+              className="text-lg max-w-md font-normal mb-8 leading-relaxed pointer-events-none"
+            >
+              <span
+                style={{
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.90) 0%, rgba(192,132,252,1) 40%, rgba(255,255,255,0.85) 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                  fontWeight: 500,
+                }}
+              >
+                Discover and collaborate with verified creators from Karachi, Lahore, Islamabad and beyond.
+              </span>
             </p>
-          </motion.div>
 
-          {/* ── Phase 2 ─────────────────────────────────────────────────────── */}
-          <motion.div
-            style={{ opacity: p2Op }}
-            className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 pointer-events-none z-20"
-          >
-            <h2 className="font-black tracking-tighter leading-[.88] mb-6"
-              style={{ fontSize: 'clamp(2.8rem,7.5vw,6.5rem)', textShadow: '0 4px 60px rgba(0,0,0,0.9)' }}>
-              ZERO FAKE FOLLOWERS.<br />
-              <span style={{ color: '#c084fc' }}>PURE SIGNAL.</span>
-            </h2>
-            <p className="text-lg max-w-md leading-relaxed" style={{ color: 'rgba(255,255,255,0.65)' }}>
-              AI-verified engagement rates.<br />Real audiences that convert.
-            </p>
-          </motion.div>
+          </div>
 
-          {/* ── Phase 3 ─────────────────────────────────────────────────────── */}
-          <motion.div
-            style={{ opacity: p3Op }}
-            className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 pointer-events-none z-20"
-          >
-            <h2 className="font-black tracking-tighter leading-[.88] mb-6"
-              style={{ fontSize: 'clamp(2.8rem,7.5vw,6.5rem)', textShadow: '0 4px 60px rgba(0,0,0,0.9)' }}>
-              FROM KARACHI TO ISLAMABAD.<br />
-              <span style={{ color: '#c084fc' }}>YOUR CREATORS.</span>
-            </h2>
-            <p className="text-lg max-w-md leading-relaxed" style={{ color: 'rgba(255,255,255,0.65)' }}>
-              12+ cities. 10,000+ verified creators.<br />One platform.
-            </p>
-          </motion.div>
-
-          {/* Bottom gradient — fades in as hero exits */}
+          {/* Bottom gradient */}
           <motion.div style={{ opacity: bOp, background: 'linear-gradient(to top, #060608, transparent)' }}
             className="absolute bottom-0 left-0 right-0 h-48 pointer-events-none z-30" />
         </div>
