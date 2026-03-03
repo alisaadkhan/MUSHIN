@@ -97,11 +97,28 @@ const MouseGlow = () => {
 /* ─── Border Beam ────────────────────────────────────────────────────────────── */
 const BorderBeam = ({ color = '#a855f7', size = 1.5, dur = 3 }: { color?: string; size?: number; dur?: number }) => (
   <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none" style={{ zIndex: 1 }}>
-    <div style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', padding: size,
-      background: `conic-gradient(from var(--bangle,0deg),transparent 70%,${color} 80%,${color}99 85%,transparent 90%)`,
-      mask: 'linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0)', maskComposite: 'exclude', WebkitMaskComposite: 'xor',
-      animation: `beamspin ${dur}s linear infinite` } as React.CSSProperties} />
-    <style>{`@keyframes beamspin{to{--bangle:360deg}} @property --bangle{syntax:'<angle>';initial-value:0deg;inherits:false}`}</style>
+    {/* Static mask/position props live in CSS; only dynamic values stay inline */}
+    <div
+      className="border-beam"
+      style={{
+        padding: size,
+        background: `conic-gradient(from var(--bangle,0deg),transparent 70%,${color} 80%,${color}99 85%,transparent 90%)`,
+        animation: `beamspin ${dur}s linear infinite`,
+      }}
+    />
+    <style>{`
+      .border-beam {
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+      }
+      @keyframes beamspin { to { --bangle: 360deg; } }
+      @property --bangle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+    `}</style>
   </div>
 );
 
