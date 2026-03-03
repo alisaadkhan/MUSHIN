@@ -430,51 +430,71 @@ const Ticker = ({ v, s = '' }: { v: number; s?: string }) => {
   return <span ref={r}>0{s}</span>;
 };
 
-/* ─── Canvas Frame Hook ─────────────────────────────────────────────────────── */
-const FRAME_COUNT = 150;
-const FRAME_PATH  = (i: number) => `/frames/frame_${String(i + 1).padStart(3, '0')}.webp`;
+/* ─── Canvas Frame Hook (MP4 source) ────────────────────────────────────────── */
+const VIDEO_SRC = '/A_seamless_cinematic_transition_from_a_dark_obsidian_c.mp4';
+
+function drawVideoFrame(canvas: HTMLCanvasElement, video: HTMLVideoElement) {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const dpr = window.devicePixelRatio || 1;
+  const cw  = canvas.offsetWidth;
+  const ch  = canvas.offsetHeight;
+  canvas.width  = cw * dpr;
+  canvas.height = ch * dpr;
+  ctx.scale(dpr, dpr);
+  const vw = video.videoWidth  || cw;
+  const vh = video.videoHeight || ch;
+  const scale = Math.max(cw / vw, ch / vh);
+  const dx = (cw - vw * scale) / 2;
+  const dy = (ch - vh * scale) / 2;
+  ctx.clearRect(0, 0, cw, ch);
+  ctx.drawImage(video, dx, dy, vw * scale, vh * scale);
+}
 
 function useCanvasScrub(
   canvasRef: React.RefObject<HTMLCanvasElement>,
   scrollYProgress: ReturnType<typeof useScroll>['scrollYProgress']
 ) {
-  const framesRef = useRef<HTMLImageElement[]>([]);
-  const loadedRef = useRef(0);
+  const videoRef   = useRef<HTMLVideoElement | null>(null);
+  const seekingRef = useRef(false);
 
-  // Preload all frames eagerly
   useEffect(() => {
-    const imgs: HTMLImageElement[] = [];
-    for (let i = 0; i < FRAME_COUNT; i++) {
-      const img = new Image();
-      img.src = FRAME_PATH(i);
-      img.onload = () => { loadedRef.current += 1; };
-      imgs.push(img);
-    }
-    framesRef.current = imgs;
-  }, []);
+    const video = document.createElement('video');
+    video.src       = VIDEO_SRC;
+    video.muted     = true;
+    video.preload   = 'auto';
+    video.playsInline = true;
+    // Keep paused — we control currentTime manually via scroll
+    const keepPaused = () => video.pause();
+    video.addEventListener('play', keepPaused);
+    video.load();
+    videoRef.current = video;
 
-  // Draw correct frame on every scroll tick
+    // Draw first frame once data is ready
+    video.addEventListener('loadeddata', () => { video.currentTime = 0; }, { once: true });
+
+    // Draw to canvas whenever a seek completes
+    const onSeeked = () => {
+      if (canvasRef.current) drawVideoFrame(canvasRef.current, video);
+      seekingRef.current = false;
+    };
+    video.addEventListener('seeked', onSeeked);
+
+    return () => {
+      video.removeEventListener('play', keepPaused);
+      video.removeEventListener('seeked', onSeeked);
+      video.src = '';
+    };
+  }, [canvasRef]);
+
+  // Map scroll 0→1 to video time and seek
   useMotionValueEvent(scrollYProgress, 'change', (progress) => {
+    const video  = videoRef.current;
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const idx   = Math.min(Math.floor(progress * FRAME_COUNT), FRAME_COUNT - 1);
-    const frame = framesRef.current[idx];
-    if (frame?.complete && frame.naturalWidth > 0) {
-      canvas.width  = canvas.offsetWidth  * window.devicePixelRatio;
-      canvas.height = canvas.offsetHeight * window.devicePixelRatio;
-      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-      const cw = canvas.offsetWidth;
-      const ch = canvas.offsetHeight;
-      const iw = frame.naturalWidth;
-      const ih = frame.naturalHeight;
-      const scale = Math.max(cw / iw, ch / ih);
-      const dx = (cw - iw * scale) / 2;
-      const dy = (ch - ih * scale) / 2;
-      ctx.clearRect(0, 0, cw, ch);
-      ctx.drawImage(frame, dx, dy, iw * scale, ih * scale);
-    }
+    if (!video || !canvas || !video.duration) return;
+    if (seekingRef.current) return; // skip if seek in flight
+    seekingRef.current = true;
+    video.currentTime  = progress * video.duration;
   });
 }
 
