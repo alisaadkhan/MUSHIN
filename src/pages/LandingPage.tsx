@@ -526,15 +526,17 @@ export default function LandingPage() {
 
       {/* ── VIDEO HERO — 300vh matches Version 2 ── */}
       <div ref={vwRef} className="relative h-[300vh]">
-        <div className="sticky top-0 h-screen overflow-hidden bg-black">
+        <div className="sticky top-0 h-screen overflow-hidden" style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 30%, #2d0a5e 0%, #0a0114 50%, #060608 100%)' }}>
           <video
             ref={vRef}
             aria-hidden="true"
             src="/A_seamless_cinematic_transition_from_a_dark_obsidian_c.mp4"
             autoPlay playsInline muted preload="auto" loop
-            className="absolute inset-0 w-full h-full object-cover opacity-80"
+            className="absolute inset-0 w-full h-full object-cover opacity-40"
             style={{ willChange: 'contents', transform: 'translateZ(0)' }}
           />
+          {/* Purple ambient overlay — ensures page never looks fully black */}
+          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 70% 55% at 50% 40%, rgba(109,40,217,0.35) 0%, rgba(88,28,135,0.15) 45%, transparent 75%)' }} />
 
           {/* Watermark */}
           <motion.div style={{ scale: textScale, opacity: textOp }} className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
@@ -542,25 +544,20 @@ export default function LandingPage() {
           </motion.div>
 
           {/* Hero content */}
-          <motion.div style={{ opacity: hOp, y: hY }} className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center px-6 pt-16 pointer-events-none">
+          <motion.div style={{ opacity: hOp, y: hY }} className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center px-6 pt-16">
             <motion.h1 initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .4, duration: .8 }}
-              className="font-black tracking-tighter leading-[.85] mb-7" style={{ fontSize: 'clamp(3.5rem,9vw,8rem)', textShadow: '0 0 80px rgba(0,0,0,.9)' }}>
+              className="font-black tracking-tighter leading-[.85] mb-7 pointer-events-none" style={{ fontSize: 'clamp(3.5rem,9vw,8rem)', textShadow: '0 4px 60px rgba(0,0,0,1), 0 0 120px rgba(0,0,0,0.8)' }}>
               FIND AUTHENTIC<br />PAKISTANI<br />INFLUENCERS.
             </motion.h1>
-            {/*
-             * Highlighted hero sentence — subtle gradient weight shift,
-             * never aggressive. White-to-violet-to-white sweep reads as
-             * emphasis without competing with the h1.
-             */}
             <motion.p
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: .65, duration: .9, ease: [0.16, 1, 0.3, 1] }}
-              className="text-lg max-w-md font-normal mb-9 leading-relaxed"
+              className="text-lg max-w-md font-normal mb-8 leading-relaxed pointer-events-none"
             >
               <span
                 style={{
-                  background: 'linear-gradient(135deg, rgba(255,255,255,0.80) 0%, rgba(192,132,252,0.95) 40%, rgba(255,255,255,0.75) 100%)',
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.90) 0%, rgba(192,132,252,1) 40%, rgba(255,255,255,0.85) 100%)',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
                   backgroundClip: 'text',
@@ -570,6 +567,48 @@ export default function LandingPage() {
                 Discover and collaborate with verified creators from Karachi, Lahore, Islamabad and beyond.
               </span>
             </motion.p>
+
+            {/* CTA buttons — fully interactive */}
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: .9, duration: .8, ease: [0.16, 1, 0.3, 1] }}
+              className="flex flex-col sm:flex-row items-center gap-3"
+            >
+              <Link
+                to="/auth"
+                className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 transition-colors text-white font-bold px-7 py-3.5 rounded-full text-sm shadow-[0_0_40px_rgba(168,85,247,0.4)] hover:shadow-[0_0_60px_rgba(168,85,247,0.6)]"
+              >
+                Start Free — No Card Needed <ArrowRight className="w-4 h-4" />
+              </Link>
+              <button
+                onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+                className="flex items-center gap-2 text-white/70 hover:text-white transition-colors text-sm font-medium px-5 py-3 rounded-full border border-white/10 hover:border-white/25 backdrop-blur-sm"
+              >
+                See how it works
+              </button>
+            </motion.div>
+
+            {/* Social proof */}
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1.3, duration: 0.6 }}
+              className="mt-6 text-xs text-white/35 pointer-events-none"
+            >
+              Trusted by 2,800+ marketing teams · Free forever plan available
+            </motion.p>
+          </motion.div>
+
+          {/* Scroll indicator */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.8, duration: 0.8 }}
+            className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-2 pointer-events-none"
+          >
+            <span className="text-white/30 text-xs tracking-widest uppercase">Scroll</span>
+            <div className="w-px h-10 bg-gradient-to-b from-white/30 to-transparent" />
           </motion.div>
 
           {/* Bottom gradient */}
