@@ -63,21 +63,31 @@ async function processJob(job: any, serviceClient: any): Promise<void> {
         const enrichUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/enrich-influencer`;
         const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-        const res = await fetch(enrichUrl, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${serviceKey}`,
-                "apikey": Deno.env.get("SUPABASE_ANON_KEY")!,
-            },
-            body: JSON.stringify({
-                platform: job.platform,
-                username: job.username,
-                primary_niche: job.primary_niche,
-                force_refresh: true,
-                _from_queue: true,  // signal to skip workspace credit check (charged at queue time)
-            }),
-        });
+        // 110-second hard timeout — prevents runaway jobs blocking the queue
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 110_000);
+
+        let res: Response;
+        try {
+            res = await fetch(enrichUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${serviceKey}`,
+                    "apikey": Deno.env.get("SUPABASE_ANON_KEY")!,
+                },
+                body: JSON.stringify({
+                    platform: job.platform,
+                    username: job.username,
+                    primary_niche: job.primary_niche,
+                    force_refresh: true,
+                    _from_queue: true,  // signal to skip workspace credit check (charged at queue time)
+                }),
+                signal: controller.signal,
+            });
+        } finally {
+            clearTimeout(timeoutId);
+        }
 
         const data = await res.json();
 
