@@ -173,14 +173,53 @@ CREATE POLICY "Admins manage announcements"
   );
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- 4a. CAMPAIGN METRICS TABLE (idempotent — table may already exist on remote)
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS campaign_metrics (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tracking_link_id  UUID NOT NULL REFERENCES tracking_links(id) ON DELETE CASCADE,
+  influencer_id     UUID REFERENCES influencer_profiles(id) ON DELETE SET NULL,
+  date              DATE NOT NULL DEFAULT CURRENT_DATE,
+  clicks            INTEGER NOT NULL DEFAULT 0,
+  conversions       INTEGER NOT NULL DEFAULT 0,
+  revenue_generated NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_campaign_metrics_tracking_link_id
+  ON campaign_metrics(tracking_link_id);
+CREATE INDEX IF NOT EXISTS idx_campaign_metrics_date
+  ON campaign_metrics(date DESC);
+
+ALTER TABLE campaign_metrics ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'campaign_metrics_tracking_link_id_date_key'
+  ) THEN
+    ALTER TABLE campaign_metrics
+      ADD CONSTRAINT campaign_metrics_tracking_link_id_date_key
+        UNIQUE (tracking_link_id, date);
+  END IF;
+END $$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- 4. MISSING RPC: increment_click_metric
 -- ─────────────────────────────────────────────────────────────────────────────
-CREATE OR REPLACE FUNCTION increment_click_metric(p_tracking_link_id UUID)
+-- Accepts named params matching track-click edge function: link_id, metric_date, influencer_uuid
+CREATE OR REPLACE FUNCTION increment_click_metric(
+  link_id         UUID,
+  metric_date     DATE    DEFAULT CURRENT_DATE,
+  influencer_uuid UUID    DEFAULT NULL
+)
 RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
-  INSERT INTO campaign_metrics (tracking_link_id, clicks, created_at, updated_at)
-  VALUES (p_tracking_link_id, 1, NOW(), NOW())
-  ON CONFLICT (tracking_link_id) DO UPDATE
+  INSERT INTO campaign_metrics (tracking_link_id, influencer_id, date, clicks, created_at, updated_at)
+  VALUES (link_id, influencer_uuid, metric_date, 1, NOW(), NOW())
+  ON CONFLICT (tracking_link_id, date) DO UPDATE
     SET clicks     = campaign_metrics.clicks + 1,
         updated_at = NOW();
 END;
@@ -395,15 +434,9 @@ END;
 $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conname = 'campaign_metrics_tracking_link_id_key'
-  ) THEN
-    ALTER TABLE campaign_metrics ADD CONSTRAINT campaign_metrics_tracking_link_id_key UNIQUE (tracking_link_id);
-  END IF;
-END $$;
+-- NOTE: campaign_metrics UNIQUE constraint (tracking_link_id, date) is now
+--       added in section 4a above. The old single-column constraint is omitted.
+-- ─────────────────────────────────────────────────────────────────────────────
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 11. ANOMALY LOGS (ensure table exists for delete-account cleanup)
