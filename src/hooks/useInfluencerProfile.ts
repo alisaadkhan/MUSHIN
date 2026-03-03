@@ -91,26 +91,19 @@ export function useInfluencerProfile(platform: string | undefined, username: str
         setError(null);
 
         try {
-            // Direct query for freshness (SEPARATE from cache fetch)
-            const { data: freshnessData } = await supabase
-                .from('influencer_profiles')
-                .select('enriched_at, enrichment_status, enrichment_error')
-                .eq('username', username)
-                .eq('platform', platform)
-                .single();
-
-            const daysSinceThisEnrichment = freshnessData?.enriched_at
-                ? (Date.now() - new Date(freshnessData.enriched_at).getTime()) / (1000 * 60 * 60 * 24)
-                : null;
-            setDaysSinceEnrichment(daysSinceThisEnrichment);
-
-            // 1. Try influencer_profiles (enriched)
+            // Single query — eliminates the duplicate round-trip that was fetching
+            // enriched_at separately before immediately re-querying the same table.
             const { data: enriched } = await supabase
                 .from("influencer_profiles")
                 .select("*")
                 .eq("platform", platform)
                 .eq("username", username)
                 .maybeSingle();
+
+            const daysSinceThisEnrichment = enriched?.enriched_at
+                ? (Date.now() - new Date(enriched.enriched_at).getTime()) / (1000 * 60 * 60 * 24)
+                : null;
+            setDaysSinceEnrichment(daysSinceThisEnrichment);
 
             if (enriched) {
                 const secondaryNiches = Array.isArray(enriched.secondary_niches)

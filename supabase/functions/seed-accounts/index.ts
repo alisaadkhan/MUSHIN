@@ -10,6 +10,14 @@ Deno.serve(async (req) => {
         return new Response(null, { headers: corsHeaders });
     }
 
+    // SECURITY: Production guard — seeding wipes the entire user database.
+    // Set SEED_ENABLED=true only in local/dev environments via Supabase secrets.
+    if (Deno.env.get("SEED_ENABLED") !== "true") {
+        return new Response(JSON.stringify({ error: "Seeding is disabled in this environment" }), {
+            status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+    }
+
     // SECURITY: This endpoint wipes the entire user database.
     // Must only be callable with the service role key.
     const authHeader = req.headers.get("Authorization");

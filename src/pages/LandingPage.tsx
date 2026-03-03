@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform, useInView, animate, AnimatePresence, MotionConfig, useMotionValueEvent } from 'framer-motion';
 import { CheckCircle, DollarSign, Info, Sparkles, ArrowRight, Search, Star, Shield, Zap, Users, Instagram, Youtube, TrendingUp, Globe, MapPin, X, Building2, ShoppingBag } from 'lucide-react';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
-import { useScrollVideoScrub } from '@/hooks/useScrollVideoScrub';
 
 /* ─── Global Styles ──────────────────────────────────────────────────────────── */
 const G = () => <style>{`

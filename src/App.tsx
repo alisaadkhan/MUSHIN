@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -51,19 +52,23 @@ const ProtectedPage = ({ children }: { children: React.ReactNode }) => (
 );
 
 const App = () => {
-  // Create inside component so cache doesn't persist across user sessions
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: 1,
-        staleTime: 30_000,
-        refetchOnWindowFocus: false,
+  // Stable client — recreated only on component mount, never on re-render.
+  // Prevents cache miss storms caused by constructing a new QueryClient every render.
+  const queryClientRef = useRef<QueryClient | null>(null);
+  if (!queryClientRef.current) {
+    queryClientRef.current = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: 1,
+          staleTime: 30_000,
+          refetchOnWindowFocus: false,
+        },
       },
-    },
-  });
+    });
+  }
   return (
   <AppErrorBoundary>
-    <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={queryClientRef.current}>
       <TooltipProvider>
         <Toaster />
         <Sonner />

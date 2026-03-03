@@ -51,11 +51,8 @@ export default function AnalyticsPage() {
       const campaignIds = workspaceCampaigns?.map(c => c.id) || [];
       if (campaignIds.length === 0) return [];
 
-      // Fetch tracking links and metrics in parallel
-      const [linksRes, _] = await Promise.all([
-        (supabase as any).from("tracking_links").select("id").in("campaign_id", campaignIds),
-        Promise.resolve(null),
-      ]);
+      // Fetch tracking links
+      const linksRes = await (supabase as any).from("tracking_links").select("id").in("campaign_id", campaignIds);
 
       const linkIds = linksRes.data?.map((l: any) => l.id) || [];
       if (linkIds.length === 0) return [];

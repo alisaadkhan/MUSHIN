@@ -122,7 +122,7 @@ export default function InfluencerProfilePage() {
   }, [platform, username, fetchCached]);
 
   // run once
-  useState(() => { loadEval(); });
+  useEffect(() => { loadEval(); }, [loadEval]);
 
   const handleEnrichAndEvaluate = async () => {
     if (!platform || !username) return;
