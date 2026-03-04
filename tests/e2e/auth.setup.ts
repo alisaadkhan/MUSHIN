@@ -10,7 +10,8 @@
 import { test as setup, expect } from "@playwright/test";
 import path from "path";
 
-const STATE_PATH = path.join(__dirname, ".auth", "state.json");
+// Use process.cwd() (workspace root) to avoid __dirname ESM issues
+const STATE_PATH = path.join(process.cwd(), "tests/e2e/.auth/state.json");
 
 setup("authenticate", async ({ page }) => {
   const email = process.env.PLAYWRIGHT_EMAIL;
