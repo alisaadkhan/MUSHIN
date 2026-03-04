@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Search as SearchIcon, Filter, ExternalLink, Loader2, Bookmark,
@@ -57,7 +57,8 @@ const FOLLOWER_RANGES = [
   { label: "Mega (500k+)", value: "500k+" },
 ];
 
-
+// Maximum number of niches a user can select simultaneously
+const MAX_NICHES = 3;
 
 // ─── Cache key for back-navigation result restoration ───────────────────────
 function buildCacheKey(q: string, platform: string, city: string, range: string) {
@@ -120,7 +121,8 @@ export default function SearchPage() {
   const [selectedCity, setSelectedCity] = useState(searchParams.get("city") || "All Pakistan");
   const [followerRange, setFollowerRange] = useState(searchParams.get("range") || "any");
   const [selectedNiches, setSelectedNiches] = useState<string[]>(
-    searchParams.get("niche") ? [searchParams.get("niche")!] : []
+    // Comma-separated in URL: "Fashion,Food" → ["Fashion", "Food"]
+    searchParams.get("niche") ? searchParams.get("niche")!.split(",").filter(Boolean) : []
   );
 
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -157,13 +159,12 @@ export default function SearchPage() {
     if (selectedPlatforms[0]) next.platform = selectedPlatforms[0];
     if (selectedCity !== "All Pakistan") next.city = selectedCity;
     if (followerRange !== "any") next.range = followerRange;
-    if (selectedNiches[0]) next.niche = selectedNiches[0];
+    if (selectedNiches.length > 0) next.niche = selectedNiches.join(",");
     setSearchParams({ ...next, ...overrides }, { replace: true });
   }, [query, isAiSearch, selectedPlatforms, selectedCity, followerRange, selectedNiches, setSearchParams]);
 
   const togglePlatform = (p: string) =>
     setSelectedPlatforms(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
-  const MAX_NICHES = 3;
   const toggleNiche = (n: string) =>
     setSelectedNiches(prev => {
       if (prev.includes(n)) return prev.filter(x => x !== n);
@@ -223,51 +224,10 @@ export default function SearchPage() {
         return;
       }
 
-      // ── Merge with existing enriched profiles from DB ────────────────────
-      const rawResults: SearchResult[] = data.results || [];
-      let mergedResults = rawResults;
-      if (rawResults.length > 0) {
-        const usernames = rawResults.map(r => r.username.replace("@", "").toLowerCase());
-        const { data: profiles } = await supabase
-          .from("influencer_profiles")
-          .select("username, platform, follower_count, engagement_rate, enrichment_status, enriched_at, avatar_url, bio, full_name, city, primary_niche")
-          .in("username", usernames);
-        if (profiles && profiles.length > 0) {
-          const profileMap = new Map(
-            profiles.map(p => [`${p.platform.toLowerCase()}_${p.username.toLowerCase()}`, p])
-          );
-          mergedResults = rawResults.map(r => {
-            const key = `${r.platform.toLowerCase()}_${r.username.replace("@", "").toLowerCase()}`;
-            const profile = profileMap.get(key);
-            if (!profile) return r;
-            const enrichedAt = profile.enriched_at ? new Date(profile.enriched_at).getTime() : 0;
-            const ttlMs = (r.enrichment_ttl_days ?? 30) * 86_400_000;
-            return {
-              ...r,
-              extracted_followers: r.extracted_followers ?? profile.follower_count ?? undefined,
-              engagement_rate: r.engagement_rate ?? profile.engagement_rate ?? undefined,
-              is_enriched: profile.enrichment_status === "success",
-              is_stale: profile.enrichment_status === "success" && enrichedAt > 0 && Date.now() - enrichedAt > ttlMs,
-              enrichment_status: profile.enrichment_status ?? undefined,
-              last_enriched_at: profile.enriched_at ?? undefined,
-              imageUrl: r.imageUrl || profile.avatar_url || undefined,
-              bio: r.bio || profile.bio || undefined,
-              full_name: r.full_name || profile.full_name || undefined,
-              city_extracted: r.city_extracted || profile.city || undefined,
-              niche: r.niche || profile.primary_niche || undefined,
-            };
-          });
-        }
-      }
-
-      // Sort merged results: real ER first, then by ER descending
-      const sortedResults = mergedResults.sort((a, b) => {
-        const aIsReal = a.engagement_source === "real_eval" || a.engagement_source === "real_enriched";
-        const bIsReal = b.engagement_source === "real_eval" || b.engagement_source === "real_enriched";
-        if (aIsReal !== bIsReal) return aIsReal ? -1 : 1;
-        return (b.engagement_rate ?? 0) - (a.engagement_rate ?? 0);
-      });
-
+      // The edge function already merges enriched profiles (influencer_profiles +
+      // influencer_evaluations) and sorts results (real ER first, then ER desc).
+      // No client-side re-merge or re-sort needed — trust the server response.
+      const sortedResults: SearchResult[] = data.results || [];
       setResults(sortedResults);
       setCreditsRemaining(data.credits_remaining ?? null);
 
@@ -716,7 +676,29 @@ export default function SearchPage() {
 }
 
 // ─── Result Card sub-component ────────────────────────────────────────────────
-function ResultCard({ c, isFreePlan, lists, cachedScores, evaluatingUsername, evalLoading, canUseAI, selectedNiches, navigate, evaluateInfluencer, setEvaluatingUsername, setCachedScores, handleAddToList, setPendingAddResult, setShowCreateList }: any) {
+interface ResultCardProps {
+  c: SearchResult;
+  isFreePlan: boolean;
+  lists: Array<{ id: string; name: string }> | undefined;
+  cachedScores: Record<string, number>;
+  evaluatingUsername: string | null;
+  evalLoading: boolean;
+  canUseAI: () => boolean;
+  selectedNiches: string[];
+  navigate: ReturnType<typeof useNavigate>;
+  evaluateInfluencer: (params: {
+    username: string; platform: string;
+    followers?: number; snippet?: string;
+    title?: string; link?: string;
+  }) => Promise<{ overall_score: number } | null>;
+  setEvaluatingUsername: (v: string | null) => void;
+  setCachedScores: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  handleAddToList: (listId: string, result: SearchResult) => Promise<void>;
+  setPendingAddResult: (r: SearchResult | null) => void;
+  setShowCreateList: (v: boolean) => void;
+}
+
+function ResultCard({ c, isFreePlan, lists, cachedScores, evaluatingUsername, evalLoading, canUseAI, selectedNiches, navigate, evaluateInfluencer, setEvaluatingUsername, setCachedScores, handleAddToList, setPendingAddResult, setShowCreateList }: ResultCardProps) {
   const displayName = c.full_name || c.title || c.username;
   const initials = displayName.split(" ").map((n: string) => n[0]).slice(0, 2).join("") || "?";
   const city = c.city_extracted || c.city;
