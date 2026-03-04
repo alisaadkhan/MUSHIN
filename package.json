@@ -20,6 +20,8 @@
     "test:e2e:regression:full": "cross-env RG_COMBO_LIMIT=800 playwright test --project=regression",
     "test:e2e:audit": "playwright test --project=audit",
     "test:e2e:audit:full": "cross-env AUDIT_LIMIT=300 playwright test --project=audit",
+    "test:e2e:kwaudit": "playwright test --project=keyword-audit",
+    "test:e2e:kwaudit:full": "cross-env KW_LIMIT=50 VAR_LIMIT=6 playwright test --project=keyword-audit",
     "test:e2e:all": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report"

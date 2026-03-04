@@ -119,5 +119,24 @@ export default defineConfig({
       testMatch: "**/live-quality-audit.spec.ts",
       timeout: 120_000,
     },
+
+    // ── 7. Keyword Quality Audit — 50 keywords × 6 variations = 300 searches ──
+    //    npx playwright test --project=keyword-audit
+    //    KW_LIMIT=50 (all keywords), VAR_LIMIT=6 (all variations)
+    //    KW_MIN_CREDITS=5 — stops if workspace credits fall below this
+    {
+      name: "keyword-audit",
+      use: {
+        ...devices["Desktop Chrome"],
+        headless: false,
+        storageState: "tests/e2e/.auth/state.json",
+        video: "retain-on-failure",
+        screenshot: "on",
+        viewport: { width: 1440, height: 900 },
+      },
+      dependencies: ["setup"],
+      testMatch: "**/keyword-quality-audit.spec.ts",
+      timeout: 120_000,
+    },
   ],
 });
