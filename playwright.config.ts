@@ -55,7 +55,12 @@ export default defineConfig({
         storageState: "tests/e2e/.auth/state.json",
       },
       dependencies: ["setup"],
-      testIgnore: ["**/auth.setup.ts", "**/stress.spec.ts"],
+      testIgnore: [
+        "**/auth.setup.ts",
+        "**/stress.spec.ts",
+        "**/phase3-combinatorial.spec.ts",
+        "**/regression-9a9d783.spec.ts",
+      ],
     },
 
     // ── 3. Stress tests — separate project to run on-demand ──────────────────
@@ -80,6 +85,20 @@ export default defineConfig({
       },
       dependencies: ["setup"],
       testMatch: "**/phase3-combinatorial.spec.ts",
+    },
+
+    // ── 5. Regression Certification — post-patch validation ──────────────────
+    //    npx playwright test --project=regression
+    //    Set RG_COMBO_LIMIT=800 for the full 800-combination assault
+    //    Default RG_COMBO_LIMIT=50 for dev mode
+    {
+      name: "regression",
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: "tests/e2e/.auth/state.json",
+      },
+      dependencies: ["setup"],
+      testMatch: "**/regression-9a9d783.spec.ts",
     },
   ],
 });
