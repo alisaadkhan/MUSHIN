@@ -274,8 +274,9 @@ export default function SearchPage() {
         followerRange,
       );
       try {
+        // Store sortedResults (same as what was rendered) so back-nav is consistent
         sessionStorage.setItem(cacheKey, JSON.stringify({
-          results: mergedResults,
+          results: sortedResults,
           creditsRemaining: data.credits_remaining ?? null,
         }));
       } catch { /* sessionStorage full — skip caching */ }
@@ -500,12 +501,24 @@ export default function SearchPage() {
 
           {/* Results meta row */}
           <div className="flex items-center justify-between min-h-[28px]">
-            {searched && results.length > 0 && (
-              <p className="text-sm text-muted-foreground">
-                {results.length} result{results.length !== 1 ? "s" : ""} found
-                {selectedCity !== "All Pakistan" && <span> · <MapPin className="inline h-3 w-3 mb-0.5" /> {selectedCity}</span>}
-              </p>
-            )}
+            {searched && results.length > 0 && (() => {
+              // Compute the effective count after client-side niche filter
+              const visibleResults = selectedNiches.length > 0
+                ? results.filter((r) => r.niche && selectedNiches.includes(r.niche))
+                : results;
+              return (
+                <p className="text-sm text-muted-foreground">
+                  {visibleResults.length} result{visibleResults.length !== 1 ? "s" : ""} found
+                  {selectedNiches.length > 0 && results.length !== visibleResults.length && (
+                    <span className="text-xs ml-1 opacity-60">({results.length} total)</span>
+                  )}
+                  {selectedCity !== "All Pakistan" && <span> · <MapPin className="inline h-3 w-3 mb-0.5" /> {selectedCity}</span>}
+                  {selectedPlatforms.length > 1 && (
+                    <span className="text-xs ml-2 text-amber-500">⚠️ Showing {selectedPlatforms[0]} only — search one platform at a time</span>
+                  )}
+                </p>
+              );
+            })()}
             {searched && results.length > 0 && (
               <Button variant="outline" size="sm" className="text-xs gap-1.5 rounded-lg border-border" onClick={() => setShowSaveSearch(true)}>
                 <Bookmark className="h-3 w-3" /> Save Search
@@ -532,7 +545,9 @@ export default function SearchPage() {
           {!loading && searched && results.length > 0 && (
             <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {(selectedNiches.length > 0
-                ? results.filter((r) => !r.niche || selectedNiches.includes(r.niche))
+                // When niche filter is active, only show results whose niche matches.
+                // Previously `!r.niche` passed niche-less results through — incorrect.
+                ? results.filter((r) => r.niche && selectedNiches.includes(r.niche))
                 : results
               ).map((c, i) => (
                 <ResultCard

@@ -320,13 +320,22 @@ Deno.serve(async (req) => {
     const rawPlatform = requestBody?.platform ?? "";
 
     const sanitized = rawQuery.trim().replace(/[^a-zA-Z0-9\s\u0600-\u06FF\-\.]/g, "").trim();
-    if (!sanitized || sanitized.length < 2 || !rawPlatform) {
+    // Hard caps: minimum 2 chars, maximum 200 chars to prevent quota burn
+    if (!sanitized || sanitized.length < 2 || sanitized.length > 200 || !rawPlatform) {
       return new Response(JSON.stringify({ error: "query and platform are required" }),
         { status: 400, headers: { "Content-Type": "application/json" } });
     }
 
+    // Validate platform against strict allowlist — prevents injected values in DB queries
+    const ALLOWED_PLATFORMS = ["instagram", "tiktok", "youtube"];
+    const platform = rawPlatform.toLowerCase().trim();
+    if (!ALLOWED_PLATFORMS.includes(platform)) {
+      return new Response(JSON.stringify({ error: "Invalid platform. Must be instagram, tiktok, or youtube." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const query = sanitized;
-    const ip = req.headers.get("x-forwarded-for") ?? "unknown";
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
     const { allowed } = await checkRateLimit(ip, "search");
     if (!allowed) {
       return new Response(JSON.stringify({ error: "Rate limit exceeded" }),
@@ -390,7 +399,11 @@ Deno.serve(async (req) => {
       console.warn(`[search-influencers] High velocity anomaly for WS ${workspaceId} (IP: ${ip})`);
     }
 
-    const { platform, location, followerRange } = requestBody;
+    const { platform: _platformIgnored, location: rawLocation, followerRange } = requestBody;
+    // Sanitize location — strip anything that isn't letters/spaces/hyphens
+    const location = typeof rawLocation === "string"
+      ? rawLocation.replace(/[^a-zA-Z\s\-]/g, "").trim().slice(0, 50)
+      : "";
 
     const cacheKey = `search:${query.toLowerCase().trim()}:${platform}:${location || "any"}:${followerRange || "any"}`;
     if (redis) {
@@ -748,37 +761,42 @@ Deno.serve(async (req) => {
         return (b.engagement_rate ?? 0) - (a.engagement_rate ?? 0);
       });
 
-    for (const r of uniqueResults) {
-      await serviceClient.from("influencers_cache").upsert(
-        {
-          platform: r.platform, username: r.username,
-          city_extracted: r.city_extracted ?? null,
-          data: {
-            title: r.title, link: r.link, snippet: r.snippet,
-            displayUrl: r.displayUrl, imageUrl: r.imageUrl,
-            niche: r.niche, niche_confidence: r.niche_confidence, city_extracted: r.city_extracted,
-            followers: r.extracted_followers ?? null,
-            engagement_rate: r.engagement_rate,
-          },
+    // Batch upsert instead of N sequential awaits (was O(n) round-trips)
+    if (uniqueResults.length > 0) {
+      const cacheRows = uniqueResults.map((r: any) => ({
+        platform: r.platform, username: r.username,
+        city_extracted: r.city_extracted ?? null,
+        data: {
+          title: r.title, link: r.link, snippet: r.snippet,
+          displayUrl: r.displayUrl, imageUrl: r.imageUrl,
+          niche: r.niche, niche_confidence: r.niche_confidence,
+          city_extracted: r.city_extracted, followers: r.extracted_followers ?? null,
+          engagement_rate: r.engagement_rate,
         },
-        { onConflict: "platform,username" }
-      );
+      }));
+      await serviceClient.from("influencers_cache")
+        .upsert(cacheRows, { onConflict: "platform,username" })
+        .catch((e: any) => console.warn("Cache upsert failed:", e?.message));
     }
 
     await serviceClient.from("search_history").insert({
       workspace_id: workspaceId, query, platform,
-      location: location || null, result_count: uniqueResults.length, filters: {},
+      location: location || null,
+      // result_count reflects what the user actually sees (post-filter)
+      result_count: sortedResults.length,
+      filters: { followerRange: followerRange || null },
     });
 
     await serviceClient.from("credits_usage").insert({
       workspace_id: workspaceId, action_type: "search", amount: 1,
     });
 
-    if (redis && enrichedResults.length > 0) {
+    if (redis && sortedResults.length > 0) {
       try {
-        await redis.set(cacheKey, JSON.stringify(enrichedResults), { ex: 3600 });
+        // Cache SORTED + filtered results (same as what is returned to client)
+        await redis.set(cacheKey, JSON.stringify(sortedResults), { ex: 3600 });
         const batch = redis.pipeline();
-        for (const result of enrichedResults) {
+        for (const result of sortedResults) {
           if (!result.username) continue;
           const cleanUsername = result.username.replace("@", "");
           const tKey = `tag:${cleanUsername}:${platform}`;
