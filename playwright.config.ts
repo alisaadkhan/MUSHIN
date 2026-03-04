@@ -100,5 +100,24 @@ export default defineConfig({
       dependencies: ["setup"],
       testMatch: "**/regression-9a9d783.spec.ts",
     },
+
+    // ── 6. Live Quality Audit — headed Chrome, real API, no mocking ──────────
+    //    npx playwright test --project=audit
+    //    AUDIT_LIMIT=30 (default dev) / 300 (full)
+    //    AUDIT_MIN_CREDITS=5 — stops if workspace credits fall below this
+    {
+      name: "audit",
+      use: {
+        ...devices["Desktop Chrome"],
+        headless: false,
+        storageState: "tests/e2e/.auth/state.json",
+        video: "on",
+        screenshot: "on",
+        viewport: { width: 1440, height: 900 },
+      },
+      dependencies: ["setup"],
+      testMatch: "**/live-quality-audit.spec.ts",
+      timeout: 120_000,
+    },
   ],
 });
