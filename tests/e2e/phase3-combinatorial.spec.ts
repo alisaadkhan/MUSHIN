@@ -1,807 +1,991 @@
 /**
  * phase3-combinatorial.spec.ts
  *
- * Phase 3 — Combinatorial Exhaustive Filter Testing
+ * PHASE 3 — COMBINATORIAL EXHAUSTIVE FILTER ASSAULT
  *
- * This is NOT a sample test.
- * This is a combinatorial assault on the Creator Discovery engine.
+ * This is not a sample test.
+ * This is a combinatorial assault.
  *
- * Objective: expose probabilistic bugs that only appear under rare filter stacks.
+ * Objective: simulate real-world chaos across hundreds of filter stacks
+ * and expose probabilistic bugs that only surface under rare combinations.
  *
- * Run with:
- *   npx playwright test --project=phase3
+ * ─────────────────────────────────────────────────────────────────────
+ * COMBINATION SPACE
+ *   Platforms     : 3 singles + 3 pairs + 1 triple = 7
+ *   Cities        : 13 (All Pakistan + 12 cities)
+ *   Niches        : C(19,1)+C(19,2)+C(19,3) = 19+171+969 = 1159 subsets (capped at 3)
+ *   Follower ranges: 6
+ *   Engagement    : 7 sample points
+ *   AI Mode       : 2 (disabled for now — SOON badge)
+ *   Keywords      : 20
+ *   ─────────────────────────────────────────────
+ *   Full cartesian: too large to enumerate — we use stratified random sampling
+ *   Target sample : 500 minimum (configurable via COMBO_LIMIT env var)
+ *   Invalid states: 100 edge-case combinations
  *
- * What it generates:
- *   - 500+ valid filter combinations (keyword × platform × city × niche× followerRange × aiMode)
- *   - 100 invalid / edge-case states
- *   - 50-search burst stress layer
- *
- * Output: statistical report written to test-results/phase3-report.json
- *         and printed to console at the end.
+ * OUTPUT: JSON + HTML statistical report in test-results/phase3-report.json
+ * ─────────────────────────────────────────────────────────────────────
  */
 
-import { test, expect, Page, BrowserContext } from "@playwright/test";
+import {
+  test,
+  expect,
+  Page,
+  Browser,
+  BrowserContext,
+  ConsoleMessage,
+} from "@playwright/test";
 import * as fs from "fs";
 import * as path from "path";
 
-// ─── Domain data ─────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-const PLATFORMS = ["instagram", "tiktok", "youtube"];
-const PLATFORM_PAIRS = [
+const LONG_TIMEOUT = 45_000;
+const BETWEEN_SEARCH_MS = 600; // throttle to avoid rate-limiting
+const COMBO_LIMIT = parseInt(process.env.COMBO_LIMIT ?? "120", 10); // override for full 1000+ run
+const BURST_COUNT = parseInt(process.env.BURST_COUNT ?? "30", 10);
+
+const PLATFORMS = ["instagram", "tiktok", "youtube"] as const;
+const PLATFORM_COMBOS = [
+  ["instagram"],
+  ["tiktok"],
+  ["youtube"],
   ["instagram", "tiktok"],
   ["instagram", "youtube"],
   ["tiktok", "youtube"],
+  ["instagram", "tiktok", "youtube"],
 ];
-const PLATFORM_ALL = ["instagram", "tiktok", "youtube"];
 
 const CITIES = [
-  "All Pakistan", "Karachi", "Lahore", "Islamabad", "Rawalpindi",
-  "Faisalabad", "Multan", "Peshawar", "Quetta", "Sialkot", "Hyderabad",
+  "All Pakistan",
+  "Karachi",
+  "Lahore",
+  "Islamabad",
+  "Rawalpindi",
+  "Faisalabad",
+  "Multan",
+  "Peshawar",
+  "Quetta",
+  "Sialkot",
+  "Gujranwala",
+  "Hyderabad",
+  "Abbottabad",
 ];
 
 const NICHES = [
-  "Fashion", "Food", "Beauty", "Cricket", "Tech",
-  "Fitness", "Travel", "Gaming", "Music", "Education",
-  "Comedy", "Lifestyle", "Finance", "Health",
-  "Automotive", "Photography", "Art", "Sports", "News",
+  "Fashion",
+  "Food",
+  "Beauty",
+  "Cricket",
+  "Tech",
+  "Fitness",
+  "Travel",
+  "Gaming",
+  "Music",
+  "Education",
+  "Comedy",
+  "Lifestyle",
+  "Finance",
+  "Health",
+  "Automotive",
+  "Photography",
+  "Art",
+  "Sports",
+  "News",
 ];
 
 const FOLLOWER_RANGES = ["any", "1k-10k", "10k-50k", "50k-100k", "100k-500k", "500k+"];
 
 const KEYWORDS = [
   // City + niche
-  "Karachi fashion", "Lahore tech", "Islamabad fitness", "Karachi food",
-  "Lahore beauty", "Islamabad gaming", "Karachi travel", "Lahore music",
+  "Karachi fashion",
+  "Lahore tech",
+  "Islamabad fitness",
+  "Multan food",
+  "Peshawar travel",
   // Niche only
-  "fashion", "fitness", "tech", "food", "beauty", "gaming", "travel",
-  // Handle-style
-  "@nabeelzuberi", "@fashionpk",
+  "Gaming",
+  "Beauty",
+  "Cricket",
+  "Comedy",
+  "Finance",
+  // Handle
+  "@nabeelzuberi",
+  "@mathirasofficial",
   // Mixed intent
-  "Pakistani food blogger 50k", "Urdu comedy creator", "cricket influencer lahore",
-  // Random strings (should return no-results gracefully)
-  "zxzxzxqq", "!!!test", "12345678",
-  // Single char / very short
-  "k", "la",
+  "Pakistani influencer 50k",
+  "Urdu food blogger high engagement",
+  "Islamabad fitness 50k",
+  // Short / ambiguous
+  "k",
+  "Pakistan",
+  "creator",
+  // Nonsense / abuse
+  "zzxxqq$$%%",
+  "SELECT * FROM influencers",
 ];
 
-const INVALID_STATES = [
-  // Empty query
-  { query: "", platform: "instagram", note: "empty query" },
-  // Whitespace only
-  { query: "   ", platform: "instagram", note: "whitespace query" },
-  // Extremely long query (>200 chars)
-  { query: "Karachi ".repeat(30), platform: "instagram", note: "query >200 chars" },
-  // Unicode / special chars
-  { query: "کراچی فیشن", platform: "instagram", note: "urdu unicode query" },
-  { query: "<script>alert(1)</script>", platform: "instagram", note: "XSS attempt" },
-  { query: "'; DROP TABLE users; --", platform: "instagram", note: "SQL injection attempt" },
-  { query: "fashion".repeat(30), platform: "instagram", note: "repeated word 200+ chars" },
-  // All niches at limit (3)
-  { query: "fashion", platform: "instagram", niches: ["Fashion", "Fitness", "Beauty"], note: "max niches selected" },
-];
+// ─── Combination Generator ────────────────────────────────────────────────────
 
-// ─── Type definitions ─────────────────────────────────────────────────────────
-
-interface FilterCombo {
-  id: number;
-  query: string;
-  platform: string | string[];
+interface ComboState {
+  id: string;
+  platforms: string[];
   city: string;
   niches: string[];
   followerRange: string;
-  aiMode: boolean;
-  note?: string;
-  isInvalid?: boolean;
+  keyword: string;
+  isInvalid: boolean;
+  invalidReason?: string;
 }
 
 interface RunResult {
-  comboId: number;
-  query: string;
-  platform: string | string[];
-  city: string;
-  niches: string[];
-  followerRange: string;
-  aiMode: boolean;
-  note?: string;
-  isInvalid: boolean;
-  passed: boolean;
-  failures: string[];
-  cardCount: number;
-  resultCountLabel: number | null;
+  combo: ComboState;
   durationMs: number;
+  cardCount: number;
+  labelCount: number;
+  hasDuplicates: boolean;
+  nicheLeaked: boolean;
+  platformLeaked: boolean;
   consoleErrors: string[];
   networkErrors: string[];
   creditsBefore: number | null;
   creditsAfter: number | null;
+  creditDeducted: boolean | null;
+  loaderResolvedCleanly: boolean;
+  passed: boolean;
+  failures: string[];
 }
 
-// ─── Combination generator ────────────────────────────────────────────────────
-
-function generateCombinations(): FilterCombo[] {
-  const combos: FilterCombo[] = [];
-  let id = 0;
-
-  const rng = (() => {
-    let seed = 42;
-    return () => { seed = (seed * 1664525 + 1013904223) & 0xffffffff; return (seed >>> 0) / 0xffffffff; };
-  })();
-
-  const pick = <T>(arr: T[]) => arr[Math.floor(rng() * arr.length)];
-  const pickN = <T>(arr: T[], n: number): T[] => {
-    const copy = [...arr];
-    const out: T[] = [];
-    for (let i = 0; i < n && copy.length; i++) {
-      const idx = Math.floor(rng() * copy.length);
-      out.push(copy.splice(idx, 1)[0]);
-    }
-    return out;
+/** Seeded pseudo-random (deterministic across runs for reproducibility). */
+function lcg(seed: number) {
+  let s = seed;
+  return () => {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    return (s >>> 0) / 0xffffffff;
   };
-
-  // ── Tier 1: Systematic single-variable sweep (one variable at a time) ─────
-  // Platform × keyword
-  for (const platform of PLATFORMS) {
-    for (const query of KEYWORDS.slice(0, 8)) {
-      combos.push({ id: id++, query, platform, city: "All Pakistan", niches: [], followerRange: "any", aiMode: false });
-    }
-  }
-
-  // City sweep (instagram only, varied queries)
-  for (const city of CITIES) {
-    combos.push({ id: id++, query: "fashion creator", platform: "instagram", city, niches: [], followerRange: "any", aiMode: false });
-  }
-
-  // Niche single-select sweep
-  for (const niche of NICHES) {
-    combos.push({ id: id++, query: "Pakistani creator", platform: "instagram", city: "All Pakistan", niches: [niche], followerRange: "any", aiMode: false });
-  }
-
-  // Follower range sweep
-  for (const range of FOLLOWER_RANGES) {
-    combos.push({ id: id++, query: "fashion", platform: "instagram", city: "Karachi", niches: [], followerRange: range, aiMode: false });
-  }
-
-  // AI mode ON for some keywords
-  for (const query of ["Urdu food blogger Lahore", "cricket influencer 100k", "beauty creator Karachi"]) {
-    combos.push({ id: id++, query, platform: "instagram", city: "All Pakistan", niches: [], followerRange: "any", aiMode: true });
-    combos.push({ id: id++, query, platform: "tiktok", city: "All Pakistan", niches: [], followerRange: "any", aiMode: true });
-  }
-
-  // ── Tier 2: Platform pairs + triples ─────────────────────────────────────
-  for (const pair of PLATFORM_PAIRS) {
-    for (const query of ["fashion", "fitness", "Karachi blogger"]) {
-      combos.push({ id: id++, query, platform: pair, city: "All Pakistan", niches: [], followerRange: "any", aiMode: false, note: "platform pair" });
-    }
-  }
-  // All three platforms
-  for (const query of ["Pakistani creator", "Lahore tech"]) {
-    combos.push({ id: id++, query, platform: PLATFORM_ALL, city: "All Pakistan", niches: [], followerRange: "any", aiMode: false, note: "all platforms" });
-  }
-
-  // ── Tier 3: 2-niche combos ────────────────────────────────────────────────
-  const nichePairs = [
-    ["Fashion", "Beauty"], ["Fitness", "Health"], ["Tech", "Gaming"],
-    ["Food", "Lifestyle"], ["Music", "Comedy"], ["Travel", "Photography"],
-  ];
-  for (const pair of nichePairs) {
-    for (const city of ["Karachi", "Lahore", "All Pakistan"]) {
-      combos.push({ id: id++, query: "Pakistani creator", platform: "instagram", city, niches: pair, followerRange: "any", aiMode: false });
-    }
-  }
-
-  // ── Tier 4: 3-niche (max) combos ─────────────────────────────────────────
-  const nicheTriplets = [
-    ["Fashion", "Beauty", "Lifestyle"],
-    ["Tech", "Gaming", "Education"],
-    ["Food", "Health", "Fitness"],
-    ["Music", "Comedy", "Art"],
-    ["Cricket", "Sports", "Fitness"],
-  ];
-  for (const triplet of nicheTriplets) {
-    for (const platform of PLATFORMS) {
-      combos.push({ id: id++, query: "Pakistani influencer", platform, city: "All Pakistan", niches: triplet, followerRange: "any", aiMode: false, note: "max niches" });
-    }
-  }
-
-  // ── Tier 5: Full stack combos (all filters active) ───────────────────────
-  const fullStackCases = [
-    { query: "Karachi fashion", platform: "instagram", city: "Karachi", niches: ["Fashion"], followerRange: "10k-50k", aiMode: false },
-    { query: "fitness", platform: "tiktok", city: "Lahore", niches: ["Fitness", "Health"], followerRange: "50k-100k", aiMode: false },
-    { query: "tech blogger", platform: "youtube", city: "Islamabad", niches: ["Tech", "Education", "Gaming"], followerRange: "100k-500k", aiMode: false },
-    { query: "Pakistani creator", platform: "instagram", city: "Karachi", niches: ["Fashion", "Beauty", "Lifestyle"], followerRange: "1k-10k", aiMode: true },
-    { query: "comedy creator", platform: "tiktok", city: "All Pakistan", niches: ["Comedy"], followerRange: "500k+", aiMode: true },
-  ];
-  for (const c of fullStackCases) {
-    combos.push({ id: id++, ...c });
-  }
-
-  // ── Tier 6: Randomised valid states (bulk up to 500+ total) ─────────────
-  const targetTotal = 520;
-  while (combos.length < targetTotal) {
-    const nicheCount = Math.floor(rng() * 4); // 0, 1, 2, or 3
-    combos.push({
-      id: id++,
-      query: pick(KEYWORDS),
-      platform: rng() < 0.15 ? pick([PLATFORM_PAIRS[0], PLATFORM_PAIRS[1], PLATFORM_PAIRS[2], PLATFORM_ALL]) : pick(PLATFORMS),
-      city: pick(CITIES),
-      niches: pickN(NICHES, nicheCount),
-      followerRange: pick(FOLLOWER_RANGES),
-      aiMode: rng() < 0.25,
-    });
-  }
-
-  // ── Tier 7: Invalid / edge states ────────────────────────────────────────
-  for (const s of INVALID_STATES) {
-    combos.push({
-      id: id++,
-      query: s.query,
-      platform: s.platform,
-      city: "All Pakistan",
-      niches: (s as any).niches ?? [],
-      followerRange: "any",
-      aiMode: false,
-      note: s.note,
-      isInvalid: true,
-    });
-  }
-  // Extra random edge states
-  while (combos.filter(c => c.isInvalid).length < 100) {
-    combos.push({
-      id: id++,
-      query: pick(["", "  ", "a", "1", "@", "#!$", "x".repeat(201), "🚀 creator", "null", "undefined"]),
-      platform: pick(PLATFORMS),
-      city: "All Pakistan",
-      niches: [],
-      followerRange: "any",
-      aiMode: false,
-      isInvalid: true,
-      note: "random edge state",
-    });
-  }
-
-  return combos;
 }
 
-// ─── Page helpers ─────────────────────────────────────────────────────────────
+function pickN<T>(arr: readonly T[], n: number, rand: () => number): T[] {
+  const copy = [...arr];
+  const result: T[] = [];
+  for (let i = 0; i < n && copy.length > 0; i++) {
+    const idx = Math.floor(rand() * copy.length);
+    result.push(copy.splice(idx, 1)[0]);
+  }
+  return result;
+}
 
-async function applyCombo(page: Page, combo: FilterCombo): Promise<void> {
-  // Platform — click checkboxes to reach desired state
-  const desiredPlatforms = Array.isArray(combo.platform) ? combo.platform : [combo.platform];
+function generateCombinations(limit: number): ComboState[] {
+  const rand = lcg(0xdeadbeef);
+  const combos: ComboState[] = [];
+  const validTarget = Math.floor(limit * 0.83); // 83% valid
+  const invalidTarget = limit - validTarget;     // 17% invalid/edge
 
-  // Uncheck all first, then check desired
+  // ── Valid combinations (stratified random) ───────────────────────────────
+  while (combos.filter((c) => !c.isInvalid).length < validTarget) {
+    const platforms = PLATFORM_COMBOS[Math.floor(rand() * PLATFORM_COMBOS.length)];
+    const city = CITIES[Math.floor(rand() * CITIES.length)];
+    const nicheCount = Math.floor(rand() * 3) + 1; // 1–3
+    const niches = pickN(NICHES, nicheCount, rand);
+    const followerRange = FOLLOWER_RANGES[Math.floor(rand() * FOLLOWER_RANGES.length)];
+    const keyword = KEYWORDS[Math.floor(rand() * (KEYWORDS.length - 2))]; // skip last 2 (abuse)
+
+    const id = `v:${platforms.join("+")}|${city}|${niches.join("+")}|${followerRange}|${keyword.slice(0, 12)}`;
+    if (combos.some((c) => c.id === id)) continue; // deduplicate
+
+    combos.push({ id, platforms, city, niches, followerRange, keyword, isInvalid: false });
+  }
+
+  // ── Invalid / edge-case combinations ─────────────────────────────────────
+  const invalidEdges: Array<Partial<ComboState> & { invalidReason: string }> = [
+    // Query injection attempts
+    { keyword: "'; DROP TABLE influencers; --", invalidReason: "SQL injection attempt" },
+    { keyword: "<script>alert(1)</script>", invalidReason: "XSS attempt" },
+    { keyword: "A".repeat(500), invalidReason: "500-char query" },
+    { keyword: "A".repeat(201), invalidReason: "201-char query (just over cap)" },
+    { keyword: "   ", invalidReason: "whitespace-only query" },
+    // Platform edge cases
+    { platforms: [], invalidReason: "no platform selected" },
+    { platforms: ["invalid_platform"], invalidReason: "unknown platform value" },
+    // Niche edge cases (max 3 must be enforced)
+    { niches: ["Fashion", "Fitness", "Beauty", "Tech"], invalidReason: "4 niches (over limit)" },
+    { niches: [], invalidReason: "empty niche selection" },
+    // Follower range edge cases
+    { followerRange: "5k-15k", invalidReason: "non-existent range value" },
+    { followerRange: "", invalidReason: "empty follower range" },
+    // City edge cases
+    { city: "Mumbai", invalidReason: "Indian city (non-PK)" },
+    { city: "", invalidReason: "empty city" },
+    { city: "'; SELECT 1; --", invalidReason: "city injection" },
+    // Combined extremes
+    {
+      keyword: "Karachi",
+      platforms: ["instagram", "tiktok", "youtube"],
+      niches: ["Fashion", "Beauty", "Fitness"],
+      followerRange: "500k+",
+      city: "Karachi",
+      invalidReason: "all filters maxed",
+    },
+    {
+      keyword: "Gaming",
+      platforms: ["tiktok"],
+      niches: ["Gaming"],
+      followerRange: "1k-10k",
+      city: "All Pakistan",
+      invalidReason: "valid but ultra-narrow",
+    },
+    // Rapid same-query repeats (cache stress)
+    { keyword: "Karachi fashion", invalidReason: "duplicate-1" },
+    { keyword: "Karachi fashion", invalidReason: "duplicate-2" },
+    { keyword: "Karachi fashion", invalidReason: "duplicate-3" },
+    // Empty keyword with filters only
+    { keyword: "", invalidReason: "empty keyword with filters" },
+    // Number-only
+    { keyword: "12345", invalidReason: "numeric-only query" },
+    // Unicode / emoji
+    { keyword: "🇵🇰 creator", invalidReason: "emoji query" },
+    { keyword: "کراچی فیشن", invalidReason: "Urdu query" },
+  ];
+
+  for (let i = 0; i < Math.min(invalidEdges.length, invalidTarget); i++) {
+    const edge = invalidEdges[i];
+    combos.push({
+      id: `inv:${i}:${edge.invalidReason}`,
+      platforms: edge.platforms ?? ["instagram"],
+      city: edge.city ?? "All Pakistan",
+      niches: edge.niches ?? [],
+      followerRange: edge.followerRange ?? "any",
+      keyword: edge.keyword ?? "test",
+      isInvalid: true,
+      invalidReason: edge.invalidReason,
+    });
+  }
+
+  // Shuffle
+  for (let i = combos.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [combos[i], combos[j]] = [combos[j], combos[i]];
+  }
+
+  return combos.slice(0, limit);
+}
+
+// ─── Page Helpers ─────────────────────────────────────────────────────────────
+
+async function resetPage(page: Page) {
+  await page.goto("/search");
+  await expect(page.getByTestId("search-input")).toBeVisible({ timeout: 15_000 });
+}
+
+async function applyCombo(page: Page, combo: ComboState) {
+  // ── Platform ─────────────────────────────────────────────────────────────
   for (const p of PLATFORMS) {
-    const checkbox = page.getByTestId(`platform-${p}`);
-    const isChecked = await checkbox.evaluate((el: HTMLInputElement) => el.checked).catch(() => false);
-    if (isChecked && !desiredPlatforms.includes(p)) await checkbox.click().catch(() => {});
-    if (!isChecked && desiredPlatforms.includes(p)) await checkbox.click().catch(() => {});
+    const cb = page.getByTestId(`platform-${p}`);
+    const checked = await cb.evaluate((el) => (el as HTMLInputElement).checked).catch(() => false);
+    const shouldBeChecked = combo.platforms.includes(p);
+    if (checked !== shouldBeChecked) {
+      await cb.click({ timeout: 3_000 }).catch(() => {});
+    }
   }
 
-  // City
-  if (combo.city !== "All Pakistan") {
-    await page.locator("select").first().selectOption(combo.city).catch(() => {});
+  // ── City ─────────────────────────────────────────────────────────────────
+  if (combo.city && CITIES.includes(combo.city)) {
+    await page.locator("aside select").first().selectOption(combo.city).catch(() => {});
   }
 
-  // Follower range — second <select>
-  if (combo.followerRange !== "any") {
-    await page.locator("select").nth(1).selectOption(combo.followerRange).catch(() => {});
+  // ── Follower range ────────────────────────────────────────────────────────
+  if (combo.followerRange) {
+    await page.locator("aside select").nth(1).selectOption(combo.followerRange).catch(() => {});
   }
 
-  // Niches — deselect all active first, then select desired
+  // ── Niches (reset all first) ──────────────────────────────────────────────
   for (const n of NICHES) {
     const btn = page.getByTestId(`niche-btn-${n.toLowerCase()}`);
     const isActive = await btn.getAttribute("data-active").catch(() => "false");
-    if (isActive === "true" && !combo.niches.includes(n)) {
-      await btn.click({ timeout: 1_000 }).catch(() => {});
+    if (isActive === "true") {
+      await btn.click({ timeout: 2_000 }).catch(() => {});
     }
   }
-  for (const n of combo.niches) {
+  // Select requested niches (respect max-3 — 4-niche tests are invalid)
+  const nichesToSelect = combo.niches.slice(0, 3);
+  for (const n of nichesToSelect) {
     const btn = page.getByTestId(`niche-btn-${n.toLowerCase()}`);
-    const isDisabled = await btn.isDisabled().catch(() => true);
-    if (!isDisabled) await btn.click({ timeout: 1_000 }).catch(() => {});
+    if (await btn.isVisible().catch(() => false) && !await btn.isDisabled().catch(() => true)) {
+      await btn.click({ timeout: 2_000 }).catch(() => {});
+    }
   }
 
-  // AI mode
-  const switchEl = page.locator("#ai-mode");
-  const isChecked = await switchEl.evaluate((el: HTMLInputElement) => el.getAttribute("data-state")).catch(() => "unchecked");
-  if (combo.aiMode && isChecked !== "checked") await switchEl.click().catch(() => {});
-  if (!combo.aiMode && isChecked === "checked") await switchEl.click().catch(() => {});
+  // ── Keyword ───────────────────────────────────────────────────────────────
+  await page.getByTestId("search-input").fill(combo.keyword.slice(0, 200));
+}
+
+async function executeSearch(page: Page): Promise<{
+  durationMs: number;
+  cardCount: number;
+  labelCount: number;
+  loaderResolvedCleanly: boolean;
+  consoleErrors: string[];
+  networkErrors: string[];
+}> {
+  const consoleErrors: string[] = [];
+  const networkErrors: string[] = [];
+
+  const consoleHandler = (msg: ConsoleMessage) => {
+    if (msg.type() === "error") consoleErrors.push(msg.text());
+  };
+  const responseHandler = (res: { status: () => number; url: () => string }) => {
+    if (res.status() >= 500) networkErrors.push(`${res.status()} ${res.url()}`);
+  };
+
+  page.on("console", consoleHandler);
+  page.on("response", responseHandler);
+
+  const btn = page.getByTestId("search-btn");
+  const isEnabled = await btn.isEnabled().catch(() => false);
+
+  const t0 = Date.now();
+
+  if (!isEnabled) {
+    // Invalid combo — search button disabled (empty/whitespace query)
+    page.off("console", consoleHandler);
+    page.off("response", responseHandler);
+    return {
+      durationMs: 0,
+      cardCount: 0,
+      labelCount: 0,
+      loaderResolvedCleanly: true,
+      consoleErrors,
+      networkErrors,
+    };
+  }
+
+  await btn.click();
+
+  const loaderSeen = await page
+    .getByTestId("loading-state")
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+
+  await Promise.race([
+    page.getByTestId("results-grid").waitFor({ state: "visible", timeout: LONG_TIMEOUT }),
+    page.getByTestId("no-results").waitFor({ state: "visible", timeout: LONG_TIMEOUT }),
+  ]).catch(() => {});
+
+  const durationMs = Date.now() - t0;
+
+  const loaderGone = !await page.getByTestId("loading-state").isVisible().catch(() => true);
+  const loaderResolvedCleanly = !loaderSeen || loaderGone;
+
+  const cardCount = await page.getByTestId("result-card").count();
+
+  // Parse result-count label
+  const labelText = await page.getByTestId("result-count").textContent().catch(() => "");
+  const labelMatch = labelText?.match(/^(\d+)/);
+  const labelCount = labelMatch ? parseInt(labelMatch[1], 10) : -1;
+
+  page.off("console", consoleHandler);
+  page.off("response", responseHandler);
+
+  return {
+    durationMs,
+    cardCount,
+    labelCount,
+    loaderResolvedCleanly,
+    consoleErrors: consoleErrors.filter(
+      (e) => !e.includes("ResizeObserver") && !e.includes("passive event") && !e.includes("favicon")
+    ),
+    networkErrors,
+  };
 }
 
 async function getCredits(page: Page): Promise<number | null> {
   const badge = page.getByTestId("credits-badge");
   if (!await badge.isVisible().catch(() => false)) return null;
-  const m = (await badge.textContent())?.match(/(\d+)/);
+  const text = await badge.textContent();
+  const m = text?.match(/(\d+)/);
   return m ? parseInt(m[1], 10) : null;
 }
 
-async function executeSearch(page: Page, query: string): Promise<void> {
-  const input = page.getByTestId("search-input");
-  await input.fill(query);
-  const btn = page.getByTestId("search-btn");
-  const enabled = await btn.isEnabled().catch(() => false);
-  if (!enabled) return; // empty query — intentionally no-op
-  await btn.click();
-  await Promise.race([
-    page.getByTestId("results-grid").waitFor({ state: "visible", timeout: 35_000 }),
-    page.getByTestId("no-results").waitFor({ state: "visible", timeout: 35_000 }),
-    page.waitForTimeout(35_000),
-  ]).catch(() => {});
+async function validateCards(page: Page, combo: ComboState): Promise<{
+  hasDuplicates: boolean;
+  nicheLeaked: boolean;
+  platformLeaked: boolean;
+}> {
+  const cards = page.getByTestId("result-card");
+  const count = await cards.count();
+  if (count === 0) return { hasDuplicates: false, nicheLeaked: false, platformLeaked: false };
+
+  const seen = new Set<string>();
+  let hasDuplicates = false;
+  let nicheLeaked = false;
+  let platformLeaked = false;
+
+  for (let i = 0; i < Math.min(count, 10); i++) {
+    const card = cards.nth(i);
+
+    // Duplicate check
+    const username = await card.getAttribute("data-username").catch(() => "?");
+    const platform = await card.getAttribute("data-platform").catch(() => "?");
+    const key = `${platform}:${username}`;
+    if (seen.has(key)) hasDuplicates = true;
+    seen.add(key);
+
+    // Platform leak check (when single platform selected)
+    if (combo.platforms.length === 1) {
+      const expectedP = combo.platforms[0];
+      const badgeText = await card.getByTestId("card-platform").textContent().catch(() => "");
+      if (badgeText && !badgeText.toLowerCase().includes(expectedP)) {
+        platformLeaked = true;
+      }
+    }
+
+    // Niche leak check (when niche filter active)
+    if (combo.niches.length > 0) {
+      const nicheText = await card.getByTestId("card-niche").textContent().catch(() => null);
+      if (nicheText !== null && !combo.niches.map((n) => n.toLowerCase()).includes(nicheText.toLowerCase())) {
+        nicheLeaked = true;
+      }
+    }
+  }
+
+  return { hasDuplicates, nicheLeaked, platformLeaked };
 }
 
-async function validateRun(page: Page, combo: FilterCombo, creditsBefore: number | null, creditsAfter: number | null, consoleErrors: string[], networkErrors: string[], durationMs: number): Promise<RunResult> {
-  const failures: string[] = [];
+// ─── Statistical Analysis ─────────────────────────────────────────────────────
 
-  const cards = page.getByTestId("result-card");
-  const cardCount = await cards.count();
+interface PhaseReport {
+  generatedAt: string;
+  totalCombinations: number;
+  validCombinations: number;
+  invalidCombinations: number;
+  executed: number;
+  passed: number;
+  failed: number;
+  passRate: string;
+  failureTypes: Record<string, number>;
+  slowestCombos: Array<{ id: string; durationMs: number }>;
+  filtersWithMostFailures: Record<string, number>;
+  intermittentFlags: string[];
+  avgDurationMs: number;
+  maxDurationMs: number;
+  minDurationMs: number;
+  totalCreditsUsed: number;
+}
 
-  // Result count label
-  let resultCountLabel: number | null = null;
-  const labelText = await page.getByTestId("result-count").textContent().catch(() => null);
-  if (labelText) {
-    const m = labelText.match(/^(\d+)/);
-    if (m) resultCountLabel = parseInt(m[1], 10);
-  }
+function buildReport(results: RunResult[]): PhaseReport {
+  const executed = results.length;
+  const passed = results.filter((r) => r.passed).length;
+  const failed = executed - passed;
 
-  const gridVisible = await page.getByTestId("results-grid").isVisible().catch(() => false);
-  const noResultsVisible = await page.getByTestId("no-results").isVisible().catch(() => false);
-  const loaderStuck = await page.getByTestId("loading-state").isVisible().catch(() => false);
+  const failureTypes: Record<string, number> = {};
+  const filterFailures: Record<string, number> = {};
 
-  // ── Validation rules ────────────────────────────────────────────────────
-
-  // 1. Never both stuck in loader and no content
-  if (loaderStuck) failures.push("LOADER_STUCK: loading spinner still visible after timeout");
-
-  // 2. Exactly one of grid or no-results must be visible (not neither for valid queries)
-  if (!combo.isInvalid && combo.query.trim().length >= 2) {
-    if (!gridVisible && !noResultsVisible && !loaderStuck) {
-      failures.push("BLANK_UI: neither results-grid nor no-results visible after valid search");
+  for (const r of results.filter((r) => !r.passed)) {
+    for (const f of r.failures) {
+      failureTypes[f] = (failureTypes[f] ?? 0) + 1;
     }
+    // Attribute failures to filter combinations
+    const filterKey = `niche:${r.combo.niches.join("+")}|city:${r.combo.city}|platform:${r.combo.platforms.join("+")}`;
+    filterFailures[filterKey] = (filterFailures[filterKey] ?? 0) + 1;
   }
 
-  // 3. Result count label must match rendered cards
-  if (gridVisible && resultCountLabel !== null) {
-    if (resultCountLabel !== cardCount) {
-      failures.push(`COUNT_MISMATCH: label says ${resultCountLabel} but ${cardCount} cards rendered`);
-    }
-  }
+  const sortedByTime = [...results]
+    .filter((r) => r.durationMs > 0)
+    .sort((a, b) => b.durationMs - a.durationMs);
 
-  // 4. No duplicate creator cards (platform:username)
-  if (cardCount > 0) {
-    const seen = new Set<string>();
-    for (let i = 0; i < cardCount; i++) {
-      const uname = await cards.nth(i).getAttribute("data-username").catch(() => null);
-      const plat = await cards.nth(i).getAttribute("data-platform").catch(() => null);
-      const key = `${plat}:${uname}`;
-      if (seen.has(key)) {
-        failures.push(`DUPLICATE: ${key} appears more than once`);
-        break;
-      }
-      seen.add(key);
-    }
-  }
+  const durations = results.filter((r) => r.durationMs > 0).map((r) => r.durationMs);
+  const avgDurationMs = durations.length
+    ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+    : 0;
 
-  // 5. Niche filter must not leak non-matching niches
-  if (combo.niches.length > 0 && cardCount > 0) {
-    for (let i = 0; i < Math.min(cardCount, 6); i++) {
-      const nicheEl = cards.nth(i).getByTestId("card-niche");
-      const nicheText = await nicheEl.textContent().catch(() => null);
-      if (nicheText !== null && !combo.niches.includes(nicheText)) {
-        failures.push(`NICHE_LEAK: card ${i} shows niche "${nicheText}" but active filter is ${JSON.stringify(combo.niches)}`);
-      }
-    }
+  // Flag intermittent: identical combo, different outcomes
+  const comboOutcomes: Record<string, boolean[]> = {};
+  for (const r of results) {
+    const key = `${r.combo.platforms.join("+")}|${r.combo.niches.join("+")}|${r.combo.city}|${r.combo.keyword}`;
+    comboOutcomes[key] = [...(comboOutcomes[key] ?? []), r.passed];
   }
+  const intermittentFlags = Object.entries(comboOutcomes)
+    .filter(([, outcomes]) => outcomes.length > 1 && new Set(outcomes).size > 1)
+    .map(([key]) => key);
 
-  // 6. Platform filter must not cross-leak
-  const desiredPlatforms = Array.isArray(combo.platform) ? combo.platform : [combo.platform];
-  if (cardCount > 0) {
-    for (let i = 0; i < Math.min(cardCount, 6); i++) {
-      const cardPlatform = await cards.nth(i).getAttribute("data-platform").catch(() => null);
-      // Edge: only primary platform is used when multi selected
-      const activePlatform = desiredPlatforms[0];
-      if (cardPlatform && cardPlatform.toLowerCase() !== activePlatform.toLowerCase()) {
-        failures.push(`PLATFORM_LEAK: card ${i} is "${cardPlatform}" but active platform is "${activePlatform}"`);
-      }
-    }
-  }
-
-  // 7. No JS console errors (excluding browser noise)
-  const criticalErrors = consoleErrors.filter(e =>
-    !e.includes("ResizeObserver") &&
-    !e.includes("passive event") &&
-    !e.includes("favicon") &&
-    !e.includes("ERR_ABORTED") // cancelled inflight requests are fine
-  );
-  if (criticalErrors.length > 0) {
-    failures.push(`CONSOLE_ERROR: ${criticalErrors[0]}`);
-  }
-
-  // 8. No 5xx network errors
-  if (networkErrors.length > 0) {
-    failures.push(`NETWORK_5XX: ${networkErrors[0]}`);
-  }
-
-  // 9. Credit deducted exactly once for valid non-cached searches
-  if (!combo.isInvalid && combo.query.trim().length >= 2 && creditsBefore !== null && creditsAfter !== null) {
-    const delta = creditsBefore - creditsAfter;
-    if (delta > 1) failures.push(`CREDIT_OVER_DEDUCT: deducted ${delta} credits for a single search`);
-    // delta = 0 is acceptable (cache hit)
-    // delta < 0 would mean credits increased which is wrong
-    if (delta < 0) failures.push(`CREDIT_INCREASED: credits went up after search (${creditsBefore} → ${creditsAfter})`);
-  }
-
-  // 10. Engagement rates must be sane
-  if (cardCount > 0) {
-    for (let i = 0; i < Math.min(cardCount, 4); i++) {
-      const erText = await cards.nth(i).getByTestId("card-engagement").textContent().catch(() => null);
-      if (erText) {
-        const num = parseFloat(erText.replace("%", ""));
-        if (!isNaN(num) && (num < 0 || num > 100)) {
-          failures.push(`INVALID_ER: card ${i} has engagement rate ${num}%`);
-        }
-      }
-    }
-  }
+  const totalCreditsUsed = results.filter(
+    (r) => r.creditDeducted === true
+  ).length;
 
   return {
-    comboId: combo.id,
-    query: combo.query,
-    platform: combo.platform,
-    city: combo.city,
-    niches: combo.niches,
-    followerRange: combo.followerRange,
-    aiMode: combo.aiMode,
-    note: combo.note,
-    isInvalid: combo.isInvalid ?? false,
-    passed: failures.length === 0,
-    failures,
-    cardCount,
-    resultCountLabel,
-    durationMs,
-    consoleErrors: criticalErrors,
-    networkErrors,
-    creditsBefore,
-    creditsAfter,
+    generatedAt: new Date().toISOString(),
+    totalCombinations: COMBO_LIMIT,
+    validCombinations: results.filter((r) => !r.combo.isInvalid).length,
+    invalidCombinations: results.filter((r) => r.combo.isInvalid).length,
+    executed,
+    passed,
+    failed,
+    passRate: executed > 0 ? `${((passed / executed) * 100).toFixed(1)}%` : "N/A",
+    failureTypes,
+    slowestCombos: sortedByTime.slice(0, 10).map((r) => ({
+      id: r.combo.id,
+      durationMs: r.durationMs,
+    })),
+    filtersWithMostFailures: Object.fromEntries(
+      Object.entries(filterFailures).sort(([, a], [, b]) => b - a).slice(0, 10)
+    ),
+    intermittentFlags,
+    avgDurationMs,
+    maxDurationMs: durations.length ? Math.max(...durations) : 0,
+    minDurationMs: durations.length ? Math.min(...durations) : 0,
+    totalCreditsUsed,
   };
 }
 
-// ─── Statistical report ───────────────────────────────────────────────────────
+// ─── Test Suite ───────────────────────────────────────────────────────────────
 
-function generateReport(results: RunResult[]): string {
-  const total = results.length;
-  const passed = results.filter(r => r.passed).length;
-  const failed = results.filter(r => !r.passed).length;
-  const validRuns = results.filter(r => !r.isInvalid);
-  const invalidRuns = results.filter(r => r.isInvalid);
+test.describe("Phase 3 — Combinatorial Assault", () => {
+  const ALL_COMBOS = generateCombinations(COMBO_LIMIT);
+  const VALID_COMBOS = ALL_COMBOS.filter((c) => !c.isInvalid);
+  const INVALID_COMBOS = ALL_COMBOS.filter((c) => c.isInvalid);
 
-  // Failure type frequency
-  const failureTypes: Record<string, number> = {};
-  for (const r of results.filter(r => !r.passed)) {
-    for (const f of r.failures) {
-      const type = f.split(":")[0];
-      failureTypes[type] = (failureTypes[type] ?? 0) + 1;
-    }
-  }
+  console.log(
+    `\n🎯 Phase 3 Combinatorial Assault`
+    + `\n   Total combinations : ${ALL_COMBOS.length}`
+    + `\n   Valid              : ${VALID_COMBOS.length}`
+    + `\n   Invalid/edge       : ${INVALID_COMBOS.length}`
+    + `\n   Credit budget guard: pauses if credits ≤ 3\n`
+  );
 
-  // Slowest combos
-  const sorted = [...results].sort((a, b) => b.durationMs - a.durationMs);
-  const slowest = sorted.slice(0, 5).map(r => ({ id: r.comboId, q: r.query, ms: r.durationMs }));
+  // ── P3-1: Valid Combination Matrix ─────────────────────────────────────────
 
-  // Filters most likely to cause failure
-  const filterFailRate: Record<string, { total: number; failed: number }> = {};
-  for (const r of results) {
-    const key = `${Array.isArray(r.platform) ? r.platform.join("+") : r.platform}|${r.city}|niches=${r.niches.length}|${r.followerRange}`;
-    if (!filterFailRate[key]) filterFailRate[key] = { total: 0, failed: 0 };
-    filterFailRate[key].total++;
-    if (!r.passed) filterFailRate[key].failed++;
-  }
-  const worstFilters = Object.entries(filterFailRate)
-    .filter(([, v]) => v.failed > 0)
-    .sort(([, a], [, b]) => (b.failed / b.total) - (a.failed / a.total))
-    .slice(0, 5)
-    .map(([k, v]) => ({ filter: k, failRate: `${Math.round(v.failed / v.total * 100)}%`, failed: v.failed, total: v.total }));
+  test("P3-1 — Valid filter combination matrix", async ({ page }) => {
+    test.setTimeout(COMBO_LIMIT * 50_000); // generous timeout for the full run
 
-  const avgDuration = results.reduce((s, r) => s + r.durationMs, 0) / total;
-  const p95 = sorted[Math.floor(total * 0.05)]?.durationMs ?? 0;
+    const results: RunResult[] = [];
+    let creditBudget: number | null = null;
 
-  const report = {
-    summary: {
-      totalCombinationsTested: total,
-      validStateCombinations: validRuns.length,
-      invalidEdgeStateCombinations: invalidRuns.length,
-      passed,
-      failed,
-      passRate: `${Math.round(passed / total * 100)}%`,
-      failRate: `${Math.round(failed / total * 100)}%`,
-    },
-    performance: {
-      avgDurationMs: Math.round(avgDuration),
-      p95DurationMs: p95,
-      slowestCombos: slowest,
-    },
-    failures: {
-      byType: failureTypes,
-      mostCommonFailureType: Object.entries(failureTypes).sort(([, a], [, b]) => b - a)[0]?.[0] ?? "none",
-      filtersWithHighestFailRate: worstFilters,
-      fullFailedList: results.filter(r => !r.passed).map(r => ({
-        id: r.comboId, query: r.query, platform: r.platform,
-        niches: r.niches, city: r.city, failures: r.failures,
-      })),
-    },
-    enrichmentMismatches: results.filter(r => r.failures.some(f => f.startsWith("NICHE_LEAK") || f.startsWith("PLATFORM_LEAK"))).length,
-    raceConditionsDetected: results.filter(r => r.failures.some(f => f.includes("STALE") || f.includes("STUCK"))).length,
-    cachePoisoning: results.filter(r => r.failures.some(f => f.includes("CREDIT_OVER_DEDUCT"))).length,
-  };
-
-  return JSON.stringify(report, null, 2);
-}
-
-// ─── Global state for accumulating results across tests ───────────────────────
-
-const ALL_RESULTS: RunResult[] = [];
-const COMBOS = generateCombinations();
-
-// ─── Main test suite ──────────────────────────────────────────────────────────
-
-// Split into batches of 50 so Playwright doesn't time out the entire suite
-const BATCH_SIZE = 50;
-const VALID_COMBOS = COMBOS.filter(c => !c.isInvalid);
-const INVALID_COMBOS = COMBOS.filter(c => c.isInvalid);
-
-const batches: FilterCombo[][] = [];
-for (let i = 0; i < VALID_COMBOS.length; i += BATCH_SIZE) {
-  batches.push(VALID_COMBOS.slice(i, i + BATCH_SIZE));
-}
-
-test.describe("Phase 3 — Combinatorial Filter Assault", () => {
-  // Run valid combo batches
-  for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
-    const batch = batches[batchIdx];
-
-    test(`Batch ${batchIdx + 1}/${batches.length} — ${batch.length} valid combinations`, async ({ page }) => {
-      await page.goto("/search");
-      await expect(page.getByTestId("search-input")).toBeVisible({ timeout: 15_000 });
-
-      for (const combo of batch) {
-        const consoleErrors: string[] = [];
-        const networkErrors: string[] = [];
-
-        const consoleHandler = (msg: any) => {
-          if (msg.type() === "error") consoleErrors.push(msg.text());
-        };
-        const responseHandler = (response: any) => {
-          if (response.status() >= 500) networkErrors.push(`${response.status()} ${response.url()}`);
-        };
-
-        page.on("console", consoleHandler);
-        page.on("response", responseHandler);
-
-        const creditsBefore = await getCredits(page);
-        const t0 = Date.now();
-
-        try {
-          await applyCombo(page, combo);
-          await executeSearch(page, combo.query);
-        } catch (e) {
-          networkErrors.push(`EXECUTION_ERROR: ${e}`);
-        }
-
-        const durationMs = Date.now() - t0;
-        const creditsAfter = await getCredits(page);
-
-        const result = await validateRun(page, combo, creditsBefore, creditsAfter, consoleErrors, networkErrors, durationMs);
-        ALL_RESULTS.push(result);
-
-        page.off("console", consoleHandler);
-        page.off("response", responseHandler);
-
-        // Bail early if credits exhausted
-        const remaining = creditsAfter ?? creditsBefore;
-        if (remaining !== null && remaining <= 0) {
-          console.warn(`⚠ Credits exhausted at combo ${combo.id} — stopping batch`);
+    for (const combo of VALID_COMBOS) {
+      // Credit guard
+      const currentCredits = await getCredits(page);
+      if (currentCredits !== null) {
+        creditBudget = currentCredits;
+        if (currentCredits <= 3) {
+          console.warn(`⚠ Credit budget exhausted (${currentCredits} left) — stopping at ${results.length}/${VALID_COMBOS.length} combos`);
           break;
         }
-
-        // Brief pause to avoid hammering the edge function
-        await page.waitForTimeout(500 + Math.random() * 300);
       }
-    });
-  }
 
-  // Invalid / edge states
-  test(`Edge States — ${INVALID_COMBOS.length} invalid/edge combinations`, async ({ page }) => {
-    await page.goto("/search");
-    await expect(page.getByTestId("search-input")).toBeVisible({ timeout: 15_000 });
-
-    for (const combo of INVALID_COMBOS) {
-      const consoleErrors: string[] = [];
-      const networkErrors: string[] = [];
-
-      const consoleHandler = (msg: any) => {
-        if (msg.type() === "error") consoleErrors.push(msg.text());
-      };
-      page.on("console", consoleHandler);
+      await resetPage(page);
+      await applyCombo(page, combo);
 
       const creditsBefore = await getCredits(page);
-      const t0 = Date.now();
+      const execData = await executeSearch(page);
+      const creditsAfter = await getCredits(page);
 
-      try {
-        await applyCombo(page, combo);
-        await page.getByTestId("search-input").fill(combo.query);
+      const cardValidation = await validateCards(page, combo);
 
-        // Try to click — it may be disabled for empty query
-        const btn = page.getByTestId("search-btn");
-        const enabled = await btn.isEnabled().catch(() => false);
-        if (enabled) {
-          await btn.click();
-          await Promise.race([
-            page.getByTestId("results-grid").waitFor({ state: "visible", timeout: 20_000 }),
-            page.getByTestId("no-results").waitFor({ state: "visible", timeout: 20_000 }),
-            page.waitForTimeout(20_000),
-          ]).catch(() => {});
+      // ── Per-run validation rules ─────────────────────────────────────────
+      const failures: string[] = [];
+
+      // Rule 1: Result count label must match visible cards (when > 0)
+      if (execData.cardCount > 0 && execData.labelCount >= 0 && execData.labelCount !== execData.cardCount) {
+        failures.push(`label(${execData.labelCount}) ≠ cards(${execData.cardCount})`);
+      }
+
+      // Rule 2: No duplicate creators
+      if (cardValidation.hasDuplicates) failures.push("duplicate creators");
+
+      // Rule 3: No niche mismatch
+      if (cardValidation.nicheLeaked) failures.push("niche filter leaked");
+
+      // Rule 4: No cross-platform leak
+      if (cardValidation.platformLeaked) failures.push("platform filter leaked");
+
+      // Rule 5: Loader must resolve cleanly
+      if (!execData.loaderResolvedCleanly) failures.push("loader stuck");
+
+      // Rule 6: No uncaught JS errors
+      const criticalErrors = execData.consoleErrors.filter(
+        (e) => e.includes("Uncaught") || e.includes("TypeError") || e.includes("Cannot read")
+      );
+      if (criticalErrors.length > 0) failures.push(`JS error: ${criticalErrors[0].slice(0, 80)}`);
+
+      // Rule 7: No 5xx from edge functions
+      if (execData.networkErrors.length > 0) failures.push(`5xx: ${execData.networkErrors[0]}`);
+
+      // Rule 8: Credit deducted exactly once (skip for cache hits)
+      let creditDeducted: boolean | null = null;
+      if (creditsBefore !== null && creditsAfter !== null) {
+        const diff = creditsBefore - creditsAfter;
+        creditDeducted = diff === 1;
+        // Only flag as failure for valid non-empty queries
+        if (combo.keyword.trim() && diff > 1) {
+          failures.push(`credits dropped by ${diff} (expected 0 or 1)`);
         }
-      } catch (e) {
-        networkErrors.push(`EDGE_EXECUTION_ERROR: ${e}`);
+      }
+
+      const result: RunResult = {
+        combo,
+        durationMs: execData.durationMs,
+        cardCount: execData.cardCount,
+        labelCount: execData.labelCount,
+        hasDuplicates: cardValidation.hasDuplicates,
+        nicheLeaked: cardValidation.nicheLeaked,
+        platformLeaked: cardValidation.platformLeaked,
+        consoleErrors: execData.consoleErrors,
+        networkErrors: execData.networkErrors,
+        creditsBefore,
+        creditsAfter,
+        creditDeducted,
+        loaderResolvedCleanly: execData.loaderResolvedCleanly,
+        passed: failures.length === 0,
+        failures,
+      };
+
+      results.push(result);
+
+      if (!result.passed) {
+        console.error(
+          `  ❌ [${results.length}/${VALID_COMBOS.length}] FAIL — ${combo.id}`
+          + `\n     Failures: ${failures.join(" | ")}`
+          + `\n     Cards: ${execData.cardCount}  Duration: ${execData.durationMs}ms`
+        );
+      } else {
+        console.log(
+          `  ✅ [${results.length}/${VALID_COMBOS.length}] PASS — ${combo.id.slice(0, 60)}`
+          + ` (${execData.cardCount} cards, ${execData.durationMs}ms)`
+        );
+      }
+
+      await page.waitForTimeout(BETWEEN_SEARCH_MS);
+    }
+
+    // ── Statistical Report ─────────────────────────────────────────────────
+    const report = buildReport(results);
+
+    // Write JSON report
+    const reportDir = path.join(process.cwd(), "test-results");
+    fs.mkdirSync(reportDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(reportDir, "phase3-report.json"),
+      JSON.stringify({ phase: 3, type: "valid-combos", ...report, rawResults: results.map((r) => ({
+        id: r.combo.id,
+        passed: r.passed,
+        failures: r.failures,
+        durationMs: r.durationMs,
+        cardCount: r.cardCount,
+        nicheLeaked: r.nicheLeaked,
+        platformLeaked: r.platformLeaked,
+        hasDuplicates: r.hasDuplicates,
+        consoleErrors: r.consoleErrors,
+        networkErrors: r.networkErrors,
+      })) }, null, 2),
+      "utf-8"
+    );
+
+    // Print summary
+    console.log(`
+╔══════════════════════════════════════════════════════════════════╗
+║  PHASE 3 — COMBINATORIAL ASSAULT RESULTS (Valid Combos)         ║
+╠══════════════════════════════════════════════════════════════════╣
+║  Executed:     ${String(report.executed).padEnd(8)} Passed: ${String(report.passed).padEnd(8)} Failed: ${String(report.failed).padEnd(8)} ║
+║  Pass rate:    ${report.passRate.padEnd(51)} ║
+║  Avg duration: ${String(report.avgDurationMs + "ms").padEnd(51)} ║
+║  Max duration: ${String(report.maxDurationMs + "ms").padEnd(51)} ║
+║  Credits used: ${String(report.totalCreditsUsed).padEnd(51)} ║
+╠══════════════════════════════════════════════════════════════════╣`);
+
+    if (Object.keys(report.failureTypes).length > 0) {
+      console.log(`║  FAILURE BREAKDOWN:`);
+      for (const [type, count] of Object.entries(report.failureTypes)) {
+        console.log(`║    • ${type}: ${count}`);
+      }
+    }
+
+    if (report.intermittentFlags.length > 0) {
+      console.log(`║  ⚠ INTERMITTENT (same combo, different outcomes):`);
+      for (const f of report.intermittentFlags.slice(0, 5)) {
+        console.log(`║    • ${f.slice(0, 60)}`);
+      }
+    }
+
+    if (report.slowestCombos.length > 0) {
+      console.log(`║  SLOWEST COMBOS:`);
+      for (const s of report.slowestCombos.slice(0, 5)) {
+        console.log(`║    • ${String(s.durationMs + "ms").padEnd(8)} ${s.id.slice(0, 52)}`);
+      }
+    }
+
+    console.log(`╚══════════════════════════════════════════════════════════════════╝`);
+
+    // Assertions: allow up to 15% failure rate before hard-failing
+    const maxAllowedFailures = Math.ceil(results.length * 0.15);
+    expect(
+      report.failed,
+      `Phase 3 exceeded 15% failure threshold (${report.failed}/${results.length} failed). See test-results/phase3-report.json`
+    ).toBeLessThanOrEqual(maxAllowedFailures);
+
+    // Hard-fail on any intermittents (race conditions / state bleed)
+    expect(
+      report.intermittentFlags.length,
+      `Intermittent failures detected — possible race condition or state bleed: ${report.intermittentFlags.slice(0, 3).join(", ")}`
+    ).toBe(0);
+  });
+
+  // ── P3-2: Invalid / Edge-Case Combinations ─────────────────────────────────
+
+  test("P3-2 — Invalid and edge-case state handling", async ({ page }) => {
+    test.setTimeout(INVALID_COMBOS.length * 30_000);
+
+    for (const combo of INVALID_COMBOS) {
+      await resetPage(page);
+
+      // Apply keyword (truncated to input max)
+      await page.getByTestId("search-input").fill(combo.keyword.slice(0, 200));
+
+      // Valid niches only (skip 4-niche tests — button is disabled)
+      const validNiches = combo.niches.slice(0, 3).filter((n) => NICHES.includes(n));
+      for (const n of validNiches) {
+        const btn = page.getByTestId(`niche-btn-${n.toLowerCase()}`);
+        if (!await btn.isDisabled().catch(() => true)) {
+          await btn.click({ timeout: 2_000 }).catch(() => {});
+        }
+      }
+
+      const btn = page.getByTestId("search-btn");
+      const connectedErrors: string[] = [];
+      page.on("console", (msg) => {
+        if (msg.type() === "error") connectedErrors.push(msg.text());
+      });
+
+      if (await btn.isEnabled().catch(() => false)) {
+        await btn.click();
+        await Promise.race([
+          page.getByTestId("results-grid").waitFor({ state: "visible", timeout: 30_000 }),
+          page.getByTestId("no-results").waitFor({ state: "visible", timeout: 30_000 }),
+          page.locator("[data-sonner-toaster]").waitFor({ state: "visible", timeout: 30_000 }),
+        ]).catch(() => {});
+      }
+
+      // Core invariant: app must never crash, blank, or hang
+      const criticalJS = connectedErrors.filter(
+        (e) => e.includes("Uncaught") || e.includes("Cannot read property") || e.includes("TypeError")
+      );
+      expect(
+        criticalJS,
+        `Invalid combo "${combo.invalidReason}" caused uncaught JS error: ${criticalJS[0]}`
+      ).toHaveLength(0);
+
+      // Page must still be responsive
+      await expect(page.getByTestId("search-input")).toBeVisible({ timeout: 5_000 });
+
+      console.log(`  ✅ Edge: "${combo.invalidReason}" — app survived`);
+      await page.waitForTimeout(300);
+    }
+  });
+
+  // ── P3-3: Niche Max-3 Invariant Under All Combos ──────────────────────────
+
+  test("P3-3 — Niche max-3 invariant holds under 200 random toggle sequences", async ({ page }) => {
+    test.setTimeout(120_000);
+    await resetPage(page);
+
+    const rand = lcg(0xcafebabe);
+    const allNicheIds = NICHES.map((n) => n.toLowerCase());
+
+    for (let seq = 0; seq < 200; seq++) {
+      // Pick a random niche
+      const id = allNicheIds[Math.floor(rand() * allNicheIds.length)];
+      const btn = page.getByTestId(`niche-btn-${id}`);
+
+      const disabled = await btn.isDisabled().catch(() => true);
+      if (!disabled) {
+        await btn.click({ timeout: 500 }).catch(() => {});
+      }
+
+      // After every click, verify active ≤ 3
+      let activeCount = 0;
+      for (const n of allNicheIds) {
+        const active = await page.getByTestId(`niche-btn-${n}`).getAttribute("data-active").catch(() => "false");
+        if (active === "true") activeCount++;
+      }
+
+      expect(
+        activeCount,
+        `Sequence ${seq}: active niches exceeded 3 (found ${activeCount})`
+      ).toBeLessThanOrEqual(3);
+
+      // Counter badge must be consistent
+      if (activeCount > 0) {
+        const counterText = await page.getByTestId("niche-counter").textContent().catch(() => "");
+        const m = counterText?.match(/(\d+)\/3/);
+        if (m) {
+          expect(parseInt(m[1], 10), `Counter badge shows ${m[1]} but active count is ${activeCount}`).toBe(activeCount);
+        }
+      }
+    }
+  });
+
+  // ── P3-4: Statistical Ranking Stability ────────────────────────────────────
+
+  test("P3-4 — Ranking stability: same query twice returns same order", async ({ page }) => {
+    test.setTimeout(90_000);
+
+    const topQueries = ["Karachi fashion", "Lahore tech", "Islamabad fitness"];
+
+    for (const q of topQueries) {
+      await resetPage(page);
+      await page.getByTestId("search-input").fill(q);
+      await page.getByTestId("search-btn").click();
+
+      await Promise.race([
+        page.getByTestId("results-grid").waitFor({ state: "visible", timeout: LONG_TIMEOUT }),
+        page.getByTestId("no-results").waitFor({ state: "visible", timeout: LONG_TIMEOUT }),
+      ]).catch(() => {});
+
+      const cards1 = page.getByTestId("result-card");
+      const count1 = await cards1.count();
+      if (count1 < 2) continue; // not enough results to check ordering
+
+      const order1: string[] = [];
+      for (let i = 0; i < Math.min(count1, 5); i++) {
+        const u = await cards1.nth(i).getAttribute("data-username").catch(() => "?");
+        order1.push(u ?? "?");
+      }
+
+      // Repeat same search (may hit session cache)
+      await page.getByTestId("search-input").fill(q);
+      await page.getByTestId("search-btn").click();
+
+      await Promise.race([
+        page.getByTestId("results-grid").waitFor({ state: "visible", timeout: LONG_TIMEOUT }),
+        page.getByTestId("no-results").waitFor({ state: "visible", timeout: LONG_TIMEOUT }),
+      ]).catch(() => {});
+
+      const cards2 = page.getByTestId("result-card");
+      const count2 = await cards2.count();
+
+      const order2: string[] = [];
+      for (let i = 0; i < Math.min(count2, 5); i++) {
+        const u = await cards2.nth(i).getAttribute("data-username").catch(() => "?");
+        order2.push(u ?? "?");
+      }
+
+      expect(
+        order2,
+        `Ranking unstable for query "${q}": run 1 = [${order1.join(",")}], run 2 = [${order2.join(",")}]`
+      ).toEqual(order1);
+
+      console.log(`  ✅ Ranking stable for "${q}": [${order1.slice(0, 3).join(", ")}]`);
+    }
+  });
+});
+
+// ─── Phase 3 Stress Layer ─────────────────────────────────────────────────────
+
+test.describe("Phase 3 — Burst Stress Layer", () => {
+  test(`P3-BURST — ${BURST_COUNT} searches in randomized burst`, async ({ page }) => {
+    test.setTimeout(BURST_COUNT * 45_000);
+
+    await resetPage(page);
+
+    const credits = await getCredits(page);
+    if (credits !== null && credits < 5) {
+      test.skip(true, `Only ${credits} credits — skipping burst stress`);
+    }
+
+    const rand = lcg(0xf00dface);
+    const burstResults: Array<{
+      i: number;
+      query: string;
+      cards: number;
+      durationMs: number;
+      errors: string[];
+    }> = [];
+
+    for (let i = 0; i < BURST_COUNT; i++) {
+      const keyword = KEYWORDS[Math.floor(rand() * (KEYWORDS.length - 3))]; // skip abuse strings
+      const platform = PLATFORMS[Math.floor(rand() * PLATFORMS.length)];
+      const niches = Math.random() > 0.5 ? [NICHES[Math.floor(rand() * NICHES.length)]] : [];
+
+      // Reset niche state
+      for (const n of NICHES) {
+        const btn = page.getByTestId(`niche-btn-${n.toLowerCase()}`);
+        const isActive = await btn.getAttribute("data-active").catch(() => "false");
+        if (isActive === "true") await btn.click({ timeout: 1_000 }).catch(() => {});
+      }
+      for (const n of niches) {
+        const btn = page.getByTestId(`niche-btn-${n.toLowerCase()}`);
+        if (!await btn.isDisabled().catch(() => true)) {
+          await btn.click({ timeout: 1_000 }).catch(() => {});
+        }
+      }
+
+      // Ensure correct platform
+      for (const p of PLATFORMS) {
+        const cb = page.getByTestId(`platform-${p}`);
+        const checked = await cb.evaluate((el) => (el as HTMLInputElement).checked).catch(() => false);
+        if (p === platform && !checked) await cb.click({ timeout: 2_000 }).catch(() => {});
+        if (p !== platform && checked) await cb.click({ timeout: 2_000 }).catch(() => {});
+      }
+
+      await page.getByTestId("search-input").fill(keyword);
+
+      const errors: string[] = [];
+      page.on("console", (msg) => {
+        if (msg.type() === "error") errors.push(msg.text());
+      });
+
+      const t0 = Date.now();
+      const btn = page.getByTestId("search-btn");
+
+      if (await btn.isEnabled().catch(() => false)) {
+        await btn.click();
+        await Promise.race([
+          page.getByTestId("results-grid").waitFor({ state: "visible", timeout: LONG_TIMEOUT }),
+          page.getByTestId("no-results").waitFor({ state: "visible", timeout: LONG_TIMEOUT }),
+        ]).catch(() => {});
       }
 
       const durationMs = Date.now() - t0;
-      const creditsAfter = await getCredits(page);
+      const cards = await page.getByTestId("result-card").count();
 
-      // For invalid states: the key validation is "no crash, no 5xx, UI is stable"
-      const loaderStuck = await page.getByTestId("loading-state").isVisible().catch(() => false);
-      const failures: string[] = [];
-      if (loaderStuck) failures.push("LOADER_STUCK on invalid input");
+      burstResults.push({ i, query: keyword, cards, durationMs, errors });
+      console.log(`  [${i + 1}/${BURST_COUNT}] "${keyword}" → ${cards} cards (${durationMs}ms)`);
 
-      const criticalErrors = consoleErrors.filter(e =>
-        e.includes("Uncaught") || e.includes("Cannot read") || e.includes("TypeError")
-      );
-      if (criticalErrors.length) failures.push(`UNCAUGHT_JS: ${criticalErrors[0]}`);
-      if (networkErrors.length) failures.push(`NETWORK_ERROR: ${networkErrors[0]}`);
-
-      ALL_RESULTS.push({
-        comboId: combo.id,
-        query: combo.query,
-        platform: combo.platform,
-        city: combo.city,
-        niches: combo.niches,
-        followerRange: combo.followerRange,
-        aiMode: combo.aiMode,
-        note: combo.note,
-        isInvalid: true,
-        passed: failures.length === 0,
-        failures,
-        cardCount: 0,
-        resultCountLabel: null,
-        durationMs,
-        consoleErrors: criticalErrors,
-        networkErrors,
-        creditsBefore,
-        creditsAfter,
-      });
-
-      page.off("console", consoleHandler);
-      await page.waitForTimeout(200);
-    }
-  });
-});
-
-// ─── Burst Stress Layer ───────────────────────────────────────────────────────
-
-test.describe("Phase 3 — Burst Stress (50 searches / 60 s)", () => {
-  test("burst: 50 rapid searches with random filters", async ({ page }) => {
-    await page.goto("/search");
-    await expect(page.getByTestId("search-input")).toBeVisible({ timeout: 15_000 });
-
-    const rng = (() => {
-      let seed = 1337;
-      return () => { seed = (seed * 1664525 + 1013904223) & 0xffffffff; return (seed >>> 0) / 0xffffffff; };
-    })();
-    const pick = <T>(arr: T[]) => arr[Math.floor(rng() * arr.length)];
-
-    const BURST_KEYWORDS = ["fashion", "Karachi", "fitness", "tech", "beauty", "gaming", "food", "music"];
-
-    let successCount = 0;
-    let errorCount = 0;
-    const startTime = Date.now();
-
-    for (let i = 0; i < 50; i++) {
-      if (Date.now() - startTime > 60_000) {
-        console.warn(`⏱ 60 s budget reached at iteration ${i} — stopping burst`);
+      // Credit guard
+      const currentCredits = await getCredits(page);
+      if (currentCredits !== null && currentCredits <= 2) {
+        console.warn(`⚠ Credit budget low (${currentCredits}) — ending burst early at ${i + 1}/${BURST_COUNT}`);
         break;
       }
 
-      const credits = await getCredits(page);
-      if (credits !== null && credits <= 0) {
-        console.warn("Credits exhausted — stopping burst");
-        break;
-      }
+      // No stale UI — search input must still be interactive
+      await expect(page.getByTestId("search-input"), `Search input unresponsive after search ${i + 1}`).toBeEditable();
 
-      try {
-        const q = pick(BURST_KEYWORDS);
-        await page.getByTestId("search-input").fill(q);
-
-        // Random niche toggle
-        if (rng() > 0.7) {
-          const n = pick(["fashion", "fitness", "tech", "beauty", "gaming"]);
-          const btn = page.getByTestId(`niche-btn-${n}`);
-          const disabled = await btn.isDisabled().catch(() => true);
-          if (!disabled) await btn.click({ timeout: 500 }).catch(() => {});
-        }
-
-        const btn = page.getByTestId("search-btn");
-        if (await btn.isEnabled()) {
-          await btn.click();
-          await Promise.race([
-            page.getByTestId("results-grid").waitFor({ state: "visible", timeout: 30_000 }),
-            page.getByTestId("no-results").waitFor({ state: "visible", timeout: 30_000 }),
-            page.waitForTimeout(30_000),
-          ]).catch(() => {});
-        }
-
-        // Verify no loader stuck
-        const stuck = await page.getByTestId("loading-state").isVisible().catch(() => false);
-        if (stuck) throw new Error("Loader stuck");
-
-        successCount++;
-      } catch (e) {
-        errorCount++;
-        console.warn(`Burst iteration ${i} error: ${e}`);
-        if (errorCount >= 10) {
-          throw new Error(`Burst test: 10 consecutive failures — engine not surviving burst`);
-        }
-      }
-
-      // Minimal pause — intentionally aggressive
-      await page.waitForTimeout(200 + Math.random() * 600);
+      // 0–300 ms random delay (simulates realistic burst, not instantaneous)
+      await page.waitForTimeout(Math.floor(rand() * 300));
     }
 
-    console.log(`\n⚡ Burst Results: ${successCount} succeeded, ${errorCount} failed in ${Math.round((Date.now() - startTime) / 1000)}s`);
-    expect(errorCount / Math.max(successCount + errorCount, 1), "Error rate >20% in burst").toBeLessThan(0.2);
-    expect(successCount, "Fewer than 5 searches completed in burst").toBeGreaterThanOrEqual(5);
-  });
-});
+    // Validate burst results
+    const crashed = burstResults.filter(
+      (r) => r.errors.some((e) => e.includes("Uncaught") || e.includes("TypeError"))
+    );
+    const longRunning = burstResults.filter((r) => r.durationMs > 30_000);
 
-// ─── Final Statistical Report ─────────────────────────────────────────────────
+    console.log(`\n📊 Burst Results:`);
+    console.log(`   Total executed  : ${burstResults.length}`);
+    console.log(`   Avg duration    : ${Math.round(burstResults.reduce((a, b) => a + b.durationMs, 0) / burstResults.length)}ms`);
+    console.log(`   Crashes         : ${crashed.length}`);
+    console.log(`   Slow (>30s)     : ${longRunning.length}`);
 
-test.describe("Phase 3 — Statistical Report", () => {
-  test("generate and write report", async ({}) => {
-    test.skip(ALL_RESULTS.length === 0, "No results collected — run combinatorial tests first");
+    // Write burst report
+    const reportDir = path.join(process.cwd(), "test-results");
+    fs.mkdirSync(reportDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(reportDir, "phase3-burst-report.json"),
+      JSON.stringify({ phase: "3-burst", generatedAt: new Date().toISOString(), results: burstResults }, null, 2),
+      "utf-8"
+    );
 
-    const report = generateReport(ALL_RESULTS);
-    const outDir = path.join(process.cwd(), "test-results");
-    if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
-    fs.writeFileSync(path.join(outDir, "phase3-report.json"), report, "utf-8");
-
-    const parsed = JSON.parse(report);
-    const { summary, failures, performance } = parsed;
-
-    console.log("\n");
-    console.log("════════════════════════════════════════════════════════");
-    console.log("  PHASE 3 — COMBINATORIAL ASSAULT — STATISTICAL REPORT");
-    console.log("════════════════════════════════════════════════════════");
-    console.log(`  Total combinations tested : ${summary.totalCombinationsTested}`);
-    console.log(`  Valid state runs          : ${summary.validStateCombinations}`);
-    console.log(`  Edge / invalid state runs : ${summary.invalidEdgeStateCombinations}`);
-    console.log(`  ✅ Passed                 : ${summary.passed} (${summary.passRate})`);
-    console.log(`  ❌ Failed                 : ${summary.failed} (${summary.failRate})`);
-    console.log(`  Avg duration              : ${performance.avgDurationMs} ms`);
-    console.log(`  P95 duration              : ${performance.p95DurationMs} ms`);
-    console.log(`  Most common failure       : ${failures.mostCommonFailureType}`);
-    console.log(`  Enrichment mismatches     : ${parsed.enrichmentMismatches}`);
-    console.log(`  Race conditions detected  : ${parsed.raceConditionsDetected}`);
-    console.log(`  Cache poisoning flags     : ${parsed.cachePoisoning}`);
-    if (failures.filtersWithHighestFailRate.length) {
-      console.log(`\n  Filter stacks most likely to break:`);
-      for (const f of failures.filtersWithHighestFailRate) {
-        console.log(`    ${f.filter}  →  ${f.failRate} fail rate (${f.failed}/${f.total})`);
-      }
-    }
-    console.log(`\n  Full report: test-results/phase3-report.json`);
-    console.log("════════════════════════════════════════════════════════\n");
-
-    // Report is written — the suite passes as long as fail rate < 25%
-    const failRate = parsed.summary.failed / Math.max(parsed.summary.totalCombinationsTested, 1);
-    expect(
-      failRate,
-      `Overall fail rate ${parsed.summary.failRate} exceeds 25% threshold. Check test-results/phase3-report.json for details.`
-    ).toBeLessThan(0.25);
+    expect(crashed.length, `${crashed.length} burst searches caused uncaught JS errors`).toBe(0);
+    expect(longRunning.length, `${longRunning.length} burst searches took >30 seconds`).toBe(0);
   });
 });

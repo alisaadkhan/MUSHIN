@@ -69,19 +69,17 @@ export default defineConfig({
       testMatch: "**/stress.spec.ts",
     },
 
-    // ── 4. Phase 3 Combinatorial Assault — separate project ───────────────────
+    // ── 4. Phase 3 — Combinatorial Assault (run on-demand) ───────────────────
+    //    npx playwright test --project=phase3
+    //    Set COMBO_LIMIT=1000 for full run, COMBO_LIMIT=120 (default) for dev
     {
       name: "phase3",
       use: {
         ...devices["Desktop Chrome"],
         storageState: "tests/e2e/.auth/state.json",
-        // Give each batch test plenty of time (50 searches × ~5s each)
-        actionTimeout: 40_000,
       },
       dependencies: ["setup"],
       testMatch: "**/phase3-combinatorial.spec.ts",
-      // Phase 3 is sequential — parallel would corrupt the credit counter
-      fullyParallel: false,
     },
   ],
 });

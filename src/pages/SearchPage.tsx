@@ -514,11 +514,23 @@ export default function SearchPage() {
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               />
             </div>
-            <div className="flex items-center space-x-2 bg-card/50 border border-white/50 px-3 h-10 rounded-lg shrink-0">
-              <Switch id="ai-mode" checked={isAiSearch} onCheckedChange={setIsAiSearch} className="data-[state=checked]:bg-primary" />
-              <Label htmlFor="ai-mode" className="text-xs font-medium cursor-pointer flex items-center gap-1">
+            <div
+              title="AI Mode — Coming Soon"
+              className="relative flex items-center space-x-2 bg-card/50 border border-white/20 px-3 h-10 rounded-lg shrink-0 opacity-50 cursor-not-allowed select-none"
+            >
+              <Switch
+                id="ai-mode"
+                checked={false}
+                onCheckedChange={() => {}}
+                disabled
+                className="pointer-events-none"
+              />
+              <Label htmlFor="ai-mode" className="text-xs font-medium flex items-center gap-1 pointer-events-none">
                 <Sparkles className="h-3 w-3" /> AI Mode
               </Label>
+              <span className="absolute -top-2 -right-2 text-[9px] font-bold bg-amber-500 text-white rounded-full px-1.5 py-0.5 leading-none tracking-wide pointer-events-none">
+                SOON
+              </span>
             </div>
             <Button
               data-testid="search-btn"
