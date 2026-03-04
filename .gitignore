@@ -26,3 +26,8 @@ dist-ssr
 *.sw?
 
 CON
+
+# Playwright
+tests/e2e/.auth/
+test-results/
+playwright-report/

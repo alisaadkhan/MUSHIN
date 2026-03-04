@@ -163,8 +163,13 @@ export default function SearchPage() {
 
   const togglePlatform = (p: string) =>
     setSelectedPlatforms(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
+  const MAX_NICHES = 3;
   const toggleNiche = (n: string) =>
-    setSelectedNiches(prev => prev.includes(n) ? prev.filter(x => x !== n) : [...prev, n]);
+    setSelectedNiches(prev => {
+      if (prev.includes(n)) return prev.filter(x => x !== n);
+      if (prev.length >= MAX_NICHES) return prev; // silently cap — button is visually disabled
+      return [...prev, n];
+    });
 
   // Auto-run once on load — restore from session cache first (no credit burn on back-nav)
   useEffect(() => {
@@ -353,7 +358,7 @@ export default function SearchPage() {
           <p className="text-sm text-muted-foreground">Search across Instagram, TikTok & YouTube in Pakistan</p>
         </div>
         {creditsRemaining !== null && (
-          <Badge variant="outline" className={`text-xs gap-1.5 py-1 px-3 ${creditsExhausted ? "border-destructive text-destructive" : ""}`}>
+          <Badge data-testid="credits-badge" variant="outline" className={`text-xs gap-1.5 py-1 px-3 ${creditsExhausted ? "border-destructive text-destructive" : ""}`}>
             {creditsRemaining} credits left
           </Badge>
         )}
@@ -397,7 +402,7 @@ export default function SearchPage() {
               <div className="space-y-1.5">
                 {PLATFORMS.map((p) => (
                   <label key={p} className="flex items-center gap-2.5 text-sm text-muted-foreground hover:text-foreground cursor-pointer">
-                    <Checkbox checked={selectedPlatforms.includes(p)} onCheckedChange={() => togglePlatform(p)} className="rounded border-border" />
+                    <Checkbox data-testid={`platform-${p.toLowerCase()}`} checked={selectedPlatforms.includes(p)} onCheckedChange={() => togglePlatform(p)} className="rounded border-border" />
                     <PlatformIcon platform={p} />
                     {p}
                   </label>
@@ -423,17 +428,42 @@ export default function SearchPage() {
 
             {/* Niche */}
             <div>
-              <p className="text-xs font-medium text-foreground mb-2">Niche</p>
-              <div className="flex flex-wrap gap-1.5">
-                {PK_NICHES.map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => toggleNiche(n)}
-                    className={`px-2 py-1 text-xs rounded-full border transition-colors ${selectedNiches.includes(n) ? "border-primary text-primary bg-primary/5" : "border-border text-muted-foreground hover:border-primary hover:text-primary"}`}
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-medium text-foreground">Niche</p>
+                {selectedNiches.length > 0 && (
+                  <span
+                    data-testid="niche-counter"
+                    className={`text-xs font-medium ${selectedNiches.length >= MAX_NICHES ? "text-amber-500" : "text-muted-foreground"}`}
                   >
-                    {n}
-                  </button>
-                ))}
+                    {selectedNiches.length}/{MAX_NICHES}
+                    {selectedNiches.length >= MAX_NICHES && " — limit reached"}
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {PK_NICHES.map((n) => {
+                  const isActive = selectedNiches.includes(n);
+                  const isDisabled = !isActive && selectedNiches.length >= MAX_NICHES;
+                  return (
+                    <button
+                      key={n}
+                      data-testid={`niche-btn-${n.toLowerCase()}`}
+                      data-active={isActive}
+                      disabled={isDisabled}
+                      onClick={() => toggleNiche(n)}
+                      title={isDisabled ? "Max 3 niches — deselect one first" : undefined}
+                      className={`px-2 py-1 text-xs rounded-full border transition-colors
+                        ${isActive
+                          ? "border-primary text-primary bg-primary/5"
+                          : isDisabled
+                            ? "border-border text-muted-foreground/40 cursor-not-allowed opacity-40"
+                            : "border-border text-muted-foreground hover:border-primary hover:text-primary"
+                        }`}
+                    >
+                      {n}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -473,6 +503,7 @@ export default function SearchPage() {
                 : <SearchIcon size={16} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               }
               <input
+                data-testid="search-input"
                 type="text"
                 placeholder={isAiSearch
                   ? "Describe the ideal Pakistani creator (e.g., Urdu food blogger from Lahore)..."
@@ -490,6 +521,7 @@ export default function SearchPage() {
               </Label>
             </div>
             <Button
+              data-testid="search-btn"
               className="btn-shine gap-2 rounded-lg shrink-0"
               disabled={!query.trim() || loading || creditsExhausted}
               onClick={handleSearch}
@@ -507,7 +539,7 @@ export default function SearchPage() {
                 ? results.filter((r) => r.niche && selectedNiches.includes(r.niche))
                 : results;
               return (
-                <p className="text-sm text-muted-foreground">
+                <p data-testid="result-count" className="text-sm text-muted-foreground">
                   {visibleResults.length} result{visibleResults.length !== 1 ? "s" : ""} found
                   {selectedNiches.length > 0 && results.length !== visibleResults.length && (
                     <span className="text-xs ml-1 opacity-60">({results.length} total)</span>
@@ -528,7 +560,7 @@ export default function SearchPage() {
 
           {/* Loading skeletons */}
           {loading && (
-            <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div data-testid="loading-state" className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-5 space-y-4">
                   <div className="flex items-start gap-3">
@@ -543,7 +575,7 @@ export default function SearchPage() {
 
           {/* Results */}
           {!loading && searched && results.length > 0 && (
-            <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div data-testid="results-grid" className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {(selectedNiches.length > 0
                 // When niche filter is active, only show results whose niche matches.
                 // Previously `!r.niche` passed niche-less results through — incorrect.
@@ -589,7 +621,7 @@ export default function SearchPage() {
 
           {/* No results */}
           {!loading && searched && results.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 text-center bg-card/50 backdrop-blur-sm border border-white/50 shadow-sm rounded-2xl">
+            <div data-testid="no-results" className="flex flex-col items-center justify-center py-20 text-center bg-card/50 backdrop-blur-sm border border-white/50 shadow-sm rounded-2xl">
               <SearchIcon className="h-10 w-10 text-muted-foreground mb-3" />
               <h3 className="font-serif text-lg font-semibold text-foreground mb-1">No Results Found</h3>
               <p className="text-sm text-muted-foreground max-w-md">
@@ -677,7 +709,12 @@ function ResultCard({ c, isFreePlan, lists, cachedScores, evaluatingUsername, ev
   const initials = displayName.split(" ").map((n: string) => n[0]).slice(0, 2).join("") || "?";
   const city = c.city_extracted || c.city;
   return (
-    <div className={`bg-background/80 backdrop-blur-md border border-white/50 shadow-sm glass-card-hover rounded-2xl p-5 transition-all duration-300 relative ${isFreePlan ? "blur-sm pointer-events-none select-none" : ""}`}>
+    <div
+      data-testid="result-card"
+      data-username={c.username}
+      data-platform={c.platform}
+      className={`bg-background/80 backdrop-blur-md border border-white/50 shadow-sm glass-card-hover rounded-2xl p-5 transition-all duration-300 relative ${isFreePlan ? "blur-sm pointer-events-none select-none" : ""}`}
+    >
       {c.is_enriched && (
         <div className="absolute -top-3 -right-2 pointer-events-none">
           <Badge className="bg-green-500 hover:bg-green-600 shadow-sm gap-1 px-2 py-0.5 pointer-events-none">
@@ -733,14 +770,14 @@ function ResultCard({ c, isFreePlan, lists, cachedScores, evaluatingUsername, ev
       </div>
 
       <div className="flex items-center gap-2 mb-3 flex-wrap">
-        <span className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5 flex items-center gap-1">
+        <span data-testid="card-platform" className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5 flex items-center gap-1">
           <PlatformIcon platform={c.platform} /> {c.platform}
         </span>
         {c.niche && (
-          <span className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5 font-medium">{c.niche}</span>
+          <span data-testid="card-niche" className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5 font-medium">{c.niche}</span>
         )}
         {city && (
-          <span className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5 flex items-center gap-1">
+          <span data-testid="card-city" className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5 flex items-center gap-1">
             <MapPin className="h-2.5 w-2.5" />{city}
           </span>
         )}
@@ -755,7 +792,7 @@ function ResultCard({ c, isFreePlan, lists, cachedScores, evaluatingUsername, ev
       <div className="grid grid-cols-3 gap-2 text-center mt-4 border-t border-border/50 pt-4">
         <div>
           <p className="text-xs text-muted-foreground">Followers</p>
-          <p className="text-sm font-semibold text-foreground data-mono">
+          <p data-testid="card-followers" className="text-sm font-semibold text-foreground data-mono">
             {c.extracted_followers ? formatFollowers(c.extracted_followers) : "—"}
           </p>
         </div>
@@ -763,7 +800,7 @@ function ResultCard({ c, isFreePlan, lists, cachedScores, evaluatingUsername, ev
           <div className="flex items-center justify-center gap-1">
             <p className="text-xs text-muted-foreground">Engagement</p>
           </div>
-          <p className="text-sm font-semibold text-foreground data-mono">
+          <p data-testid="card-engagement" className="text-sm font-semibold text-foreground data-mono">
             {c.engagement_rate != null ? `${c.engagement_rate.toFixed(1)}%` : "—"}
           </p>
           <div className="flex justify-center mt-1">
