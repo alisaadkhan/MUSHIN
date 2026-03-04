@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
     );
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    const stripe = stripeKey ? new Stripe(stripeKey, { apiVersion: "2023-10-16" }) : null;
+    const stripe = stripeKey ? new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" as const }) : null;
 
     // Get workspace membership
     const { data: membership } = await supabaseAdmin

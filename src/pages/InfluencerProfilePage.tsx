@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useInfluencerLists } from "@/hooks/useInfluencerLists";
 import { useInfluencerEvaluation, type InfluencerEvaluation } from "@/hooks/useInfluencerEvaluation";
 import { useInfluencerProfile } from "@/hooks/useInfluencerProfile";
 import { EvaluationScoreBadge } from "@/components/influencer/EvaluationScoreBadge";
@@ -100,6 +102,33 @@ export default function InfluencerProfilePage() {
   const [enriching, setEnriching] = useState(false);
   const [brandMentions] = useState<BrandMention[]>([]);
   const [botFeedbackSent, setBotFeedbackSent] = useState(false);
+  const [showAddToList, setShowAddToList] = useState(false);
+  const [addingToList, setAddingToList] = useState(false);
+
+  const { data: lists } = useInfluencerLists();
+
+  const handleAddToListSelect = async (listId: string) => {
+    if (!profile) return;
+    setAddingToList(true);
+    try {
+      const { error } = await supabase.from("list_items").upsert(
+        { list_id: listId, platform: profile.platform, username: profile.username, profile_id: profile.id },
+        { onConflict: "list_id,username,platform" }
+      );
+      if (error) throw error;
+      toast({ title: "Added to list", description: `${profile.username} added successfully.` });
+      setShowAddToList(false);
+    } catch {
+      toast({ title: "Failed to add", variant: "destructive" });
+    } finally {
+      setAddingToList(false);
+    }
+  };
+
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href);
+    toast({ title: "Link copied!", description: "Profile link copied to clipboard." });
+  };
 
   // Real data from DB
   const {
@@ -369,8 +398,8 @@ export default function InfluencerProfilePage() {
                   />
                 )}
                 <div className="flex gap-2">
-                  <Button variant="outline" size="icon" className="rounded-lg flex-1 sm:flex-none"><Heart size={16} strokeWidth={1.5} /></Button>
-                  <Button variant="outline" size="icon" className="rounded-lg flex-1 sm:flex-none"><Share2 size={16} strokeWidth={1.5} /></Button>
+                  <Button variant="outline" size="icon" className="rounded-lg flex-1 sm:flex-none" onClick={() => setShowAddToList(true)} title="Add to list"><Heart size={16} strokeWidth={1.5} /></Button>
+                  <Button variant="outline" size="icon" className="rounded-lg flex-1 sm:flex-none" onClick={handleShare} title="Copy link"><Share2 size={16} strokeWidth={1.5} /></Button>
                   {profileLink && (
                     <Button variant="outline" size="icon" className="rounded-lg flex-1 sm:flex-none" asChild>
                       <a href={profileLink} target="_blank" rel="noopener noreferrer"><ExternalLink size={16} strokeWidth={1.5} /></a>
@@ -764,6 +793,35 @@ export default function InfluencerProfilePage() {
           </div>
         </motion.div>
       )}
+
+      {/* Add to List Dialog */}
+      <Dialog open={showAddToList} onOpenChange={setShowAddToList}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Add to List</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 max-h-60 overflow-y-auto py-1">
+            {!lists || lists.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No lists yet. Create one from the Lists page.</p>
+            ) : (
+              lists.map((list) => (
+                <button
+                  key={list.id}
+                  disabled={addingToList}
+                  onClick={() => handleAddToListSelect(list.id)}
+                  className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-muted transition-colors flex items-center justify-between text-sm disabled:opacity-50"
+                >
+                  <span>{list.name}</span>
+                  <Plus size={14} className="text-muted-foreground" />
+                </button>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setShowAddToList(false)}>Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

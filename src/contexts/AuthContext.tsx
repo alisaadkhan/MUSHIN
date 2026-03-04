@@ -124,14 +124,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
-      setSession(initialSession);
-      setUser(initialSession?.user ?? null);
-      if (initialSession?.user && initialSession.user.email_confirmed_at) {
-        fetchProfileAndWorkspace(initialSession.user.id);
-      }
-      setLoading(false);
-    });
+    // M-5 fix: onAuthStateChange fires INITIAL_SESSION immediately with the
+    // current session — no need to call getSession() separately which causes a
+    // duplicate fetchProfileAndWorkspace on every app load.
+    // setLoading(false) is already handled inside the listener for all paths.
 
     return () => subscription.unsubscribe();
   }, [fetchProfileAndWorkspace]);

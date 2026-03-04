@@ -85,7 +85,7 @@ export default function Settings() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("workspaces")
-        .select("*, workspace_members(*, profiles(full_name, avatar_url))")
+        .select("*, settings, workspace_members(*, profiles(full_name, avatar_url))")
         .eq("id", workspace!.workspace_id)
         .single();
       if (error) throw error;
@@ -94,22 +94,17 @@ export default function Settings() {
     enabled: !!workspace?.workspace_id,
   });
 
+  // Sync outreach settings from already-fetched workspaceData (avoids double query)
+  // M-3 fix: removed separate useEffect that issued a second workspaces SELECT.
   useEffect(() => {
-    if (workspace?.workspace_id) {
-      supabase
-        .from("workspaces")
-        .select("settings")
-        .eq("id", workspace.workspace_id)
-        .single()
-        .then(({ data }) => {
-          const s = data?.settings as any;
-          if (s) {
-            setDefaultFromName(s.default_from_name || "");
-            setDefaultReplyTo(s.default_reply_to || "");
-          }
-        });
+    if (workspaceData) {
+      const s = (workspaceData as any).settings as any;
+      if (s) {
+        setDefaultFromName(s.default_from_name || "");
+        setDefaultReplyTo(s.default_reply_to || "");
+      }
     }
-  }, [workspace?.workspace_id]);
+  }, [workspaceData]);
 
   const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

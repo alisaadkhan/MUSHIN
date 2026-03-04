@@ -162,36 +162,56 @@ export function useInfluencerProfile(platform: string | undefined, username: str
                     setProfile(prev => prev ? { ...prev, audience_analysis: analysis } as InfluencerProfile : null);
                 }
 
-                // 5. Call detect-bot-entendre to get detailed signals (not stored in DB, fetched live)
-                try {
-                    const botResult = await supabase.functions.invoke("detect-bot-entendre", {
-                        body: {
-                            username: enriched.username,
-                            platform: enriched.platform,
-                            follower_count: enriched.follower_count,
-                            following_count: enriched.following_count,
-                            posts_count: enriched.posts_count,
-                            engagement_rate: enriched.engagement_rate,
-                            bio: enriched.bio,
-                        },
-                    });
+                // 5. Call detect-bot-entendre — respect 7-day cache to avoid burning AI credits
+                // C-2 fix: check bot_signals_computed_at before invoking the edge function
+                const cachedAge = enriched.bot_signals_computed_at
+                    ? Date.now() - new Date(enriched.bot_signals_computed_at as string).getTime()
+                    : Infinity;
+                const BOT_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-                    if (botResult.data) {
-                        setProfile(prev => prev ? {
-                            ...prev,
-                            bot_probability_entendre: botResult.data.bot_probability_entendre != null
-                                ? botResult.data.bot_probability_entendre / 100
-                                : prev.bot_probability_entendre,
-                            bot_signals: botResult.data.signals || [],
-                            bot_signals_triggered: botResult.data.signals_triggered,
-                            bot_total_signals_checked: botResult.data.total_signals_checked,
-                            bot_confidence_tier: botResult.data.confidence_tier,
-                            bot_interpretation: botResult.data.interpretation,
-                        } : prev);
+                if (cachedAge < BOT_CACHE_TTL_MS && enriched.bot_signals) {
+                    // Use cached signals — no edge function call needed
+                    setProfile(prev => prev ? {
+                        ...prev,
+                        bot_signals: enriched.bot_signals as any,
+                    } : prev);
+                } else {
+                    try {
+                        const botResult = await supabase.functions.invoke("detect-bot-entendre", {
+                            body: {
+                                username: enriched.username,
+                                platform: enriched.platform,
+                                follower_count: enriched.follower_count,
+                                following_count: enriched.following_count,
+                                posts_count: enriched.posts_count,
+                                engagement_rate: enriched.engagement_rate,
+                                bio: enriched.bio,
+                            },
+                        });
+
+                        if (botResult.data) {
+                            const signals = botResult.data.signals || [];
+                            setProfile(prev => prev ? {
+                                ...prev,
+                                bot_probability_entendre: botResult.data.bot_probability_entendre != null
+                                    ? botResult.data.bot_probability_entendre / 100
+                                    : prev.bot_probability_entendre,
+                                bot_signals: signals,
+                                bot_signals_triggered: botResult.data.signals_triggered,
+                                bot_total_signals_checked: botResult.data.total_signals_checked,
+                                bot_confidence_tier: botResult.data.confidence_tier,
+                                bot_interpretation: botResult.data.interpretation,
+                            } : prev);
+                            // Persist to DB so next load uses cache
+                            await supabase
+                                .from("influencer_profiles")
+                                .update({ bot_signals: signals, bot_signals_computed_at: new Date().toISOString() })
+                                .eq("id", enriched.id);
+                        }
+                    } catch (botErr) {
+                        // Non-critical: bot signals are supplementary, don't block render
+                        console.warn("Bot signal fetch failed:", botErr);
                     }
-                } catch (botErr) {
-                    // Non-critical: bot signals are supplementary, don't block render
-                    console.warn("Bot signal fetch failed:", botErr);
                 }
             } else {
                 // Fallback to influencers_cache

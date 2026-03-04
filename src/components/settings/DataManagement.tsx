@@ -26,26 +26,21 @@ export function DataManagement() {
     if (!user || !workspace) return;
     setExporting(true);
     try {
-      const [profileRes, campaignsRes, cardsRes, outreachRes, listsRes] = await Promise.all([
+      const [profileRes, campaignsRes, listsRes] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", user.id).single(),
-        supabase.from("campaigns").select("*").eq("workspace_id", workspace.workspace_id),
-        supabase.from("pipeline_cards").select("*").in(
-          "campaign_id",
-          (await supabase.from("campaigns").select("id").eq("workspace_id", workspace.workspace_id)).data?.map((c) => c.id) || []
-        ),
-        supabase.from("outreach_log").select("*").in(
-          "campaign_id",
-          (await supabase.from("campaigns").select("id").eq("workspace_id", workspace.workspace_id)).data?.map((c) => c.id) || []
-        ),
+        // Single query with nested relations — eliminates the 2 extra campaigns ID lookups
+        supabase.from("campaigns").select("*, pipeline_cards(*), outreach_log(*)").eq("workspace_id", workspace.workspace_id),
         supabase.from("influencer_lists").select("*, list_items(*)").eq("workspace_id", workspace.workspace_id),
       ]);
+
+      const rawCampaigns = campaignsRes.data || [];
 
       const exportData = {
         exported_at: new Date().toISOString(),
         profile: profileRes.data,
-        campaigns: campaignsRes.data,
-        pipeline_cards: cardsRes.data,
-        outreach_log: outreachRes.data,
+        campaigns: rawCampaigns.map(({ pipeline_cards: _pc, outreach_log: _ol, ...c }) => c),
+        pipeline_cards: rawCampaigns.flatMap((c) => (c as any).pipeline_cards || []),
+        outreach_log: rawCampaigns.flatMap((c) => (c as any).outreach_log || []),
         lists: listsRes.data,
       };
 
