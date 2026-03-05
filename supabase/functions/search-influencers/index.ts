@@ -412,9 +412,9 @@ Deno.serve(async (req) => {
         if (cached) {
           const t1 = performance.now();
           await supabase.from("admin_audit_log").insert({
-            action: "search", user_id: userData.user.id,
+            action: "search", admin_user_id: userData.user.id,
             details: { query, platform, location, latency_ms: Math.round(t1 - t0), cached: true }
-          }).catch(() => {});
+          }); // { error } silently ignored — audit log best-effort
           return new Response(JSON.stringify({ results: cached, cached: true }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
@@ -668,7 +668,7 @@ Deno.serve(async (req) => {
       await serviceClient.from("search_history").insert({
         workspace_id: workspaceId, query, platform,
         location: location || null, result_count: 0, filters: {},
-      }).catch(() => {});
+      }); // { error } silently ignored
       return new Response(
         JSON.stringify({ results: [], credits_remaining: (workspace?.search_credits_remaining || 1) - 1 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -774,9 +774,9 @@ Deno.serve(async (req) => {
           engagement_rate: r.engagement_rate,
         },
       }));
-      await serviceClient.from("influencers_cache")
-        .upsert(cacheRows, { onConflict: "platform,username" })
-        .catch((e: any) => console.warn("Cache upsert failed:", e?.message));
+      const { error: cacheErr } = await serviceClient.from("influencers_cache")
+        .upsert(cacheRows, { onConflict: "platform,username" });
+      if (cacheErr) console.warn("Cache upsert failed:", cacheErr.message);
     }
 
     await serviceClient.from("search_history").insert({
@@ -809,16 +809,16 @@ Deno.serve(async (req) => {
 
     const t1 = performance.now();
     await serviceClient.from("admin_audit_log").insert({
-      action: "search", user_id: userData.user.id,
+      action: "search", admin_user_id: userData.user.id,
       details: { query, platform, location, latency_ms: Math.round(t1 - t0), result_count: enrichedResults.length, cached: false }
-    });
+    }); // { error } silently ignored
 
     return new Response(
       JSON.stringify({ results: sortedResults, credits_remaining: (workspace?.search_credits_remaining || 1) - 1 }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
-  } catch (err) {
+  } catch (err: any) {
     console.error("Unexpected error:", err);
     return new Response(JSON.stringify({ error: "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });

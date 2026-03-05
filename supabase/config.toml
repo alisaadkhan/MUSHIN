@@ -8,8 +8,10 @@ verify_jwt = false
 verify_jwt = false
 
 # All other functions require a valid JWT
+# search-influencers validates JWT internally via auth.getUser() — gateway
+# verify_jwt=true is incompatible with ES256 asymmetric key projects.
 [functions.search-influencers]
-verify_jwt = true
+verify_jwt = false
 
 [functions.send-outreach-email]
 verify_jwt = true
@@ -24,7 +26,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.check-subscription]
-verify_jwt = true
+verify_jwt = false
 
 [functions.sync-hubspot]
 verify_jwt = true
