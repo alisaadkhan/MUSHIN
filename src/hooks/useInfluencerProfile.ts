@@ -109,8 +109,38 @@ export function useInfluencerProfile(platform: string | undefined, username: str
                 const secondaryNiches = Array.isArray(enriched.secondary_niches)
                     ? enriched.secondary_niches
                     : [];
-                setProfile({ ...enriched, secondary_niches: secondaryNiches } as unknown as InfluencerProfile);
-                setIsEnriched(true);
+                const fullyEnriched = enriched.enrichment_status === "success";
+                setIsEnriched(fullyEnriched);
+
+                // For stubs (searched but not yet enriched), merge influencers_cache data
+                // so the profile page can show follower count, snippet bio, and avatar
+                let profileData: any = { ...enriched, secondary_niches: secondaryNiches };
+                if (!fullyEnriched) {
+                    const { data: cached } = await supabase
+                        .from("influencers_cache")
+                        .select("*")
+                        .eq("platform", platform)
+                        .eq("username", username)
+                        .maybeSingle();
+                    if (cached) {
+                        const d = cached.data as any;
+                        profileData = {
+                            ...profileData,
+                            follower_count: enriched.follower_count ?? d?.followers ?? null,
+                            full_name: enriched.full_name ?? d?.title ?? username,
+                            bio: enriched.bio ?? d?.snippet ?? null,
+                            avatar_url: enriched.avatar_url ?? d?.imageUrl ?? null,
+                            city: enriched.city ?? (cached as any).city_extracted ?? null,
+                            primary_niche: enriched.primary_niche ?? d?.niche ?? null,
+                            metrics: {
+                                ...(enriched.metrics as object || {}),
+                                followers: enriched.follower_count ?? d?.followers ?? null,
+                                engagement_rate: enriched.engagement_rate ?? d?.engagement_rate ?? null,
+                            },
+                        };
+                    }
+                }
+                setProfile(profileData as unknown as InfluencerProfile);
 
                 // 2. Follower history
                 const { data: history } = await supabase
@@ -162,7 +192,10 @@ export function useInfluencerProfile(platform: string | undefined, username: str
                     setProfile(prev => prev ? { ...prev, audience_analysis: analysis } as InfluencerProfile : null);
                 }
 
-                // 5. Call detect-bot-entendre — respect 7-day cache to avoid burning AI credits
+                // 5. Call detect-bot-entendre — only for fully enriched profiles with real data
+                // Skip stubs: null follower/engagement data produces meaningless bot scores
+                if (!fullyEnriched) return;
+
                 // C-2 fix: check bot_signals_computed_at before invoking the edge function
                 const cachedAge = enriched.bot_signals_computed_at
                     ? Date.now() - new Date(enriched.bot_signals_computed_at as string).getTime()

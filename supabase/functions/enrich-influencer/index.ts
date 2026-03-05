@@ -567,7 +567,7 @@ Deno.serve(async (req: Request) => {
         if (user) {
             await serviceClient.from("admin_audit_log").insert({
                 action: "enrich",
-                user_id: user.id,
+                admin_user_id: user.id,
                 details: {
                     username,
                     platform,

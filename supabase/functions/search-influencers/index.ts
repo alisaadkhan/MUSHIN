@@ -696,7 +696,8 @@ Deno.serve(async (req) => {
         .from("influencer_profiles")
         .select("platform, username, avatar_url, bio, follower_count, engagement_rate, enrichment_status, full_name, city, last_enriched_at, enrichment_ttl_days")
         .eq("platform", platform)
-        .eq("enrichment_status", "success")
+        // No enrichment_status filter — include stubs so follower_count is available for cards
+        // is_enriched on each result is derived from profile?.enrichment_status === "success"
         .in("username", usernames),
       serviceClient
         .from("influencer_evaluations")
@@ -727,15 +728,17 @@ Deno.serve(async (req) => {
         return { engagement_rate: bm.rate, engagement_is_estimated: true, engagement_source: 'benchmark_estimate', engagement_benchmark_bucket: bm.bucket };
       })();
 
+      const isFullyEnriched = profile?.enrichment_status === "success";
       return {
         ...r,
-        imageUrl: profile?.avatar_url ?? r.imageUrl,
-        bio: profile?.bio ?? null,
+        // Only use DB image/bio/full_name when fully enriched — stubs have no real data
+        imageUrl: isFullyEnriched ? (profile?.avatar_url ?? r.imageUrl) : r.imageUrl,
+        bio: isFullyEnriched ? (profile?.bio ?? null) : null,
         extracted_followers: profile?.follower_count ?? r._follower_count_raw,
         ...engagementMeta,
         city_extracted: profile?.city ?? r.city_extracted,
-        full_name: profile?.full_name ?? null,
-        is_enriched: !!profile,
+        full_name: isFullyEnriched ? (profile?.full_name ?? null) : null,
+        is_enriched: isFullyEnriched,
         enrichment_status: profile?.enrichment_status ?? null,
         last_enriched_at: profile?.last_enriched_at ?? null,
         is_stale: profile?.last_enriched_at
@@ -777,6 +780,29 @@ Deno.serve(async (req) => {
       const { error: cacheErr } = await serviceClient.from("influencers_cache")
         .upsert(cacheRows, { onConflict: "platform,username" });
       if (cacheErr) console.warn("Cache upsert failed:", cacheErr.message);
+
+      // Upsert follower-count stubs to influencer_profiles so profile pages can display
+      // follower counts even before enrichment runs. ignoreDuplicates=true ensures we never
+      // overwrite success records or existing stubs.
+      const stubRows = uniqueResults
+        .filter((r: any) => {
+          const existing = profileMap.get(`${r.platform}:${r.username}`);
+          return r._follower_count_raw != null && existing?.enrichment_status !== "success";
+        })
+        .map((r: any) => ({
+          platform: r.platform,
+          username: r.username.replace("@", ""),
+          follower_count: r._follower_count_raw,
+          primary_niche: r.niche && r.niche !== "General" ? r.niche : null,
+          city: r.city_extracted || null,
+          enrichment_status: "stub",
+        }));
+      if (stubRows.length > 0) {
+        const { error: stubErr } = await serviceClient
+          .from("influencer_profiles")
+          .upsert(stubRows, { onConflict: "platform,username", ignoreDuplicates: true });
+        if (stubErr) console.warn("Stub profile upsert failed:", stubErr.message);
+      }
     }
 
     await serviceClient.from("search_history").insert({
