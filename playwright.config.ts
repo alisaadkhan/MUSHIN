@@ -138,5 +138,23 @@ export default defineConfig({
       testMatch: "**/keyword-quality-audit.spec.ts",
       timeout: 120_000,
     },
+
+    // ── 8. Deep Capture — full field extraction per card + profile visit ────
+    //    npx playwright test --project=deep-capture
+    //    COMBO_LIMIT=60 PROFILE_DEPTH=3 (defaults)
+    {
+      name: "deep-capture",
+      use: {
+        ...devices["Desktop Chrome"],
+        headless: false,
+        storageState: "tests/e2e/.auth/state.json",
+        video: "retain-on-failure",
+        screenshot: "on",
+        viewport: { width: 1440, height: 900 },
+      },
+      dependencies: ["setup"],
+      testMatch: "**/deep-capture.spec.ts",
+      timeout: 180_000,
+    },
   ],
 });
