@@ -152,7 +152,7 @@ export default defineConfig({
         screenshot: "on",
         viewport: { width: 1440, height: 900 },
       },
-      dependencies: ["setup"],
+      // dependencies: ["setup"],  // skipped — reuse existing state.json
       testMatch: "**/deep-capture.spec.ts",
       timeout: 180_000,
     },
