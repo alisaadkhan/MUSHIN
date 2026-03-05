@@ -301,11 +301,12 @@ const MockSearch = () => (
         {['Travel', 'Karachi', 'Instagram'].map(f => <span key={f} className="px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-white/40">{f}</span>)}
       </div>
       <div className="text-white/20 text-[10px]">3 verified creators · sorted by IQ score</div>
+      <div className="text-white/15 text-[9px] text-right pb-1 italic">Illustrative · not real data</div>
       <div className="space-y-1">
         {[
-          { n: 'Mooroo',       av: 'MO', bg: '7c3aed', s: 'Indie Films · Lahore', f: '421K', e: '7.3%', hi: true },
-          { n: 'Ukhano',       av: 'UK', bg: '0891b2', s: 'Travel · Karachi',     f: '892K', e: '5.8%' },
-          { n: 'Irfan Junejo', av: 'IJ', bg: '059669', s: 'Travel · Karachi',     f: '1.1M', e: '6.4%' },
+          { n: 'Sana Malik',   av: 'SM', bg: '7c3aed', s: 'Lifestyle · Lahore',  f: '421K', e: '7.3%', hi: true },
+          { n: 'Usman Tariq',  av: 'UT', bg: '0891b2', s: 'Travel · Karachi',    f: '892K', e: '5.8%' },
+          { n: 'Mehreen Raza', av: 'MR', bg: '059669', s: 'Fashion · Islamabad', f: '1.1M', e: '6.4%' },
         ].map(c => (
           <div key={c.n} className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg border ${c.hi ? 'bg-purple-600/10 border-purple-500/20' : 'border-transparent'}`}>
             <img src={`https://ui-avatars.com/api/?name=${c.av}&background=${c.bg}&color=fff&bold=true&size=64&rounded=true`} alt={c.n}
@@ -323,15 +324,16 @@ const MockProfile = () => (
   <div className="rounded-2xl border border-white/10 overflow-hidden bg-zinc-950/80 shadow-2xl backdrop-blur-sm select-none text-xs">
     <div className="flex items-center gap-1.5 px-4 py-3 border-b border-white/[0.08] bg-black/40">
       <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
-      <span className="ml-2 text-white/30">Creator Trust Score — Mooroo</span>
+      <span className="ml-2 text-white/30">Creator Trust Score — Sana Malik</span>
     </div>
     <div className="p-4">
+      <div className="text-white/15 text-[9px] text-right pb-1 italic">Illustrative · not real data</div>
       <div className="flex items-start gap-3 mb-4">
-        <img src="https://ui-avatars.com/api/?name=MO&background=7c3aed&color=fff&bold=true&size=96&rounded=true" alt="Mooroo"
+        <img src="https://ui-avatars.com/api/?name=SM&background=7c3aed&color=fff&bold=true&size=96&rounded=true" alt="Sana Malik"
           className="w-12 h-12 rounded-full flex-shrink-0 object-cover border border-purple-500/30" />
         <div className="flex-1">
-          <div className="text-white/80 font-semibold text-sm">Mooroo</div>
-          <div className="text-white/30 text-[10px] mb-1.5">@mooroo7 · Indie Films · Lahore</div>
+          <div className="text-white/80 font-semibold text-sm">Sana Malik</div>
+          <div className="text-white/30 text-[10px] mb-1.5">@sana_pk · Lifestyle · Lahore</div>
           <div className="flex gap-1">
             {['High IQ', 'Real Eng', 'PK'].map(t => <span key={t} className="px-1.5 py-0.5 rounded text-[9px] font-bold" style={{ background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc' }}>{t}</span>)}
           </div>
@@ -361,11 +363,11 @@ const MockKanban = () => (
     <div className="p-3 grid grid-cols-3 gap-2">
       {[
         { col: 'Shortlisted', color: 'rgba(168,85,247,0.9)', bg: 'rgba(168,85,247,0.08)', border: 'rgba(168,85,247,0.2)',
-          items: [{ n: 'Mooroo', av: 'MO', bg2: '7c3aed' }, { n: 'Ukhano', av: 'UK', bg2: '0891b2' }] },
+          items: [{ n: 'Sana M.',   av: 'SM', bg2: '7c3aed' }, { n: 'Usman T.', av: 'UT', bg2: '0891b2' }] },
         { col: 'Contacted', color: 'rgba(59,130,246,0.9)',  bg: 'rgba(59,130,246,0.08)',  border: 'rgba(59,130,246,0.2)',
-          items: [{ n: 'Irfan J.', av: 'IJ', bg2: '059669' }] },
+          items: [{ n: 'Mehreen R.', av: 'MR', bg2: '059669' }] },
         { col: 'Signed',    color: 'rgba(34,197,94,0.9)',   bg: 'rgba(34,197,94,0.08)',   border: 'rgba(34,197,94,0.2)',
-          items: [{ n: 'Nadir A.', av: 'NA', bg2: 'd97706' }, { n: 'Zaid A.', av: 'ZA', bg2: 'dc2626' }] },
+          items: [{ n: 'Farah S.',  av: 'FS', bg2: 'd97706' }, { n: 'Ali H.',   av: 'AH', bg2: 'dc2626' }] },
       ].map(({ col, color, bg, border, items }) => (
         <div key={col} className="space-y-1.5">
           <div className="text-[10px] font-bold mb-2" style={{ color }}>{col}</div>
@@ -856,24 +858,25 @@ export default function LandingPage() {
       <SectionSpotlight aria-label="Testimonials section" className="py-20 border-t border-white/[0.06] z-20 bg-[#060608]">
         <div>
           <div className="text-center mb-12 px-6">
-            <motion.div initial={{ opacity: 0, x: -16 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="text-purple-400 text-xs font-medium uppercase tracking-widest mb-4">Trusted by Pakistan's Best Brands</motion.div>
+            <motion.div initial={{ opacity: 0, x: -16 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="text-purple-400 text-xs font-medium uppercase tracking-widest mb-4">Built for Marketing Teams Across Pakistan</motion.div>
             <RevealLine />
             <h2 className="text-3xl md:text-5xl font-black tracking-tighter leading-tight">
-              <RevealText text="Trusted Teams" className="aurora-text" />{' '}
-              <RevealText text="Already Inside." delay={0.2} />
+              <RevealText text="Teams Love" className="aurora-text" />{' '}
+              <RevealText text="What We Built." delay={0.2} />
             </h2>
+            <p className="text-white/30 text-xs mt-4">* Testimonials below are illustrative scenarios — not attributed to specific companies.</p>
           </div>
           <div className="mb-8">
-            <MarqueeRow speed={28} items={['JazzCash','EasyPaisa','Daraz','Gul Ahmed','Khaadi','Jazz','Telenor','Unilever PK','Nestle PK','PepsiCo PK','Sapphire','Sana Safinaz'].map((b, i) => (
+            <MarqueeRow speed={28} items={['Fintech','E-commerce','Telecom','Fashion Retail','FMCG','Digital Agency','D2C Brand','Media House','Startup','Food & Beverage','Beauty & Skincare','EdTech'].map((b, i) => (
               <div key={i} className="px-5 py-2 rounded-full border border-white/10 bg-white/[0.03] text-white/40 text-sm font-semibold whitespace-nowrap hover:border-purple-500/30 hover:text-purple-400 transition-colors cursor-pointer">{b}</div>
             ))} />
           </div>
           <div className="space-y-4">
             <MarqueeRow speed={38} items={[
-              { name: 'Sarah K.',  role: 'Brand Manager · JazzCash',      text: 'Found 3 mega-creators for our Eid campaign in under 10 minutes. The ROAS was exceptional.' },
-              { name: 'Ahmed R.', role: 'Growth Lead · Daraz',            text: 'The fraud detection alone saved us from 2 fake-follower influencers with 800K combined followers.' },
-              { name: 'Fatima Z.', role: 'CMO · Gul Ahmed',              text: 'We replaced 3 separate tools with InfluenceIQ. The Kanban board is a game changer.' },
-              { name: 'Usman T.', role: 'Digital Director · EasyPaisa',  text: 'Karachi-specific filtering is insane. Found 47 verified nano-influencers in our exact market.' },
+              { name: 'Sarah K.',  role: 'Brand Manager · Fintech',         text: 'Found 3 mega-creators for our Eid campaign in under 10 minutes. The ROAS was exceptional.' },
+              { name: 'Ahmed R.',  role: 'Growth Lead · E-commerce',        text: 'The fraud detection alone saved us from 2 fake-follower influencers with 800K combined followers.' },
+              { name: 'Fatima Z.', role: 'CMO · Fashion Retail',            text: 'We replaced 3 separate tools with InfluenceIQ. The Kanban board is a game changer.' },
+              { name: 'Usman T.', role: 'Digital Director · Fintech',       text: 'Karachi-specific filtering is insane. Found 47 verified nano-influencers in our exact market.' },
             ].map((t, i) => (
               <div key={i} className="w-72 flex-shrink-0 bg-white/[0.03] border border-white/10 rounded-2xl p-5 hover:border-purple-500/20 transition-all">
                 <div className="flex gap-1 mb-3">{[...Array(5)].map((_, j) => <Star key={j} className="w-3 h-3 fill-purple-400 text-purple-400" />)}</div>
@@ -883,10 +886,10 @@ export default function LandingPage() {
               </div>
             ))} />
             <MarqueeRow reverse speed={42} items={[
-              { name: 'Nadia M.',  role: 'Influencer Lead · Khaadi',    text: "The IQ Score is the most reliable metric for Pakistani creator quality I've ever used." },
-              { name: 'Bilal A.',  role: 'CEO · HashTagPK',             text: 'Clients trust our recommendations more now that we back everything with InfluenceIQ data.' },
-              { name: 'Anosha B.', role: 'Marketing Head · Sapphire',   text: 'Went from 2 weeks of manual research to 30 minutes of verified outreach. Remarkable.' },
-              { name: 'Zaid H.',   role: 'Founder · Dukaan Digital',    text: 'City-level niche filters are something no other platform offers for Pakistan. Game-changing.' },
+              { name: 'Nadia M.',  role: 'Influencer Lead · Fashion Retail', text: "The IQ Score is the most reliable metric for Pakistani creator quality I've ever used." },
+              { name: 'Bilal A.',  role: 'CEO · Digital Agency',             text: 'Clients trust our recommendations more now that we back everything with InfluenceIQ data.' },
+              { name: 'Anosha B.', role: 'Marketing Head · D2C Brand',       text: 'Went from 2 weeks of manual research to 30 minutes of verified outreach. Remarkable.' },
+              { name: 'Zaid H.',   role: 'Founder · Media House',            text: 'City-level niche filters are something no other platform offers for Pakistan. Game-changing.' },
             ].map((t, i) => (
               <div key={i} className="w-72 flex-shrink-0 bg-white/[0.03] border border-white/10 rounded-2xl p-5 hover:border-purple-500/20 transition-all">
                 <div className="flex gap-1 mb-3">{[...Array(5)].map((_, j) => <Star key={j} className="w-3 h-3 fill-purple-400 text-purple-400" />)}</div>

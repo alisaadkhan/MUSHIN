@@ -12,11 +12,12 @@ const fadeUp: Variants = {
   }),
 };
 
+// NOTE: All names below are entirely fictional and used for illustrative purposes only.
 const MOCK_ROWS = [
-  { name: "Zara Khalid", platform: "Instagram", city: "Karachi", followers: "1.2M", engagement: "4.8%", score: 97 },
-  { name: "Hassan Ali", platform: "YouTube", city: "Lahore", followers: "890K", engagement: "6.1%", score: 94 },
-  { name: "Ayesha Noor", platform: "TikTok", city: "Islamabad", followers: "2.1M", engagement: "3.9%", score: 91 },
-  { name: "Bilal Khan", platform: "Instagram", city: "Faisalabad", followers: "540K", engagement: "5.3%", score: 88 },
+  { name: "Sara Qureshi",   platform: "Instagram", city: "Karachi",   followers: "1.2M", engagement: "4.8%", score: 97 },
+  { name: "Usman Tariq",    platform: "YouTube",   city: "Lahore",    followers: "890K", engagement: "6.1%", score: 94 },
+  { name: "Mehreen Noor",   platform: "TikTok",   city: "Islamabad", followers: "2.1M", engagement: "3.9%", score: 91 },
+  { name: "Farah Siddiqui", platform: "Instagram", city: "Faisalabad",followers: "540K", engagement: "5.3%", score: 88 },
 ];
 
 const FLOATING_BADGES = [
