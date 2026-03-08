@@ -464,7 +464,8 @@ export default function InfluencerProfilePage() {
           description: `Data was enriched recently — running AI evaluation on current data. Re-enrichment available in ${days} day(s).`,
         });
         // Don't return — fall through to evaluate() with existing profile data
-      } else if (enrichData?.code === "PROCESSING") {
+      } else
+      if (enrichData?.code === "PROCESSING") {
         toast({ title: "Enrichment In Progress", description: "Data fetch is running — showing evaluation on current data.", variant: "default" });
         // Fall through to evaluate with current data
       } else if (enrichData?.code === "BUDGET_LOCKED") {
@@ -489,7 +490,7 @@ export default function InfluencerProfilePage() {
         followers: latestMetrics.followers ?? enrichData?.profile?.follower_count ?? profile?.metrics?.followers ?? profile?.follower_count,
         engagement_rate: latestMetrics.engagement_rate ?? enrichData?.profile?.engagement_rate ?? profile?.metrics?.engagement_rate ?? profile?.engagement_rate,
         bio: enrichData?.profile?.bio ?? profile?.bio,
-      });
+      }, !!evaluation); // forceRefresh=true when already have an evaluation
     } catch (err: any) {
       const raw: string = err.message || "Unknown error";
       const enrichMsg = raw.includes("Failed to send a request")
@@ -502,7 +503,7 @@ export default function InfluencerProfilePage() {
         followers: profile?.metrics?.followers,
         engagement_rate: profile?.metrics?.engagement_rate,
         bio: profile?.bio,
-      }).catch(() => { });
+      }, !!evaluation).catch(() => { });
     } finally {
       setEnriching(false);
     }

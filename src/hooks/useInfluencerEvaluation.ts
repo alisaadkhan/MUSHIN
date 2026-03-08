@@ -48,18 +48,20 @@ export function useInfluencerEvaluation() {
     return null;
   }, [workspace]);
 
-  const evaluate = useCallback(async (influencerData: any): Promise<InfluencerEvaluation | null> => {
+  const evaluate = useCallback(async (influencerData: any, forceRefresh = false): Promise<InfluencerEvaluation | null> => {
     if (!workspace) {
       toast({ title: "Not ready", description: "Workspace is still loading. Please wait a moment and try again.", variant: "destructive" });
       return null;
     }
     setLoading(true);
     try {
-      // Check cache first
-      const cached = await fetchCached(influencerData.platform, influencerData.username);
-      if (cached) {
-        setLoading(false);
-        return cached.evaluation as unknown as InfluencerEvaluation;
+      // Check cache first — skip when forceRefresh is true (user clicked "Refresh Data")
+      if (!forceRefresh) {
+        const cached = await fetchCached(influencerData.platform, influencerData.username);
+        if (cached) {
+          setLoading(false);
+          return cached.evaluation as unknown as InfluencerEvaluation;
+        }
       }
 
       // Call AI
@@ -83,7 +85,7 @@ export function useInfluencerEvaluation() {
       const result = data as InfluencerEvaluation;
       setEvaluation(result);
 
-      // Cache result
+      // Cache result — always overwrite so refreshes are persisted
       await supabase.from("influencer_evaluations").upsert({
         platform: influencerData.platform,
         username: influencerData.username,
@@ -93,7 +95,7 @@ export function useInfluencerEvaluation() {
         evaluated_at: new Date().toISOString(),
         expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(), // 90-day expiry
         evaluation_version: 1,
-      }, { onConflict: "platform,username,workspace_id" });
+      }, { onConflict: "platform,username,workspace_id", ignoreDuplicates: false });
 
       return result;
     } catch (err: any) {

@@ -149,7 +149,7 @@ Deno.serve(async (req) => {
     // If we already have ≥ MIN_DB_RESULTS enriched profiles for this query,
     // return them immediately. This dramatically reduces external API usage
     // once the creator index grows.
-    const MIN_DB_RESULTS = 15;
+    const MIN_DB_RESULTS = 20;
     const queryNicheDataPre = inferNiche(query, "", query);
     const queryNichePre = queryNicheDataPre.confidence >= 0.3 ? queryNicheDataPre.niche : null;
     const queryCityPre = extractCity(`${query} ${location || ""}`, query)
@@ -189,7 +189,7 @@ Deno.serve(async (req) => {
         p_max_followers: dbMaxFollowers === Infinity ? 9_999_999_999 : dbMaxFollowers,
         p_min_er:        minEr,
         p_city:          queryCityPre ?? null,
-        p_limit:         40,
+        p_limit:         80,
       });
 
       const dbResults = (dbRows ?? []) as any[];
@@ -251,7 +251,7 @@ Deno.serve(async (req) => {
             _intent:          queryIntentPre.intent,
             _source:          "db",
           };
-        }).sort((a: any, b: any) => b._search_score - a._search_score).slice(0, 25);
+        }).sort((a: any, b: any) => b._search_score - a._search_score).slice(0, 50);
 
         // Log search + cache results
         await Promise.all([
@@ -329,7 +329,7 @@ Deno.serve(async (req) => {
         fetch("https://google.serper.dev/search", {
           method: "POST",
           headers: { "X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json" },
-          body: JSON.stringify({ q: variant.query, num: 50, gl: "pk", hl: "en" }),
+          body: JSON.stringify({ q: variant.query, num: 100, gl: "pk", hl: "en" }),
           signal: controller.signal,
         })
       );
@@ -421,12 +421,11 @@ Deno.serve(async (req) => {
     for (const item of platformFiltered) {
       const text = ((item.title || "") + " " + (item.snippet || "")).toLowerCase();
       const hasPakistanSignal = PAKISTAN_KEYWORDS.some(kw => text.includes(kw));
-      // Skip results that explicitly signal India
       const hasIndiaSignal = INDIA_SIGNALS.some(kw => text.includes(kw));
-      if (hasIndiaSignal) continue; // hard reject ΓÇö even Pakistani mentions won't save an Indian profile
-      // Require a positive Pakistan signal for ALL results ΓÇö city match alone isn't sufficient
-      if (!hasPakistanSignal) continue;
+      // Hard reject India-only signals
+      if (hasIndiaSignal && !hasPakistanSignal) continue;
       if (selectedCity && text.includes(selectedCity)) tier1.push(item);
+      // tier2: has Pakistan signal, or no geo signal at all (give benefit of doubt for platform-matched URLs)
       else tier2.push(item);
     }
 
@@ -468,9 +467,9 @@ Deno.serve(async (req) => {
     // Filter out items with very low quality scores (< 10 = likely not a real profile)
     const qualityFilter = (arr: any[]) => arr.filter(item => qualityScore(item) >= 10);
 
-    // Result count targets: 15 minimum, 25 maximum per platform
-    const MIN_RESULTS = 15;
-    const MAX_RESULTS = 25;
+    // Result count targets: 20 minimum, 50 maximum per platform
+    const MIN_RESULTS = 20;
+    const MAX_RESULTS = 50;
 
     // Build ranked candidates list: tier-1 (city match) first, then tier-2
     const candidates = [
@@ -480,12 +479,11 @@ Deno.serve(async (req) => {
 
     let finalResults = candidates.slice(0, MAX_RESULTS);
 
-    // If below minimum, relax quality threshold from 10 → 5 and fill up from remaining
+    // If below minimum, relax quality threshold completely and fill up from remaining
     if (finalResults.length < MIN_RESULTS) {
-      const relaxedFilter = (arr: any[]) => arr.filter(item => qualityScore(item) >= 5);
       const relaxedCandidates = [
-        ...sortByQuality(relaxedFilter(tier1)),
-        ...sortByQuality(relaxedFilter(tier2)),
+        ...sortByQuality(tier1),
+        ...sortByQuality(tier2),
       ];
       const seen = new Set(finalResults.map((r: any) => r.link));
       for (const item of relaxedCandidates) {

@@ -58,19 +58,95 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── Python service URL ────────────────────────────────────────────────────
-    const pythonUrl = Deno.env.get("PYTHON_ANALYTICS_URL");
-    if (!pythonUrl) {
-      // Service not configured — graceful degradation
-      return new Response(
-        JSON.stringify({
-          available: false,
-          reason: "Statistical analytics requires the Python analytics service. Use the Evaluate button for AI-based insights.",
-          bot_detection: { data_available: false },
-          engagement_anomaly: { data_available: false },
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // ── Inline Statistical Engine ─────────────────────────────────────────────
+    // Computes bot detection + engagement anomaly purely from the metrics passed
+    // in. No external service required. The Python service URL is optional — if
+    // set, its results replace the inline computation.
+
+    function runInlineAnalytics(m: Record<string, any>): Record<string, unknown> {
+      const follower_count: number = m.follower_count ?? 0;
+      const following_count: number = m.following_count ?? 0;
+      const posts_count: number = m.posts_count ?? 0;
+      const engagement_rate: number | null = m.engagement_rate ?? null;
+      const avg_likes: number | null = m.avg_likes ?? null;
+      const avg_comments: number | null = m.avg_comments ?? null;
+
+      // ── Bot Detection ─────────────────────────────────────────────────────
+      const signals_triggered: string[] = [];
+      let bot_score = 0;
+
+      // 1. Follower / following ratio
+      if (follower_count > 0 && following_count > 0) {
+        const ratio = following_count / follower_count;
+        if (ratio > 2.0) { signals_triggered.push("High following-to-follower ratio (>2x)"); bot_score += 25; }
+        else if (ratio > 1.0) { signals_triggered.push("Elevated following-to-follower ratio (>1x)"); bot_score += 10; }
+      }
+
+      // 2. Engagement rate vs expected range
+      if (engagement_rate !== null && follower_count > 0) {
+        const expected = follower_count > 1_000_000 ? 1.0 : follower_count > 100_000 ? 2.0 : follower_count > 10_000 ? 3.5 : 5.0;
+        if (engagement_rate < 0.1) { signals_triggered.push("Engagement rate critically low (<0.1%)"); bot_score += 35; }
+        else if (engagement_rate < expected * 0.2) { signals_triggered.push(`Engagement rate well below benchmark (${engagement_rate.toFixed(1)}% vs ~${expected}% expected)`); bot_score += 20; }
+        else if (engagement_rate > expected * 10) { signals_triggered.push("Suspiciously high engagement rate (possible engagement pods)"); bot_score += 15; }
+      }
+
+      // 3. Posts count anomaly
+      if (posts_count === 0 && follower_count > 10_000) { signals_triggered.push("Zero posts with significant follower count"); bot_score += 20; }
+      if (posts_count > 0 && follower_count > 0) {
+        const postsPerFollower = posts_count / follower_count;
+        if (postsPerFollower > 2) { signals_triggered.push("Abnormally high post-to-follower ratio"); bot_score += 10; }
+      }
+
+      // 4. Comments/likes ratio
+      if (avg_likes !== null && avg_comments !== null && avg_likes > 0) {
+        const commentRatio = avg_comments / avg_likes;
+        if (commentRatio < 0.001) { signals_triggered.push("Near-zero comment-to-like ratio (possible engagement manipulation)"); bot_score += 15; }
+        if (commentRatio > 2.0) { signals_triggered.push("Unusual comment-to-like ratio"); bot_score += 10; }
+      }
+
+      // 5. Large accounts with no following
+      if (follower_count > 50_000 && following_count === 0) { signals_triggered.push("Large account with zero following (may be bought)"); bot_score += 5; }
+
+      const capped = Math.min(100, bot_score);
+      const bot_probability = capped / 100;
+      const risk_level = capped < 20 ? "low" : capped < 50 ? "medium" : "high";
+      const confidence = follower_count > 0 && engagement_rate !== null ? "high" : follower_count > 0 ? "medium" : "low";
+
+      // ── Engagement Anomaly ────────────────────────────────────────────────
+      const anomalies_detected: string[] = [];
+      let anomaly_score = 0;
+
+      if (engagement_rate !== null && follower_count > 0) {
+        const expected = follower_count > 1_000_000 ? 1.0 : follower_count > 100_000 ? 2.0 : follower_count > 10_000 ? 3.5 : 5.0;
+        const deviation = Math.abs(engagement_rate - expected) / expected;
+
+        if (deviation > 3) { anomalies_detected.push(`Engagement rate (${engagement_rate.toFixed(1)}%) deviates ${Math.round(deviation * 100)}% from benchmark`); anomaly_score += 50; }
+        else if (deviation > 1.5) { anomalies_detected.push(`Engagement rate moderately off benchmark (${engagement_rate.toFixed(1)}% vs ~${expected}%)`); anomaly_score += 25; }
+      }
+
+      if (avg_likes !== null && avg_comments !== null && avg_likes > 10) {
+        const cr = avg_comments / avg_likes;
+        if (cr < 0.005) { anomalies_detected.push("Very few comments relative to likes — possible like inflation"); anomaly_score += 20; }
+      }
+
+      return {
+        available: true,
+        bot_detection: {
+          data_available: follower_count > 0,
+          bot_probability,
+          risk_level,
+          signals_triggered,
+          confidence,
+        },
+        engagement_anomaly: {
+          data_available: engagement_rate !== null,
+          anomaly_score: Math.min(1, anomaly_score / 100),
+          anomalies_detected,
+          explanation: anomalies_detected.length > 0
+            ? `${anomalies_detected.length} anomal${anomalies_detected.length > 1 ? "ies" : "y"} detected in engagement patterns.`
+            : "No statistically notable anomalies detected in engagement patterns.",
+        },
+      };
     }
 
     // ── Cache lookup (7-day) ──────────────────────────────────────────────────
@@ -95,60 +171,36 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Credits (atomic deduction) ────────────────────────────────────────────
-    const targetWorkspace = workspace_id ?? user.id;
-    const { data: creditData, error: creditError } = await supabase.rpc(
-      "consume_search_credit",
-      { p_workspace_id: targetWorkspace, p_amount: ANALYTICS_CREDIT_COST }
-    );
+    // ── Try optional Python service, fall back to inline engine ──────────────
+    const pythonUrl = Deno.env.get("PYTHON_ANALYTICS_URL");
+    let analyticsResult: Record<string, unknown>;
 
-    if (creditError || creditData === false) {
-      return new Response(
-        JSON.stringify({ available: false, reason: "Insufficient credits for analytics. Please top up your credits.", bot_detection: { data_available: false }, engagement_anomaly: { data_available: false } }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // ── Call Python service ───────────────────────────────────────────────────
-    const secret = Deno.env.get("ANALYTICS_SECRET") ?? "";
-    let pythonResult: Record<string, unknown>;
-
-    try {
-      const resp = await fetch(`${pythonUrl}/analyze`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(secret ? { "x-analytics-secret": secret } : {}),
-        },
-        body: JSON.stringify({ platform, username, metrics }),
-        signal: AbortSignal.timeout(10_000), // 10-second timeout
-      });
-
-      if (!resp.ok) {
-        throw new Error(`Python service returned ${resp.status}`);
+    if (pythonUrl) {
+      try {
+        const secret = Deno.env.get("ANALYTICS_SECRET") ?? "";
+        const resp = await fetch(`${pythonUrl}/analyze`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(secret ? { "x-analytics-secret": secret } : {}),
+          },
+          body: JSON.stringify({ platform, username, metrics }),
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (!resp.ok) throw new Error(`Python service returned ${resp.status}`);
+        analyticsResult = await resp.json() as Record<string, unknown>;
+        console.log(`[ai-analytics] Python service result for ${username}`);
+      } catch (err) {
+        console.warn("[ai-analytics] Python service failed, using inline engine:", err);
+        analyticsResult = runInlineAnalytics(metrics);
       }
-      pythonResult = await resp.json() as Record<string, unknown>;
-    } catch (err) {
-      console.error("[ai-analytics] Python service error:", err);
-
-      // Refund credits on Python service failure
-      await supabase.rpc("consume_search_credit", {
-        p_workspace_id: targetWorkspace,
-        p_amount: -ANALYTICS_CREDIT_COST,
-      }).catch(() => { /* best-effort refund */ });
-
-      return new Response(
-        JSON.stringify({
-          available: false,
-          reason: "Analytics service temporarily unavailable",
-          bot_detection: { data_available: false },
-          engagement_anomaly: { data_available: false },
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    } else {
+      console.log("[ai-analytics] No PYTHON_ANALYTICS_URL — using inline statistical engine");
+      analyticsResult = runInlineAnalytics(metrics);
     }
 
     // ── Persist to cache ──────────────────────────────────────────────────────
+    const targetWorkspace = workspace_id ?? user.id;
     await supabase
       .from("influencer_evaluations")
       .upsert(
@@ -156,16 +208,15 @@ Deno.serve(async (req) => {
           platform,
           username,
           workspace_id: targetWorkspace,
-          python_analytics: pythonResult,
+          python_analytics: analyticsResult,
           python_analytics_at: new Date().toISOString(),
-          // Keep other evaluation fields untouched by only upserting the analytics cols
         },
         { onConflict: "platform,username,workspace_id", ignoreDuplicates: false }
       )
       .catch((e) => console.warn("[ai-analytics] cache persist failed:", e));
 
     return new Response(
-      JSON.stringify({ ...pythonResult, available: true, cached: false }),
+      JSON.stringify({ ...analyticsResult, cached: false }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
