@@ -1,12 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-3-flash-preview";
+import { corsHeaders } from "../_shared/rate_limit.ts";
+import { generateText, extractJsonFromText, extractTagsFromBio, normalizeTags } from "../\_shared/huggingface.ts";
 
 Deno.serve(async (req) => {
     if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -53,65 +47,53 @@ Deno.serve(async (req) => {
         // Combine captions to understand the overall aesthetic and niche
         const combinedCaptions = posts.map(p => p.caption).filter(Boolean).join("\n---\n");
 
-        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+        const HF_API_KEY = Deno.env.get("HUGGINGFACE_API_KEY");
 
-        // Analyze Niche and Brand Safety
-        const systemPrompt = `You are a social media content analyzer. Given a collection of an influencer's recent post captions, analyze them and extract:
-1. 2 to 5 highly specific Niche Categories from this list: Food, Fashion, Beauty, Tech, Fitness, Travel, Gaming, Music, Education, Comedy, Parenting, Entertainment, Lifestyle, Finance, Health, Sports, News, Photography, Art. 
-   - If the content does not strongly fit any specific category, use 'General'.
-2. Aesthetic/Style tags (e.g., 'Minimalist', 'Vibrant', 'Casual').
-3. Brand Safety Rating: analyze for profanity, extreme politics, adult content, or highly controversial topics.
-4. Extracted Brand Mentions: A list of any brand names explicitly mentioned in the captions.
+        let analysis: any;
 
-Return ONLY pure JSON matching the provided tool schema.`;
+        if (HF_API_KEY) {
+            // AI path: Mistral-7B-Instruct generates structured JSON
+            const systemPrompt = `You are a social media content analyzer. Analyze influencer post captions and return ONLY a JSON object with this exact structure:
+{"niches":["Food"],"aesthetics":["Vibrant"],"brand_safety":{"rating":"safe","flags":[]},"brand_mentions":[]}
+Valid niche values: Food, Fashion, Beauty, Tech, Fitness, Travel, Gaming, Music, Education, Comedy, Parenting, Entertainment, Lifestyle, Finance, Health, Sports, News, Photography, Art, General.
+Brand safety rating: safe, caution, or risk. Return ONLY the JSON, no explanation.`;
 
-        const aiRes = await fetch(AI_GATEWAY, {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${LOVABLE_API_KEY}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                model: MODEL,
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: `Analyze these captions:\n${combinedCaptions.substring(0, 3000)}` } // Limit tokens
-                ],
-                tools: [{
-                    type: "function",
-                    function: {
-                        name: "content_analysis",
-                        parameters: {
-                            type: "object",
-                            properties: {
-                                niches: { type: "array", items: { type: "string" } },
-                                aesthetics: { type: "array", items: { type: "string" } },
-                                brand_safety: {
-                                    type: "object",
-                                    properties: {
-                                        rating: { type: "string", enum: ["safe", "caution", "risk"] },
-                                        flags: { type: "array", items: { type: "string" } }
-                                    },
-                                    required: ["rating", "flags"]
-                                },
-                                brand_mentions: { type: "array", items: { type: "string" } }
-                            },
-                            required: ["niches", "aesthetics", "brand_safety", "brand_mentions"],
-                            additionalProperties: false
-                        }
-                    }
-                }],
-                tool_choice: { type: "function", function: { name: "content_analysis" } }
-            }),
-        });
-
-        if (!aiRes.ok) throw new Error(`AI Gateway Error ${aiRes.status}`);
-
-        const aiData = await aiRes.json();
-        const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-        if (!toolCall) throw new Error("No tool call returned from AI");
-
-        const analysis = JSON.parse(toolCall.function.arguments);
+            try {
+                const rawText = await generateText(
+                    systemPrompt,
+                    `Analyze these captions:\n${combinedCaptions.substring(0, 2500)}`,
+                    HF_API_KEY,
+                    { maxTokens: 300, temperature: 0.1 }
+                );
+                analysis = extractJsonFromText(rawText);
+                // Validate minimum structure
+                if (!Array.isArray(analysis.niches)) throw new Error("niches missing");
+                if (!analysis.brand_safety) analysis.brand_safety = { rating: "safe", flags: [] };
+                if (!Array.isArray(analysis.brand_mentions)) analysis.brand_mentions = [];
+                if (!Array.isArray(analysis.aesthetics)) analysis.aesthetics = [];
+            } catch (aiErr: any) {
+                console.warn("[classify-niche] AI failed, using keyword fallback:", aiErr.message);
+                // Fallback: keyword-based classification
+                const { inferNiche } = await import("../\_shared/niche.ts");
+                const nicheData = inferNiche("", combinedCaptions.substring(0, 500), "");
+                analysis = {
+                    niches: nicheData.niche !== "General" ? [nicheData.niche] : ["General"],
+                    aesthetics: [],
+                    brand_safety: { rating: "safe", flags: [] },
+                    brand_mentions: [],
+                };
+            }
+        } else {
+            // No API key: keyword fallback only
+            const { inferNiche } = await import("../\_shared/niche.ts");
+            const nicheData = inferNiche("", combinedCaptions.substring(0, 500), "");
+            analysis = {
+                niches: nicheData.niche !== "General" ? [nicheData.niche] : ["General"],
+                aesthetics: [],
+                brand_safety: { rating: "safe", flags: [] },
+                brand_mentions: [],
+            };
+        }
 
         // 1. Update Profile with Niches & Brand Safety
         await serviceClient

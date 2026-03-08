@@ -5,8 +5,7 @@ const corsHeaders = {
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-3-flash-preview";
+
 
 Deno.serve(async (req) => {
     if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -55,59 +54,29 @@ Deno.serve(async (req) => {
         // Process in a single AI prompt via a compressed JSON object for efficiency
         const postsPayload = posts.map(p => ({ id: p.id, caption: p.caption, date: p.posted_at }));
 
-        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+        const HF_API_KEY = Deno.env.get("HUGGINGFACE_API_KEY");
+        const { generateText: hfGenerate, extractJsonFromText } = await import("../\_shared/huggingface.ts");
 
-        const systemPrompt = `You are a Named Entity Recognition (NER) system for influencer marketing. Given a JSON list of posts with captions, identify ANY brand names mentioned.
-Return a pure JSON list of objects matching the schema.`;
+        let analysis: { mentions: Array<{ post_id: string; brand_name: string; category: string }> } = { mentions: [] };
 
-        const aiRes = await fetch(AI_GATEWAY, {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${LOVABLE_API_KEY}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                model: MODEL,
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: `Analyze these posts:\n${JSON.stringify(postsPayload).substring(0, 4000)}` }
-                ],
-                tools: [{
-                    type: "function",
-                    function: {
-                        name: "extract_mentions",
-                        parameters: {
-                            type: "object",
-                            properties: {
-                                mentions: {
-                                    type: "array",
-                                    items: {
-                                        type: "object",
-                                        properties: {
-                                            post_id: { type: "string", description: "The ID of the post containing the mention" },
-                                            brand_name: { type: "string" },
-                                            category: { type: "string", description: "e.g., Apparel, Tech, Food, Beauty" }
-                                        },
-                                        required: ["post_id", "brand_name", "category"]
-                                    }
-                                }
-                            },
-                            required: ["mentions"],
-                            additionalProperties: false
-                        }
-                    }
-                }],
-                tool_choice: { type: "function", function: { name: "extract_mentions" } }
-            }),
-        });
-
-        if (!aiRes.ok) throw new Error(`AI Gateway Error ${aiRes.status}`);
-
-        const aiData = await aiRes.json();
-        const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-        if (!toolCall) throw new Error("No tool call returned from AI");
-
-        const analysis = JSON.parse(toolCall.function.arguments);
+        if (HF_API_KEY) {
+            const systemPrompt = `You are a Named Entity Recognition (NER) system for influencer marketing. Given a JSON list of posts, identify brand names mentioned in captions.
+Return ONLY a JSON object: {"mentions":[{"post_id":"id","brand_name":"Brand","category":"Tech"}]}
+If no brands are found, return {"mentions":[]}. Return ONLY the JSON.`;
+            try {
+                const rawText = await hfGenerate(
+                    systemPrompt,
+                    `Analyze posts:\n${JSON.stringify(postsPayload).substring(0, 3000)}`,
+                    HF_API_KEY,
+                    { maxTokens: 400, temperature: 0.1 }
+                );
+                const parsed = extractJsonFromText(rawText) as any;
+                if (Array.isArray(parsed?.mentions)) analysis = parsed;
+            } catch (aiErr: any) {
+                console.warn("[extract-brand-mentions] AI failed:", aiErr.message);
+                // Fallback: no mentions extracted — non-blocking
+            }
+        }
 
         if (analysis.mentions && analysis.mentions.length > 0) {
             // Map to DB schema

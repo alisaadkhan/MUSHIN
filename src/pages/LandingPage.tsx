@@ -204,7 +204,7 @@ const AtomOrbit = () => {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         animation: 'hub-pulse 3s ease-in-out infinite', zIndex: 10,
       }}>
-        <span style={{ fontWeight: 900, fontSize: 22, color: '#c084fc', letterSpacing: '-0.04em' }}>IQ</span>
+        <span style={{ fontWeight: 900, fontSize: 15, color: '#c084fc', letterSpacing: '-0.02em' }}>Mushin</span>
       </div>
     </div>
   );
@@ -300,7 +300,7 @@ const MockSearch = () => (
       <div className="flex gap-2">
         {['Travel', 'Karachi', 'Instagram'].map(f => <span key={f} className="px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-white/40">{f}</span>)}
       </div>
-      <div className="text-white/20 text-[10px]">3 verified creators · sorted by IQ score</div>
+      <div className="text-white/20 text-[10px]">3 verified creators · sorted by Relevance</div>
       <div className="text-white/15 text-[9px] text-right pb-1 italic">Illustrative · not real data</div>
       <div className="space-y-1">
         {[
@@ -335,10 +335,10 @@ const MockProfile = () => (
           <div className="text-white/80 font-semibold text-sm">Sana Malik</div>
           <div className="text-white/30 text-[10px] mb-1.5">@sana_pk · Lifestyle · Lahore</div>
           <div className="flex gap-1">
-            {['High IQ', 'Real Eng', 'PK'].map(t => <span key={t} className="px-1.5 py-0.5 rounded text-[9px] font-bold" style={{ background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc' }}>{t}</span>)}
+            {['Verified', 'Real Eng', 'PK'].map(t => <span key={t} className="px-1.5 py-0.5 rounded text-[9px] font-bold" style={{ background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc' }}>{t}</span>)}
           </div>
         </div>
-        <div className="text-right"><div className="text-4xl font-black text-white leading-none">94</div><div className="text-[10px] text-white/30 mt-0.5">IQ Score</div></div>
+        <div className="text-right"><div className="text-4xl font-black text-white leading-none">94</div><div className="text-[10px] text-white/30 mt-0.5">Relevance</div></div>
       </div>
       <div className="space-y-0">
         {[{ l: 'Followers', v: '421K' }, { l: 'Engagement', v: '7.3%' }, { l: 'Fake Followers', v: '< 1.2%' }, { l: 'Total Views', v: '48M' }, { l: 'Avg Views', v: '114K' }].map((r, i, a) => (
@@ -542,7 +542,7 @@ export default function LandingPage() {
 
           {/* Watermark */}
           <motion.div style={{ scale: textScale, opacity: textOp }} className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-            <div className="font-black text-center leading-none select-none" style={{ fontSize: 'clamp(3rem,12vw,10rem)', color: 'rgba(255,255,255,0.06)', letterSpacing: '-0.04em' }}>INFLUENCEIQ</div>
+            <div className="font-black text-center leading-none select-none" style={{ fontSize: 'clamp(3rem,12vw,10rem)', color: 'rgba(255,255,255,0.06)', letterSpacing: '-0.04em' }}>MUSHIN</div>
           </motion.div>
 
           {/* Hero content — no opacity transform on wrapper; individual elements animate in.
@@ -672,7 +672,7 @@ export default function LandingPage() {
             </h2>
             <p className="text-zinc-400 text-lg leading-relaxed mb-8">Most brands are burning budget on fake audiences, manual guesswork, and global tools never designed for Pakistan's unique creator landscape.</p>
             <Link to="/auth" className="inline-flex items-center gap-2 text-purple-400 text-sm font-semibold hover:text-purple-300 transition-colors">
-              See how InfluenceIQ fixes this <ArrowRight className="w-4 h-4" />
+              See how Mushin fixes this <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
           <div className="space-y-3 pt-2">
@@ -813,7 +813,7 @@ export default function LandingPage() {
       <SectionSpotlight aria-label="Comparison section" className="py-24 px-6 border-t border-white/[0.06] z-20 bg-[#060608]">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-14">
-            <motion.div initial={{ opacity: 0, x: -16 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="text-purple-400 text-xs font-medium uppercase tracking-widest mb-4">Why InfluenceIQ</motion.div>
+            <motion.div initial={{ opacity: 0, x: -16 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="text-purple-400 text-xs font-medium uppercase tracking-widest mb-4">Why Mushin</motion.div>
             <RevealLine />
             <h2 className="text-4xl md:text-5xl font-black tracking-tighter leading-tight">
               <RevealText text="Not All Tools Are" /><br />
@@ -827,7 +827,7 @@ export default function LandingPage() {
                   <th className="text-left py-4 px-5 text-zinc-500 font-semibold w-1/2">Capability</th>
                   <th className="text-center py-4 px-3 text-zinc-600 font-medium text-xs">Manual</th>
                   <th className="text-center py-4 px-3 text-zinc-500 font-medium text-xs">Global Tools</th>
-                  <th className="text-center py-4 px-3 text-purple-400 font-bold text-xs bg-purple-500/[0.08]">InfluenceIQ</th>
+                  <th className="text-center py-4 px-3 text-purple-400 font-bold text-xs bg-purple-500/[0.08]">Mushin</th>
                 </tr>
               </thead>
               <tbody>
@@ -875,7 +875,7 @@ export default function LandingPage() {
             <MarqueeRow speed={38} items={[
               { name: 'Sarah K.',  role: 'Brand Manager · Fintech',         text: 'Found 3 mega-creators for our Eid campaign in under 10 minutes. The ROAS was exceptional.' },
               { name: 'Ahmed R.',  role: 'Growth Lead · E-commerce',        text: 'The fraud detection alone saved us from 2 fake-follower influencers with 800K combined followers.' },
-              { name: 'Fatima Z.', role: 'CMO · Fashion Retail',            text: 'We replaced 3 separate tools with InfluenceIQ. The Kanban board is a game changer.' },
+              { name: 'Fatima Z.', role: 'CMO · Fashion Retail',            text: 'We replaced 3 separate tools with Mushin. The Kanban board is a game changer.' },
               { name: 'Usman T.', role: 'Digital Director · Fintech',       text: 'Karachi-specific filtering is insane. Found 47 verified nano-influencers in our exact market.' },
             ].map((t, i) => (
               <div key={i} className="w-72 flex-shrink-0 bg-white/[0.03] border border-white/10 rounded-2xl p-5 hover:border-purple-500/20 transition-all">
@@ -886,8 +886,8 @@ export default function LandingPage() {
               </div>
             ))} />
             <MarqueeRow reverse speed={42} items={[
-              { name: 'Nadia M.',  role: 'Influencer Lead · Fashion Retail', text: "The IQ Score is the most reliable metric for Pakistani creator quality I've ever used." },
-              { name: 'Bilal A.',  role: 'CEO · Digital Agency',             text: 'Clients trust our recommendations more now that we back everything with InfluenceIQ data.' },
+              { name: 'Nadia M.',  role: 'Influencer Lead · Fashion Retail', text: "The Relevance Score is the most reliable metric for Pakistani creator quality I've ever used." },
+              { name: 'Bilal A.',  role: 'CEO · Digital Agency',             text: 'Clients trust our recommendations more now that we back everything with Mushin data.' },
               { name: 'Anosha B.', role: 'Marketing Head · D2C Brand',       text: 'Went from 2 weeks of manual research to 30 minutes of verified outreach. Remarkable.' },
               { name: 'Zaid H.',   role: 'Founder · Media House',            text: 'City-level niche filters are something no other platform offers for Pakistan. Game-changing.' },
             ].map((t, i) => (
@@ -975,7 +975,7 @@ export default function LandingPage() {
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {([
-              { name: 'Free',     price: { m: 0,     a: 0     }, desc: 'For individuals just getting started.',       features: ['50 searches/month','5 creator profiles/day','Basic IQ score','Email support'],                                                                     cta: 'Start Free',     highlight: false },
+              { name: 'Free',     price: { m: 0,     a: 0     }, desc: 'For individuals just getting started.',       features: ['50 searches/month','5 creator profiles/day','Basic Relevance score','Email support'],                                                                     cta: 'Start Free',     highlight: false },
               { name: 'Pro',      price: { m: 4999,  a: 3999  }, desc: 'For brands running active campaigns.',        features: ['Unlimited searches','Full creator profiles','Fraud detection reports','Campaign Kanban board','CSV export','Priority support'],                    cta: 'Start Pro',      highlight: true  },
               { name: 'Business', price: { m: 14999, a: 11999 }, desc: 'For agencies managing multiple brands.',      features: ['Everything in Pro','Multi-seat access (5 users)','API access','White-label reports','Dedicated account manager','Custom integrations'],           cta: 'Contact Sales',  highlight: false },
             ] as { name: string; price: { m: number; a: number }; desc: string; features: string[]; cta: string; highlight: boolean }[]).map(plan => (
@@ -1036,7 +1036,7 @@ export default function LandingPage() {
             <RevealText text="Your Next Campaign" /><br />
             <RevealText text="Starts Here." delay={0.2} />
           </h2>
-          <p className="text-zinc-400 text-lg mb-10 max-w-xl mx-auto">Join Pakistani marketing teams already using InfluenceIQ to find, verify, and close creators — faster.</p>
+          <p className="text-zinc-400 text-lg mb-10 max-w-xl mx-auto">Join Pakistani marketing teams already using Mushin to find, verify, and close creators — faster.</p>
           <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: .97 }}
             transition={{ type: 'spring', stiffness: 400, damping: 20 }} className="conic-wrap inline-block">
             <Link to="/auth" className="conic-inner flex items-center gap-3 px-12 py-4 text-white font-bold text-sm tracking-[0.18em] uppercase">
@@ -1054,7 +1054,7 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between gap-8 mb-10">
             <div className="max-w-xs">
-              <div className="font-black text-lg tracking-tight mb-3">InfluenceIQ<span className="text-purple-400">.</span></div>
+              <div className="font-black text-lg tracking-tight mb-3">Mushin<span className="text-purple-400">.</span></div>
               <p className="text-zinc-500 text-sm leading-relaxed">Pakistan's first AI-powered influencer intelligence platform. Built to bring signal to a noisy market.</p>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-8 text-sm">
@@ -1077,7 +1077,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="border-t border-white/[0.06] pt-6 flex flex-col sm:flex-row justify-between items-center gap-3">
-            <div className="text-zinc-600 text-xs">© 2026 InfluenceIQ. All rights reserved. Made in Pakistan 🇵🇰</div>
+            <div className="text-zinc-600 text-xs">© 2026 Mushin. All rights reserved. Made in Pakistan 🇵🇰</div>
             <div className="flex items-center gap-4">
               <Instagram className="w-4 h-4 text-zinc-600 hover:text-white transition-colors cursor-pointer" />
               <Youtube   className="w-4 h-4 text-zinc-600 hover:text-white transition-colors cursor-pointer" />

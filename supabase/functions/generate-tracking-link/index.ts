@@ -54,8 +54,8 @@ Deno.serve(async (req) => {
         }
 
         const trackingCode = generateTrackingCode();
-        // In production, you would map this to a custom domain (e.g., trk.influenceiq.com/{code})
-        const shortUrl = `${req.headers.get("origin") || "https://app.influenceiq.com"}/api/t/${trackingCode}`;
+        // In production, you would map this to a custom domain (e.g., trk.mushin.com/{code})
+        const shortUrl = `${req.headers.get("origin") || "https://app.mushin.com"}/api/t/${trackingCode}`;
 
         const { data: trackingLink, error: insertErr } = await serviceClient
             .from("tracking_links")

@@ -94,7 +94,7 @@ Deno.serve(async (req: Request) => {
             headers: {
                 ...corsHeaders,
                 "Content-Type": "application/json",
-                "Content-Disposition": `attachment; filename="influenceiq-data-export-${user.id}.json"`,
+                "Content-Disposition": `attachment; filename="mushin-data-export-${user.id}.json"`,
             }
         });
 

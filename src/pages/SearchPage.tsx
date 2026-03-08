@@ -30,9 +30,10 @@ import { format } from "date-fns";
 import { EvaluationScoreBadge } from "@/components/influencer/EvaluationScoreBadge";
 import { useInfluencerEvaluation } from "@/hooks/useInfluencerEvaluation";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
+import { getQualityTier } from "@/modules/search/ranking";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const PLATFORMS = ["Instagram", "TikTok", "YouTube"];
+const PLATFORMS = ["Instagram", "TikTok", "YouTube", "Twitch"];
 
 const PK_CITIES = [
   "All Pakistan",
@@ -61,8 +62,11 @@ const FOLLOWER_RANGES = [
 const MAX_NICHES = 3;
 
 // ─── Cache key for back-navigation result restoration ───────────────────────
-function buildCacheKey(q: string, platform: string, city: string, range: string) {
-  return `iq_sr:${q.toLowerCase()}|${platform}|${city}|${range}`;
+function buildCacheKey(q: string, platform: string | string[], city: string, range: string) {
+  const pStr = Array.isArray(platform)
+    ? [...platform].map(p => p.toLowerCase()).sort().join(",") || "instagram"
+    : platform.toLowerCase();
+  return `mushin_sr:${q.toLowerCase()}|${pStr}|${city}|${range}`;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -82,6 +86,11 @@ interface SearchResult {
   engagement_is_estimated?: boolean;
   bio?: string;
   full_name?: string;
+  contact_email?: string | null;
+  social_links?: string[];
+  /** Server-computed multi-factor relevance score [0, 1]. Used for card display & sort order. */
+  _search_score?: number;
+  niche_confidence?: number;
   is_enriched?: boolean;
   enrichment_status?: string;
   is_stale?: boolean;
@@ -89,6 +98,10 @@ interface SearchResult {
   enrichment_ttl_days?: number;
   engagement_source?: "real_eval" | "real_enriched" | "benchmark_estimate";
   engagement_benchmark_bucket?: string;
+  /** Detected search intent for the query that produced this result. */
+  _intent?: string;
+  /** Creator topic tags from AI tag pipeline (creator_tags table, denormalized into cache). */
+  tags?: string[];
 }
 
 function formatFollowers(n: number): string {
@@ -101,6 +114,7 @@ function PlatformIcon({ platform }: { platform: string }) {
   const p = platform.toLowerCase();
   if (p === "instagram") return <Instagram className="h-3.5 w-3.5 text-pink-500" />;
   if (p === "youtube") return <Youtube className="h-3.5 w-3.5 text-red-500" />;
+  if (p === "twitch") return <span className="text-xs font-bold" style={{ color: "#9147ff" }}>TV</span>;
   // TikTok — use Unicode glyph
   return <span className="text-xs font-bold text-foreground">TT</span>;
 }
@@ -120,6 +134,8 @@ export default function SearchPage() {
   );
   const [selectedCity, setSelectedCity] = useState(searchParams.get("city") || "All Pakistan");
   const [followerRange, setFollowerRange] = useState(searchParams.get("range") || "any");
+  const [engagementRange, setEngagementRange] = useState("any");
+  const [contentLanguage, setContentLanguage] = useState("any");
   const [selectedNiches, setSelectedNiches] = useState<string[]>(
     // Comma-separated in URL: "Fashion,Food" → ["Fashion", "Food"]
     searchParams.get("niche") ? searchParams.get("niche")!.split(",").filter(Boolean) : []
@@ -129,6 +145,7 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null);
+  const [tagFilter, setTagFilter] = useState("");
 
   const { data: workspaceCredits } = useWorkspaceCredits();
   const { evaluate: evaluateInfluencer, loading: evalLoading } = useInfluencerEvaluation();
@@ -199,57 +216,92 @@ export default function SearchPage() {
 
   const handleSearch = async () => {
     if (!query.trim()) return;
+    if (selectedPlatforms.length === 0) {
+      toast({
+        title: "Platform required",
+        description: "Please select at least one platform to search creators.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (creditsExhausted) { setShowCreditsPopup(true); return; }
 
     setLoading(true);
     setSearched(true);
     syncParams();
 
-    const platformParam = selectedPlatforms.length > 0
-      ? selectedPlatforms[0].toLowerCase()
-      : "instagram";
+    const platforms = selectedPlatforms.length > 0
+      ? selectedPlatforms.map(p => p.toLowerCase())
+      : ["instagram"];
 
     try {
-      const endpoint = isAiSearch ? "search-natural" : "search-influencers";
-      const body = isAiSearch
-        ? { query: query.trim(), platform: platformParam, location: selectedCity }
-        : { query: query.trim(), platform: platformParam, location: selectedCity, followerRange };
+      let sortedResults: SearchResult[] = [];
+      let creditsLeft: number | null = null;
 
-      const { data, error } = await supabase.functions.invoke(endpoint, { body });
-      if (error) throw error;
+      if (platforms.length === 1) {
+        // ── Single-platform (or AI search which is always single-platform) ──────
+        const endpoint = isAiSearch ? "search-natural" : "search-influencers";
+        const body = isAiSearch
+          ? { query: query.trim(), platform: platforms[0], location: selectedCity }
+          : { query: query.trim(), platform: platforms[0], location: selectedCity, followerRange, engagementRange, contentLanguage };
 
-      if (data?.error) {
-        toast({ title: "Search failed", description: data.error, variant: "destructive" });
-        setResults([]);
-        return;
+        const { data, error } = await supabase.functions.invoke(endpoint, { body });
+        if (error) throw error;
+
+        if (data?.error) {
+          toast({ title: "Search failed", description: data.error, variant: "destructive" });
+          setResults([]);
+          return;
+        }
+
+        sortedResults = data.results || [];
+        creditsLeft = data.credits_remaining ?? null;
+      } else {
+        // ── Multi-platform: parallel calls per platform, merge & deduplicate ───
+        const responses = await Promise.allSettled(
+          platforms.map(p =>
+            supabase.functions.invoke("search-influencers", {
+              body: { query: query.trim(), platform: p, location: selectedCity, followerRange, engagementRange, contentLanguage },
+            })
+          )
+        );
+        const seen = new Set<string>();
+        const merged: SearchResult[] = [];
+        for (const r of responses) {
+          if (r.status === "fulfilled" && !r.value.error && r.value.data?.results) {
+            for (const item of r.value.data.results) {
+              const key = `${item.platform?.toLowerCase()}:${item.username}`;
+              if (!seen.has(key)) { seen.add(key); merged.push(item); }
+            }
+            if (r.value.data.credits_remaining != null) creditsLeft = r.value.data.credits_remaining;
+          }
+        }
+        sortedResults = merged.sort((a, b) => (b._search_score ?? 0) - (a._search_score ?? 0));
       }
 
-      // The edge function already merges enriched profiles (influencer_profiles +
-      // influencer_evaluations) and sorts results (real ER first, then ER desc).
-      // No client-side re-merge or re-sort needed — trust the server response.
-      const sortedResults: SearchResult[] = data.results || [];
       setResults(sortedResults);
-      setCreditsRemaining(data.credits_remaining ?? null);
+      setCreditsRemaining(creditsLeft);
 
       // ── Cache for back-navigation (avoids credit spend on re-visit) ────────
-      const cacheKey = buildCacheKey(
-        query.trim(),
-        selectedPlatforms[0] || "instagram",
-        selectedCity,
-        followerRange,
-      );
+      const cacheKey = buildCacheKey(query.trim(), platforms, selectedCity, followerRange);
       try {
-        // Store sortedResults (same as what was rendered) so back-nav is consistent
         sessionStorage.setItem(cacheKey, JSON.stringify({
           results: sortedResults,
-          creditsRemaining: data.credits_remaining ?? null,
+          creditsRemaining: creditsLeft,
         }));
+        const urlParams = new URLSearchParams();
+        urlParams.set("q", query.trim());
+        if (selectedPlatforms[0]) urlParams.set("platform", selectedPlatforms[0]);
+        if (selectedCity !== "All Pakistan") urlParams.set("city", selectedCity);
+        if (followerRange !== "any") urlParams.set("range", followerRange);
+        if (selectedNiches.length > 0) urlParams.set("niche", selectedNiches.join(","));
+        sessionStorage.setItem("mushin_last_search_url", `?${urlParams.toString()}`);
       } catch { /* sessionStorage full — skip caching */ }
 
       queryClient.invalidateQueries({ queryKey: ["workspace-credits"] });
       queryClient.invalidateQueries({ queryKey: ["search-history"] });
 
-      if ((data.results || []).length === 0) {
+      if (sortedResults.length === 0) {
         toast({ title: "No results", description: "Try a different keyword, city, or platform." });
       }
     } catch (err: any) {
@@ -356,7 +408,7 @@ export default function SearchPage() {
               <h3 className="text-sm font-semibold text-foreground">Filters</h3>
             </div>
 
-            {/* Platform — Instagram / TikTok / YouTube only */}
+            {/* Platform — Instagram / TikTok / YouTube / Twitch */}
             <div>
               <p className="text-xs font-medium text-foreground mb-2">Platform</p>
               <div className="space-y-1.5">
@@ -368,6 +420,11 @@ export default function SearchPage() {
                   </label>
                 ))}
               </div>
+              {selectedPlatforms.length === 0 && (
+                <p className="text-[10px] text-amber-500/80 mt-1.5">
+                  ⚠️ Select a platform to search
+                </p>
+              )}
             </div>
 
             {/* Location — Pakistan cities */}
@@ -441,14 +498,47 @@ export default function SearchPage() {
               </select>
             </div>
 
+            {/* Tag filter */}
+            <div>
+              <p className="text-xs font-medium text-foreground mb-2">Tag Filter</p>
+              <input
+                type="text"
+                value={tagFilter}
+                onChange={(e) => setTagFilter(e.target.value)}
+                placeholder="#tech, #beauty..."
+                className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+
             {/* Engagement rate */}
             <div>
-              <p className="text-xs font-medium text-foreground mb-2 flex items-center gap-2">
-                Engagement Rate
-                <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">Soon</span>
-              </p>
-              <input type="range" min="0" max="100" className="w-full accent-primary opacity-40 cursor-not-allowed" disabled />
-              <div className="flex justify-between text-xs text-muted-foreground opacity-40"><span>0%</span><span>15%+</span></div>
+              <p className="text-xs font-medium text-foreground mb-2">Engagement Rate</p>
+              <select
+                value={engagementRange}
+                onChange={(e) => setEngagementRange(e.target.value)}
+                className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="any">Any rate</option>
+                <option value="0-2">Low (0–2%)</option>
+                <option value="2-5">Good (2–5%)</option>
+                <option value="5-10">High (5–10%)</option>
+                <option value="10+">Viral (10%+)</option>
+              </select>
+            </div>
+
+            {/* Content language */}
+            <div>
+              <p className="text-xs font-medium text-foreground mb-2">Content Language</p>
+              <select
+                value={contentLanguage}
+                onChange={(e) => setContentLanguage(e.target.value)}
+                className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="any">Any language</option>
+                <option value="urdu">Urdu / Roman Urdu</option>
+                <option value="english">English</option>
+                <option value="bilingual">Bilingual</option>
+              </select>
             </div>
           </div>
         </aside>
@@ -506,20 +596,21 @@ export default function SearchPage() {
           {/* Results meta row */}
           <div className="flex items-center justify-between min-h-[28px]">
             {searched && results.length > 0 && (() => {
-              // Compute the effective count after client-side niche filter
-              const visibleResults = selectedNiches.length > 0
+              // Compute the effective count after client-side niche + tag filters
+              let visibleResults = selectedNiches.length > 0
                 ? results.filter((r) => r.niche && selectedNiches.includes(r.niche))
                 : results;
+              if (tagFilter.trim()) {
+                const tf = tagFilter.toLowerCase().replace(/^#/, "");
+                visibleResults = visibleResults.filter(r => r.tags?.some(t => t.includes(tf)));
+              }
               return (
                 <p data-testid="result-count" className="text-sm text-muted-foreground">
                   {visibleResults.length} result{visibleResults.length !== 1 ? "s" : ""} found
-                  {selectedNiches.length > 0 && results.length !== visibleResults.length && (
+                  {(selectedNiches.length > 0 || tagFilter.trim()) && results.length !== visibleResults.length && (
                     <span className="text-xs ml-1 opacity-60">({results.length} total)</span>
                   )}
                   {selectedCity !== "All Pakistan" && <span> · <MapPin className="inline h-3 w-3 mb-0.5" /> {selectedCity}</span>}
-                  {selectedPlatforms.length > 1 && (
-                    <span className="text-xs ml-2 text-amber-500">⚠️ Showing {selectedPlatforms[0]} only — search one platform at a time</span>
-                  )}
                 </p>
               );
             })()}
@@ -548,12 +639,16 @@ export default function SearchPage() {
           {/* Results */}
           {!loading && searched && results.length > 0 && (
             <div data-testid="results-grid" className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-              {(selectedNiches.length > 0
-                // When niche filter is active, only show results whose niche matches.
-                // Previously `!r.niche` passed niche-less results through — incorrect.
-                ? results.filter((r) => r.niche && selectedNiches.includes(r.niche))
-                : results
-              ).map((c, i) => (
+              {(() => {
+                let filtered = selectedNiches.length > 0
+                  ? results.filter((r) => r.niche && selectedNiches.includes(r.niche))
+                  : results;
+                if (tagFilter.trim()) {
+                  const tf = tagFilter.toLowerCase().replace(/^#/, "");
+                  filtered = filtered.filter(r => r.tags?.some(t => t.includes(tf)));
+                }
+                return filtered;
+              })().map((c, i) => (
                 <ResultCard
                   key={`${c.platform}-${c.username}-${i}`}
                   c={c}
@@ -719,7 +814,7 @@ function ResultCard({ c, isFreePlan, lists, cachedScores, evaluatingUsername, ev
 
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3 cursor-pointer"
-          onClick={() => navigate(`/influencer/${c.platform.toLowerCase()}/${c.username.replace("@", "")}`)}>
+          onClick={() => navigate(`/influencer/${c.platform.toLowerCase()}/${c.username.replace("@", "")}`, { state: { from: window.location.search } })}>
 
           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary uppercase overflow-hidden flex-shrink-0 shadow-[0_0_0_2px_hsl(var(--primary)/0.1)]">
             {c.imageUrl
@@ -728,9 +823,9 @@ function ResultCard({ c, isFreePlan, lists, cachedScores, evaluatingUsername, ev
               : <span>{initials}</span>
             }
           </div>
-          <div className="overflow-hidden">
-            <p className="text-sm font-medium text-foreground truncate max-w-[120px]">{displayName}</p>
-            <p className="text-xs text-muted-foreground truncate max-w-[120px]">@{c.username.replace("@", "")}</p>
+          <div className="overflow-hidden min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
+            <p className="text-xs text-muted-foreground truncate">@{c.username.replace("@", "")}</p>
           </div>
         </div>
 
@@ -746,6 +841,28 @@ function ResultCard({ c, isFreePlan, lists, cachedScores, evaluatingUsername, ev
                 <ExternalLink className="h-4 w-4 mr-2" /> View Profile
               </a>
             </DropdownMenuItem>
+            {canUseAI() && (
+              <DropdownMenuItem
+                disabled={evalLoading && evaluatingUsername === c.username}
+                onClick={async () => {
+                  setEvaluatingUsername(c.username);
+                  const result = await evaluateInfluencer({
+                    username: c.username, platform: c.platform,
+                    followers: c.extracted_followers, snippet: c.snippet,
+                    title: c.title, link: c.link,
+                  });
+                  if (result) {
+                    setCachedScores((prev: any) => ({ ...prev, [`${c.platform} - ${c.username}`]: result.overall_score }));
+                  }
+                  setEvaluatingUsername(null);
+                }}
+              >
+                {evalLoading && evaluatingUsername === c.username
+                  ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  : <Sparkles className="h-4 w-4 mr-2 text-primary" />}
+                AI Evaluate
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-xs font-medium text-muted-foreground uppercase tracking-wider" disabled>
               Add to List
@@ -768,20 +885,111 @@ function ResultCard({ c, isFreePlan, lists, cachedScores, evaluatingUsername, ev
           <PlatformIcon platform={c.platform} /> {c.platform}
         </span>
         {c.niche && (
-          <span data-testid="card-niche" className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5 font-medium">{c.niche}</span>
+          <span
+            data-testid="card-niche"
+            className="text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5 font-medium"
+            style={{ opacity: c.niche_confidence != null ? Math.max(0.5, c.niche_confidence) : 1 }}
+            title={c.niche_confidence != null ? `Niche confidence: ${Math.round(c.niche_confidence * 100)}%` : undefined}
+          >
+            {c.niche}
+          </span>
         )}
         {city && (
           <span data-testid="card-city" className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5 flex items-center gap-1">
             <MapPin className="h-2.5 w-2.5" />{city}
           </span>
         )}
+        {/* Quality tier badge (Phase 5) */}
+        {(() => {
+          const qt = getQualityTier(c._search_score);
+          return qt ? (
+            <span
+              data-testid="card-quality-tier"
+              className={`text-[10px] font-semibold rounded-full px-2 py-0.5 border ${qt.colorClass}`}
+              title={`Relevance tier based on multi-factor ranking score (${c._search_score != null ? Math.round(c._search_score * 100) : "?"}%)`}
+            >
+              {qt.label}
+            </span>
+          ) : null;
+        })()}
+        {/* Verified contact marker */}
+        {c.contact_email && (
+          <span
+            data-testid="card-verified-contact"
+            className="text-[10px] font-semibold rounded-full px-2 py-0.5 border bg-violet-50 text-violet-700 border-violet-200"
+            title="Verified contact email found in profile"
+          >
+            ✉ Contact
+          </span>
+        )}
       </div>
+
+      {/* Creator topic tags */}
+      {c.tags && c.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-2.5">
+          {c.tags.slice(0, 5).map(tag => (
+            <span key={tag} className="text-[10px] bg-muted/80 text-muted-foreground rounded px-1.5 py-0.5 font-mono">
+              #{tag}
+            </span>
+          ))}
+        </div>
+      )}
 
       {c.bio && (
         <div className="mb-3 text-xs text-muted-foreground/80 line-clamp-2">
           {c.bio}
         </div>
       )}
+
+      {c.contact_email && (
+        <div className="mb-3">
+          <a
+            href={`mailto:${c.contact_email}`}
+            className="text-xs text-primary/80 hover:text-primary truncate flex items-center gap-1 max-w-full"
+            title={c.contact_email}
+            onClick={e => e.stopPropagation()}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 flex-shrink-0">
+              <path d="M3 4a2 2 0 00-2 2v1.161l8.441 4.221a1.25 1.25 0 001.118 0L19 7.162V6a2 2 0 00-2-2H3z" />
+              <path d="M19 8.839l-7.77 3.885a2.75 2.75 0 01-2.46 0L1 8.839V14a2 2 0 002 2h14a2 2 0 002-2V8.839z" />
+            </svg>
+            <span className="truncate">{c.contact_email}</span>
+          </a>
+        </div>
+      )}
+
+      {/* Show social links OR contact unavailable notice for enriched profiles */}
+      {c.social_links && c.social_links.length > 0 ? (
+        <div className="mb-3 flex items-center gap-2 flex-wrap">
+          {c.social_links.map((url) => {
+            const isIG = url.includes("instagram.com");
+            const isYT = url.includes("youtube.com");
+            const isTT = url.includes("tiktok.com");
+            const isTW = url.includes("x.com") || url.includes("twitter.com");
+            const isFB = url.includes("facebook.com") || url.includes("fb.com");
+            const label = isIG ? "Instagram" : isYT ? "YouTube" : isTT ? "TikTok" : isTW ? "X" : isFB ? "Facebook" : "Social";
+            return (
+              <a
+                key={url}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={e => e.stopPropagation()}
+                className="text-[10px] text-muted-foreground hover:text-primary flex items-center gap-0.5 border border-border/60 rounded-full px-2 py-0.5 hover:border-primary/40 transition-colors"
+              >
+                {isIG && <Instagram className="h-2.5 w-2.5 text-pink-500 mr-0.5" />}
+                {isYT && <Youtube className="h-2.5 w-2.5 text-red-500 mr-0.5" />}
+                {isTT && <span className="text-[8px] font-bold mr-0.5">TT</span>}
+                {isTW && <span className="text-[8px] font-bold mr-0.5">X</span>}
+                {isFB && <span className="text-[8px] font-bold mr-0.5">FB</span>}
+                {label}
+              </a>
+            );
+          })}
+        </div>
+      ) : c.is_enriched && !c.contact_email ? (
+        <p className="mb-3 text-[10px] text-muted-foreground/50 italic">Contact information unavailable</p>
+      ) : null}
 
       <div className="grid grid-cols-3 gap-2 text-center mt-4 border-t border-border/50 pt-4">
         <div>
@@ -830,34 +1038,42 @@ function ResultCard({ c, isFreePlan, lists, cachedScores, evaluatingUsername, ev
           </div>
         </div>
         <div>
-          <p className="text-xs text-muted-foreground">IQ Score</p>
-          {cachedScores[`${c.platform} - ${c.username}`] != null ? (
-            <div className="flex justify-center mt-1">
-              <EvaluationScoreBadge score={cachedScores[`${c.platform} - ${c.username}`]} size="sm" />
+          <p className="text-xs text-muted-foreground">Relevance</p>
+          {c._search_score != null ? (
+            <div className="mt-1">
+              <p
+                className="text-sm font-semibold text-foreground data-mono cursor-help"
+                title={`Score: ${Math.round(c._search_score * 100)}%\nSignals: keyword match, snippet relevance, engagement, authenticity, recency${c._intent ? `, intent (${c._intent.replace("_", " ")})` : ""}`}
+              >
+                {Math.round(c._search_score * 100)}%
+              </p>
+              <div className="h-1 bg-muted/50 rounded-full mt-1 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${
+                    c._search_score >= 0.65
+                      ? "bg-emerald-500"
+                      : c._search_score >= 0.35
+                      ? "bg-amber-400"
+                      : "bg-muted-foreground/40"
+                  }`}
+                  style={{ width: `${Math.round(c._search_score * 100)}%` }}
+                />
+              </div>
+              {cachedScores[`${c.platform} - ${c.username}`] != null && (
+                <div className="flex justify-center mt-1.5">
+                  <EvaluationScoreBadge score={cachedScores[`${c.platform} - ${c.username}`]} size="sm" />
+                </div>
+              )}
             </div>
           ) : (
-            <Button
-              variant="ghost" size="sm"
-              className="h-6 mt-0.5 text-[10px] w-full bg-primary/5 hover:bg-primary/10 text-primary"
-              disabled={!canUseAI() || (evalLoading && evaluatingUsername === c.username)}
-              onClick={async () => {
-                setEvaluatingUsername(c.username);
-                const result = await evaluateInfluencer({
-                  username: c.username, platform: c.platform,
-                  followers: c.extracted_followers, snippet: c.snippet,
-                  title: c.title, link: c.link,
-                });
-                if (result) {
-                  setCachedScores((prev: any) => ({ ...prev, [`${c.platform} - ${c.username}`]: result.overall_score }));
-                }
-                setEvaluatingUsername(null);
-              }}
-            >
-              {evalLoading && evaluatingUsername === c.username
-                ? <Loader2 className="h-3 w-3 animate-spin mx-auto" />
-                : <span className="flex items-center gap-1"><Sparkles className="h-3 w-3" /> Evaluate</span>
-              }
-            </Button>
+            /* Fallback for cached results without _search_score */
+            cachedScores[`${c.platform} - ${c.username}`] != null ? (
+              <div className="flex justify-center mt-1">
+                <EvaluationScoreBadge score={cachedScores[`${c.platform} - ${c.username}`]} size="sm" />
+              </div>
+            ) : (
+              <p className="text-sm font-semibold text-muted-foreground/40 mt-1">&mdash;</p>
+            )
           )}
         </div>
       </div>

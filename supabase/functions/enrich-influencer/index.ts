@@ -1,48 +1,11 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+﻿import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Redis } from "https://esm.sh/@upstash/redis";
 import { checkRateLimit, corsHeaders } from "../_shared/rate_limit.ts";
+import { extractCityFromBio } from "../_shared/geo.ts";
+import { computeQuickBotScore } from "../_shared/bot_signals.ts";
 
 // ── Shared Utilities ───────────────────────────────────────────────────────────
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
-
-const PK_CITIES = [
-    "karachi", "lahore", "islamabad", "rawalpindi", "faisalabad", "multan",
-    "peshawar", "quetta", "sialkot", "gujranwala", "hyderabad", "bahawalpur",
-    "sargodha", "sukkur", "larkana", "sheikhupura", "jhang", "rahim yar khan",
-    "gujrat", "kasur", "mardan", "mingora", "nawabshah", "mirpur", "okara",
-    "abbottabad", "mansehra", "attock", "jhelum", "chakwal", "muzaffarabad",
-];
-
-function extractCityFromBio(bio: string): string | null {
-    if (!bio) return null;
-    const lower = bio.toLowerCase();
-    for (const city of PK_CITIES) {
-        const idx = lower.indexOf(city);
-        if (idx === -1) continue;
-        const before = idx > 0 ? lower[idx - 1] : " ";
-        const after = idx + city.length < lower.length ? lower[idx + city.length] : " ";
-        if (/\w/.test(before) || /\w/.test(after)) continue;
-        return city.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-    }
-    return null;
-}
-
-function computeBotProbability(p: {
-    followers: number; following: number; postsCount: number;
-    engagementRate: number; bioLength: number;
-}): number {
-    let score = 0;
-    const { followers, following, postsCount, engagementRate, bioLength } = p;
-    const ratio = followers > 0 ? following / followers : 10;
-    if (ratio > 5) score += 25; else if (ratio > 2) score += 12;
-    if (engagementRate > 20) score += 20;
-    else if (engagementRate < 0.5 && followers > 10_000) score += 20;
-    else if (engagementRate < 1 && followers > 50_000) score += 10;
-    if (postsCount === 0) score += 20; else if (postsCount < 5) score += 8;
-    if (bioLength === 0) score += 15; else if (bioLength < 10) score += 8;
-    if (followers > 500_000 && following > 5_000) score += 10;
-    return Math.min(score, 100);
-}
 
 function extractLinkedHandles(bio: string, currentPlatform: string): Array<{ platform: string; username: string }> {
     const out: Array<{ platform: string; username: string }> = [];
@@ -55,7 +18,7 @@ function extractLinkedHandles(bio: string, currentPlatform: string): Array<{ pla
     return out;
 }
 
-// ── YouTube Data API v3 ────────────────────────────────────────────────────────
+// ΓöÇΓöÇ YouTube Data API v3 ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 async function fetchYouTubeData(username: string, apiKey: string) {
     const clean = username.replace(/^@/, "");
     const BASE = "https://www.googleapis.com/youtube/v3";
@@ -125,7 +88,7 @@ async function fetchYouTubeData(username: string, apiKey: string) {
     };
 }
 
-// ── Apify Integration (Instagram / TikTok) ─────────────────────────────────────
+// ΓöÇΓöÇ Apify Integration (Instagram / TikTok) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 function apifyActorFor(platform: string): { actorId: string; buildInput: (u: string) => unknown } {
     const clean = (u: string) => u.replace(/^@/, "");
     if (platform === "instagram") return {
@@ -263,8 +226,8 @@ async function fetchApifyDataWithRetries(platform: string, username: string, api
             // 1. Start run
             const input = actor.buildInput(username);
             console.log(`[enrich] Calling Apify ${actor.actorId} for ${platform}/${username} (Attempt ${attempts})`);
-            const startRes = await fetch(`https://api.apify.com/v2/acts/${actor.actorId}/runs?token=${apiKey}`, {
-                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+            const startRes = await fetch(`https://api.apify.com/v2/acts/${actor.actorId}/runs`, {
+                method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` }, body: JSON.stringify(input)
             });
             if (!startRes.ok) throw new Error(`Apify start failed: ${startRes.status} ${await startRes.text()}`);
 
@@ -275,7 +238,9 @@ async function fetchApifyDataWithRetries(platform: string, username: string, api
             let succeeded = false;
             for (let i = 0; i < 24; i++) {
                 await sleep(5000);
-                const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${apiKey}`);
+                const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}`, {
+                    headers: { "Authorization": `Bearer ${apiKey}` },
+                });
                 const { data: s } = await statusRes.json();
                 if (s.status === "SUCCEEDED") { succeeded = true; break; }
                 if (["FAILED", "ABORTED", "TIMED-OUT"].includes(s.status)) {
@@ -285,7 +250,9 @@ async function fetchApifyDataWithRetries(platform: string, username: string, api
             if (!succeeded) throw new Error("Apify polling timed out after 120s");
 
             // 3. Fetch items
-            const itemsRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${apiKey}`);
+            const itemsRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}/dataset/items`, {
+                headers: { "Authorization": `Bearer ${apiKey}` },
+            });
             if (!itemsRes.ok) throw new Error("Failed to fetch Apify dataset items");
             const items = await itemsRes.json();
 
@@ -322,8 +289,8 @@ if (Deno.env.get("UPSTASH_REDIS_REST_URL") && Deno.env.get("UPSTASH_REDIS_REST_T
     });
 }
 
-// ── Main handler ───────────────────────────────────────────────────────────────
-// ── Main handler ───────────────────────────────────────────────────────────────
+// ΓöÇΓöÇ Main handler ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ΓöÇΓöÇ Main handler ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 Deno.serve(async (req: Request) => {
     if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
     const t0 = performance.now();
@@ -360,8 +327,9 @@ Deno.serve(async (req: Request) => {
         // Check budget cap before hitting paid APIs
         if (workspace?.enrichment_locked) {
             return new Response(JSON.stringify({
-                error: "Monthly API budget reached. Enrichment is paused until next billing cycle or admin increases budget."
-            }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+                error: "Monthly API budget reached. Enrichment is paused until next billing cycle or admin increases budget.",
+                code: "BUDGET_LOCKED"
+            }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
         // Credit decrement will happen atomically at the end
 
@@ -373,8 +341,6 @@ Deno.serve(async (req: Request) => {
             return new Response(JSON.stringify({ error: `Unsupported platform: ${platform}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
-        const isAdmin = authHeader.includes(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "SUPER_SECRET_FALLBACK");
-
         const { data: existing } = await serviceClient.from("influencer_profiles").select("id, enriched_at, enrichment_status").eq("platform", platform).eq("username", username).maybeSingle();
         if (existing?.enriched_at && !force_refresh) {
             const daysSince = (Date.now() - new Date(existing.enriched_at).getTime()) / (1000 * 60 * 60 * 24);
@@ -382,18 +348,19 @@ Deno.serve(async (req: Request) => {
                 return new Response(
                     JSON.stringify({
                         error: 'Profile was recently enriched. Please wait 7 days before re-enriching.',
-                        enriched_at: existing.enriched_at
+                        enriched_at: existing.enriched_at,
+                        cooldown_remaining_days: Math.ceil(7 - daysSince)
                     }),
-                    { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                 );
             }
         }
-        if (existing?.enrichment_status === "processing") return new Response(JSON.stringify({ error: "processing" }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        if (existing?.enrichment_status === "processing") return new Response(JSON.stringify({ error: "processing", code: "PROCESSING" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
         // Lock profile state to 'processing'
         await serviceClient.from("influencer_profiles").upsert({ platform, username, enrichment_status: "processing", enrichment_error: null }, { onConflict: "platform,username" });
 
-        // ── Execute Data Fetching ──────────────────────────────────────────────────
+        // ΓöÇΓöÇ Execute Data Fetching ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         let enriched: any = null;
         let dataSource = "apify";
         const ytKey = Deno.env.get("YOUTUBE_API_KEY");
@@ -401,14 +368,17 @@ Deno.serve(async (req: Request) => {
 
         try {
             if (platform === "youtube") {
-                if (!ytKey) throw new Error("YOUTUBE_API_KEY is not configured.");
+                if (!ytKey) {
+                    console.warn("[enrich] YOUTUBE_API_KEY not configured — YouTube profile enrichment is unavailable");
+                    throw new Error("YOUTUBE_API_KEY is not configured.");
+                }
                 enriched = await fetchYouTubeData(username, ytKey);
                 dataSource = "youtube_api";
             } else {
                 if (!apifyKey) {
-                    // Rule #5: 503 if API key missing
+                    console.warn("[enrich] APIFY_API_KEY not configured — Instagram/TikTok enrichment is unavailable");
                     return new Response(JSON.stringify({ error: "Enrichment is temporarily unavailable. Please contact support." }), {
-                        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" }
+                        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" }
                     });
                 }
                 enriched = await fetchApifyDataWithRetries(platform, username, apifyKey);
@@ -417,7 +387,7 @@ Deno.serve(async (req: Request) => {
             const errorMsg = e.message || "Unknown error during data fetching";
             console.error(`[enrich] Primary fetch failed for ${platform}/${username}:`, errorMsg);
 
-            // ── Fallback: return partial data from Serper cache ─────────────────
+            // ΓöÇΓöÇ Fallback: return partial data from Serper cache ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
             // Don't charge credits. Return what we know from the search snippet.
             // This is clearly labeled as partial/estimated so the user isn't misled.
             const { data: cachedProfile } = await serviceClient
@@ -428,7 +398,7 @@ Deno.serve(async (req: Request) => {
                 .maybeSingle();
 
             if (cachedProfile?.follower_count || cachedProfile?.bio) {
-                // Mark as partial — not full enrichment
+                // Mark as partial ΓÇö not full enrichment
                 await serviceClient.from("influencer_profiles").update({
                     enrichment_status: "partial",
                     enrichment_error: `Primary data source unavailable: ${errorMsg}. Showing cached data only.`,
@@ -442,12 +412,12 @@ Deno.serve(async (req: Request) => {
                     data_source: "cache_fallback",
                     credits_remaining: workspace?.enrichment_credits_remaining ?? 0,
                 }), {
-                    status: 206, // 206 Partial Content — semantically correct
+                    status: 206, // 206 Partial Content ΓÇö semantically correct
                     headers: { ...corsHeaders, "Content-Type": "application/json" }
                 });
             }
 
-            // No fallback data available — unlock and fail cleanly
+            // No fallback data available ΓÇö unlock and fail cleanly
             await serviceClient.from("influencer_profiles").update({
                 enrichment_status: "failed",
                 enrichment_error: errorMsg
@@ -465,20 +435,20 @@ Deno.serve(async (req: Request) => {
             return new Response(JSON.stringify({
                 error: "Enrichment temporarily unavailable. Credits were not deducted. Please try again in a few minutes.",
                 technical_detail: errorMsg,
-            }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
         if (!enriched) {
             const errMsg = "Enrichment yielded no data";
             await serviceClient.from("influencer_profiles").update({ enrichment_status: "failed", enrichment_error: errMsg }).eq("platform", platform).eq("username", username);
-            return new Response(JSON.stringify({ error: errMsg }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            return new Response(JSON.stringify({ error: errMsg, code: "NO_DATA" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
-        // ── Apply Data ─────────────────────────────────────────────────────────────
+        // ΓöÇΓöÇ Apply Data ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         const resolvedNiche = primary_niche || "Lifestyle";
         const city = enriched.city || extractCityFromBio(bio || "");
 
-        const botP = computeBotProbability({
+        const botP = computeQuickBotScore({
             followers: enriched.follower_count ?? 0, following: enriched.following_count ?? 0,
             postsCount: enriched.posts_count ?? (enriched.posts?.length ?? 0),
             engagementRate: enriched.engagement_rate ?? 3, bioLength: (enriched.bio || "").length,
@@ -518,7 +488,7 @@ Deno.serve(async (req: Request) => {
             }
         } catch (writeErr: any) {
             await serviceClient.from("influencer_profiles").update({ enrichment_status: "failed", enrichment_error: writeErr.message }).eq("platform", platform).eq("username", username);
-            return new Response(JSON.stringify({ error: `Database write failed: ${writeErr.message}` }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            return new Response(JSON.stringify({ error: `Database write failed: ${writeErr.message}`, code: "DB_ERROR" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
         // Success -> Deduct Credits Atomically
@@ -527,8 +497,8 @@ Deno.serve(async (req: Request) => {
         } catch (error: any) {
             if (error.code === 'P0001') {
                 return new Response(
-                    JSON.stringify({ error: 'Insufficient credits' }),
-                    { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                    JSON.stringify({ error: 'Insufficient credits', code: "CREDITS_EXHAUSTED" }),
+                    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                 );
             }
             throw error;
@@ -547,6 +517,19 @@ Deno.serve(async (req: Request) => {
             p_cost_usd: approxCostUsd,
             p_units: 1,
         }).catch((e: any) => console.warn("[enrich] Cost logging failed:", e.message));
+
+        // Fire-and-forget: trigger AI tag extraction pipeline for this profile
+        if (profile?.id) {
+            const tagUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/extract-creator-tags`;
+            fetch(tagUrl, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ profile_id: profile.id }),
+            }).catch((e: any) => console.warn("[enrich] tag extraction fire-and-forget failed:", e.message));
+        }
 
         // Invalidate Search Cache for this Profile
         if (redis) {
@@ -580,6 +563,6 @@ Deno.serve(async (req: Request) => {
 
         return new Response(JSON.stringify({ success: true, profile, data_source: dataSource, is_stale: isStale, credits_remaining: (workspace?.enrichment_credits_remaining || 1) - 1 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     } catch (err: any) {
-        return new Response(JSON.stringify({ error: err.message || "Internal server error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ error: err.message || "Internal server error", code: "INTERNAL_ERROR" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 });

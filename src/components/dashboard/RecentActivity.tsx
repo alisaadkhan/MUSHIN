@@ -6,7 +6,7 @@ const activities = [
   { icon: TrendingUp, text: "Campaign ROI updated: +12% from last week", time: "15 min ago", color: "text-emerald-500" },
   { icon: Handshake, text: "Maya Kingston accepted collaboration", time: "1 hr ago", color: "text-amber-500" },
   { icon: FileText, text: "Audience report generated for Q3 Brand Push", time: "3 hrs ago", color: "text-blue-500" },
-  { icon: Brain, text: "New IQ score calculated for 847 creators", time: "6 hrs ago", color: "text-primary" },
+  { icon: Brain, text: "Relevance scores refreshed for 847 creators", time: "6 hrs ago", color: "text-primary" },
 ];
 
 export function RecentActivity() {

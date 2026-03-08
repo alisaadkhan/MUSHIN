@@ -49,7 +49,10 @@ export function useInfluencerEvaluation() {
   }, [workspace]);
 
   const evaluate = useCallback(async (influencerData: any): Promise<InfluencerEvaluation | null> => {
-    if (!workspace) return null;
+    if (!workspace) {
+      toast({ title: "Not ready", description: "Workspace is still loading. Please wait a moment and try again.", variant: "destructive" });
+      return null;
+    }
     setLoading(true);
     try {
       // Check cache first
@@ -68,7 +71,12 @@ export function useInfluencerEvaluation() {
         const status = data?.status;
         if (status === 429) toast({ title: "Rate limited", description: "Please wait a moment.", variant: "destructive" });
         else if (status === 402) toast({ title: "Credits exhausted", description: "Add AI credits in settings.", variant: "destructive" });
-        else toast({ title: "Evaluation failed", description: data.error, variant: "destructive" });
+        else {
+          const friendlyDesc = (data.error || "").includes("non-2xx") || (data.error || "").includes("Failed to send a request")
+            ? "AI evaluation service is unavailable. Make sure the edge functions are deployed and your AI API key is configured."
+            : data.error;
+          toast({ title: "Evaluation failed", description: friendlyDesc, variant: "destructive" });
+        }
         return null;
       }
 
@@ -89,7 +97,11 @@ export function useInfluencerEvaluation() {
 
       return result;
     } catch (err: any) {
-      toast({ title: "Evaluation failed", description: err.message || "Unknown error", variant: "destructive" });
+      const raw: string = err.message || "Unknown error";
+      const friendly = raw.includes("non-2xx") || raw.includes("Failed to send a request")
+        ? "AI evaluation service is unavailable. Make sure the edge functions are deployed and your AI API key is configured."
+        : raw;
+      toast({ title: "Evaluation failed", description: friendly, variant: "destructive" });
       return null;
     } finally {
       setLoading(false);

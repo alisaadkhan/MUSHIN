@@ -1,14 +1,12 @@
 // @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Redis } from "https://esm.sh/@upstash/redis";
+import { generateEmbedding } from "../_shared/huggingface.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": Deno.env.get("APP_URL") || "*",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-3-flash-preview";
 
 // Initialize Redis client if env vars are present (fallback to none if missing)
 let redis: Redis | null = null;
@@ -69,24 +67,15 @@ Deno.serve(async (req) => {
             } catch (e) { console.warn("Redis Fetch Error", e); }
         }
 
-        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+        const HUGGINGFACE_API_KEY = Deno.env.get("HUGGINGFACE_API_KEY");
+        if (!HUGGINGFACE_API_KEY) {
+            return new Response(JSON.stringify({ error: "No AI credits remaining" }), {
+                status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+        }
 
-        // 1. Generate Embedding for the Search Query
-        const embeddingRes = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${LOVABLE_API_KEY}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                input: query,
-                model: "text-embedding-3-small"
-            })
-        });
-
-        if (!embeddingRes.ok) throw new Error("Failed to generate embedding");
-        const embeddingData = await embeddingRes.json();
-        const vector = embeddingData.data[0].embedding;
+        // 1. Generate Embedding for the Search Query via HuggingFace BGE-large
+        const vector = await generateEmbedding(query, HUGGINGFACE_API_KEY);
 
         // 2. Perform Similarity Search
         const { data: influencers, error: searchErr } = await serviceClient.rpc(

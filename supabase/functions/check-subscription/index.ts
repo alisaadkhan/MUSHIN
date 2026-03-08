@@ -19,7 +19,6 @@ Deno.serve(async (req) => {
 
   try {
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    if (!stripeKey) throw new Error("STRIPE_SECRET_KEY not configured");
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -34,8 +33,6 @@ Deno.serve(async (req) => {
     const { data: userData, error: userError } = await supabase.auth.getUser(token);
     if (userError || !userData.user?.email) throw new Error("Not authenticated");
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
-
     // Get workspace ID for this user
     const { data: memberData } = await supabase
       .from("workspace_members")
@@ -44,24 +41,55 @@ Deno.serve(async (req) => {
       .limit(1)
       .single();
 
-    // H-4: Look up stripe_customer_id from DB first (handles OAuth/email-changed users)
-    let customers: { data: Array<{ id: string }> } = { data: [] };
-    if (memberData?.workspace_id) {
-      const { data: sub } = await supabase
-        .from("subscriptions")
-        .select("stripe_customer_id")
-        .eq("workspace_id", memberData.workspace_id)
-        .not("stripe_customer_id", "is", null)
-        .maybeSingle();
-      if (sub?.stripe_customer_id) {
-        customers = { data: [{ id: sub.stripe_customer_id }] };
+    // ── DB-only path: when Stripe key is absent (local dev / test envs) ────────
+    if (!stripeKey) {
+      console.warn("[check-subscription] STRIPE_SECRET_KEY not set — using DB subscription only");
+      if (memberData) {
+        const { data: dbSub } = await supabase
+          .from("subscriptions")
+          .select("*")
+          .eq("workspace_id", memberData.workspace_id)
+          .eq("status", "active")
+          .limit(1)
+          .maybeSingle();
+
+        if (dbSub && dbSub.plan !== "free") {
+          return new Response(JSON.stringify({
+            subscribed: true,
+            plan: dbSub.plan,
+            subscription_end: dbSub.current_period_end,
+            cancel_at_period_end: dbSub.cancel_at_period_end ?? false,
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Also check workspaces.plan as a final fallback
+        const { data: ws } = await supabase
+          .from("workspaces")
+          .select("plan")
+          .eq("id", memberData.workspace_id)
+          .single();
+
+        if (ws?.plan && ws.plan !== "free") {
+          return new Response(JSON.stringify({
+            subscribed: true,
+            plan: ws.plan,
+            subscription_end: null,
+            cancel_at_period_end: false,
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
       }
+      return new Response(JSON.stringify({ subscribed: false, plan: "free" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
-    // Fall back to email lookup if no stored customer ID
-    if (customers.data.length === 0 && userData.user.email) {
-      const stripeCustomers = await stripe.customers.list({ email: userData.user.email, limit: 1 });
-      customers = { data: stripeCustomers.data.map((c) => ({ id: c.id })) };
-    }
+
+    // ── Full Stripe path ───────────────────────────────────────────────────────
+    const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
+    const customers = await stripe.customers.list({ email: userData.user.email, limit: 1 });
 
     if (customers.data.length === 0) {
       // Check for manually provisioned subscription (test accounts)

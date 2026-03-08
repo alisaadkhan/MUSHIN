@@ -27,7 +27,245 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid } from "recharts";
 import { GrowthAnalyticsPanel } from "@/components/influencer/GrowthAnalyticsPanel";
 import { BrandAffinityPanel, type BrandMention } from "@/components/influencer/BrandAffinityPanel";
 import { SponsoredVsOrganicPanel } from "@/components/influencer/SponsoredVsOrganicPanel";
+import { PredictiveGrowthPanel } from "@/components/influencer/PredictiveGrowthPanel";
+import { CampaignResponsePanel } from "@/components/influencer/CampaignResponsePanel";
+import { AudienceStabilityPanel } from "@/components/influencer/AudienceStabilityPanel";
+import { BrandFitMeterPanel } from "@/components/influencer/BrandFitMeterPanel";
 import { useState, useEffect } from "react";
+
+// ── Python Analytics types ────────────────────────────────────────────────────
+interface BotDetectionResult {
+  data_available: boolean;
+  bot_probability?: number | null;
+  risk_level?: string | null;
+  signals_triggered?: string[];
+  confidence?: string | null;
+}
+interface EngagementAnomalyResult {
+  data_available: boolean;
+  anomaly_score?: number | null;
+  anomalies_detected?: string[];
+  explanation?: string | null;
+}
+interface PythonAnalyticsData {
+  available: boolean;
+  reason?: string;
+  bot_detection: BotDetectionResult;
+  engagement_anomaly: EngagementAnomalyResult;
+  cached?: boolean;
+  analyzed_at?: string;
+}
+
+// ── SimilarCreatorsSection ────────────────────────────────────────────────────
+function SimilarCreatorsSection({ profileId, currentPlatform }: { profileId: string; currentPlatform: string }) {
+  const [similar, setSimilar] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    supabase.functions
+      .invoke("find-lookalikes", {
+        body: { target_profile_id: profileId, limit: 12, same_platform_only: false },
+      })
+      .then(({ data }) => {
+        if (!cancelled && data?.results) setSimilar(data.results);
+      })
+      .catch(console.warn)
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [profileId]);
+
+  if (!loading && similar.length === 0) return null;
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+      <div className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl p-5 shadow-sm">
+        <div className="flex items-center gap-2 mb-4">
+          <Sparkles className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold text-foreground">Similar Creators You May Like</h3>
+        </div>
+        {loading ? (
+          <div className="flex gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex-shrink-0 w-36 space-y-2">
+                <Skeleton className="h-10 w-10 rounded-full mx-auto" />
+                <Skeleton className="h-3 w-24 mx-auto" />
+                <Skeleton className="h-3 w-16 mx-auto" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {similar.map((c: any) => (
+              <div
+                key={c.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/influencer/${c.platform}/${c.username.replace("@", "")}`)}
+                onKeyDown={(e) => e.key === "Enter" && navigate(`/influencer/${c.platform}/${c.username.replace("@", "")}`)}
+                className="flex-shrink-0 w-36 cursor-pointer hover:bg-muted/50 rounded-xl p-3 transition-colors text-center"
+              >
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary uppercase overflow-hidden mx-auto mb-2">
+                  {c.avatar_url ? (
+                    <img
+                      src={c.avatar_url}
+                      alt={c.username}
+                      className="w-full h-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  ) : (
+                    (c.full_name || c.username).slice(0, 2).toUpperCase()
+                  )}
+                </div>
+                <p className="text-xs font-medium text-foreground truncate">{c.full_name || c.username}</p>
+                <p className="text-[10px] text-muted-foreground truncate">@{c.username.replace("@", "")}</p>
+                {c.primary_niche && (
+                  <span className="text-[9px] bg-primary/10 text-primary rounded-full px-1.5 py-0.5 mt-1 inline-block">
+                    {c.primary_niche}
+                  </span>
+                )}
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {Math.round((c.similarity ?? 0) * 100)}% match
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+// ── PythonAnalyticsPanel ──────────────────────────────────────────────────────
+function PythonAnalyticsPanel({ data }: { data: PythonAnalyticsData }) {
+  if (!data.available) {
+    return (
+      <div className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl p-5 shadow-sm">
+        <p className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+          <BarChart3 className="h-4 w-4 text-primary" /> Statistical Analytics
+        </p>
+        <p className="text-xs text-muted-foreground italic">
+          {data.reason ?? "Analytics service unavailable — try again later."}
+        </p>
+      </div>
+    );
+  }
+
+  const bot = data.bot_detection;
+  const eng = data.engagement_anomaly;
+
+  const botPct = bot.data_available && bot.bot_probability != null
+    ? Math.round(bot.bot_probability * 100) : null;
+  const botRiskColor =
+    bot.risk_level === "high" ? "bg-red-500"
+    : bot.risk_level === "medium" ? "bg-amber-500"
+    : "bg-emerald-500";
+  const botBadgeColor =
+    bot.risk_level === "high" ? "text-red-600 bg-red-50 border-red-200"
+    : bot.risk_level === "medium" ? "text-amber-600 bg-amber-50 border-amber-200"
+    : "text-emerald-600 bg-emerald-50 border-emerald-200";
+
+  const anomalyPct = eng.data_available && eng.anomaly_score != null
+    ? Math.round(eng.anomaly_score * 100) : null;
+  const anomalyLabel =
+    anomalyPct === null ? null
+    : anomalyPct < 20 ? "Normal"
+    : anomalyPct < 50 ? "Moderate"
+    : "Anomalous";
+  const anomalyColor =
+    anomalyPct === null ? ""
+    : anomalyPct < 20 ? "bg-emerald-500"
+    : anomalyPct < 50 ? "bg-amber-500"
+    : "bg-red-500";
+
+  return (
+    <div className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl p-5 shadow-sm space-y-5">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <BarChart3 className="h-4 w-4 text-primary" /> Statistical Analytics
+        </p>
+        {data.cached && (
+          <span className="text-[9px] text-muted-foreground bg-muted/60 border border-border/40 rounded-full px-2 py-0.5">
+            Cached · {data.analyzed_at ? new Date(data.analyzed_at).toLocaleDateString() : ""}
+          </span>
+        )}
+      </div>
+
+      {/* Bot probability */}
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <p className="text-xs font-medium text-muted-foreground">Statistical Bot Risk</p>
+          {bot.data_available && bot.risk_level ? (
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${botBadgeColor}`}>
+              {bot.risk_level.charAt(0).toUpperCase() + bot.risk_level.slice(1)} Risk
+            </span>
+          ) : (
+            <span className="text-[10px] text-muted-foreground italic">Data unavailable</span>
+          )}
+        </div>
+        {botPct !== null ? (
+          <>
+            <div className="h-2.5 bg-muted/60 rounded-full overflow-hidden mb-1">
+              <div className={`h-full rounded-full transition-all ${botRiskColor}`} style={{ width: `${botPct}%` }} />
+            </div>
+            <p className="text-[10px] text-muted-foreground text-right">{botPct}% probability · {bot.confidence} confidence</p>
+          </>
+        ) : (
+          <p className="text-xs text-muted-foreground/60 italic">Insufficient data to compute bot probability.</p>
+        )}
+        {bot.signals_triggered && bot.signals_triggered.length > 0 && (
+          <details className="mt-2 group">
+            <summary className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground list-none flex items-center gap-1 select-none">
+              <span className="group-open:rotate-90 transition-transform inline-block">▶</span>
+              {bot.signals_triggered.length} signal{bot.signals_triggered.length > 1 ? "s" : ""} triggered
+            </summary>
+            <ul className="mt-2 space-y-1 pl-3 border-l-2 border-muted">
+              {bot.signals_triggered.map((s, i) => (
+                <li key={i} className="text-[10px] text-muted-foreground leading-relaxed">{s}</li>
+              ))}
+            </ul>
+          </details>
+        )}
+      </div>
+
+      {/* Engagement anomaly */}
+      <div className="pt-3 border-t border-border/30">
+        <div className="flex items-center justify-between mb-1.5">
+          <p className="text-xs font-medium text-muted-foreground">Engagement Anomaly</p>
+          {anomalyLabel ? (
+            <span className="text-[10px] text-muted-foreground font-medium">{anomalyLabel}</span>
+          ) : (
+            <span className="text-[10px] text-muted-foreground italic">Data unavailable</span>
+          )}
+        </div>
+        {anomalyPct !== null ? (
+          <div className="h-2.5 bg-muted/60 rounded-full overflow-hidden mb-1">
+            <div className={`h-full rounded-full transition-all ${anomalyColor}`} style={{ width: `${anomalyPct}%` }} />
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground/60 italic">Insufficient engagement data.</p>
+        )}
+        {eng.anomalies_detected && eng.anomalies_detected.length > 0 ? (
+          <ul className="mt-2 space-y-1">
+            {eng.anomalies_detected.map((a, i) => (
+              <li key={i} className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 leading-relaxed">{a}</li>
+            ))}
+          </ul>
+        ) : eng.data_available && anomalyPct === 0 ? (
+          <p className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5 mt-1">
+            ✓ No statistically notable engagement anomalies detected
+          </p>
+        ) : null}
+      </div>
+
+      <p className="text-[9px] text-muted-foreground/50 pt-1 border-t border-border/20">
+        Rule-based statistical model · Not a substitute for platform-verified data
+      </p>
+    </div>
+  );
+}
 
 export function DataStalenessBadge({ daysSince, onRefresh, disabled }: { daysSince: number; onRefresh: () => void; disabled?: boolean }) {
   return (
@@ -53,6 +291,17 @@ function formatFollowers(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
   if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, "") + "K";
   return n.toString();
+}
+
+/** Parse following/posts counts from the Google-snippet bio text when DB values are null. */
+function parseStatsFromBio(bio: string | null): { following: number | null; posts: number | null } {
+  if (!bio) return { following: null, posts: null };
+  const followingMatch = bio.match(/(\d[\d,]*)\s+following/i);
+  const postsMatch = bio.match(/(\d[\d,]*)\s+posts?/i);
+  return {
+    following: followingMatch ? parseInt(followingMatch[1].replace(/,/g, ""), 10) : null,
+    posts: postsMatch ? parseInt(postsMatch[1].replace(/,/g, ""), 10) : null,
+  };
 }
 
 /** Parse AI age_range string like "18-34" or "18-34 (65%)" into bar-chart data. */
@@ -102,6 +351,8 @@ export default function InfluencerProfilePage() {
   const [enriching, setEnriching] = useState(false);
   const [brandMentions] = useState<BrandMention[]>([]);
   const [botFeedbackSent, setBotFeedbackSent] = useState(false);
+  const [analyticsData, setAnalyticsData] = useState<PythonAnalyticsData | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [showAddToList, setShowAddToList] = useState(false);
   const [addingToList, setAddingToList] = useState(false);
 
@@ -128,6 +379,40 @@ export default function InfluencerProfilePage() {
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);
     toast({ title: "Link copied!", description: "Profile link copied to clipboard." });
+  };
+
+  const handleRunAnalytics = async () => {
+    if (!platform || !username) return;
+    setAnalyticsLoading(true);
+    try {
+      const metrics = {
+        follower_count: profile?.metrics?.followers ?? profile?.metrics?.subscriber_count ?? profile?.follower_count ?? null,
+        following_count: profile?.metrics?.following_count ?? profile?.following_count ?? null,
+        posts_count: profile?.metrics?.posts_count ?? null,
+        engagement_rate: profile?.metrics?.engagement_rate ?? profile?.engagement_rate ?? null,
+        avg_likes: profile?.metrics?.avg_likes ?? null,
+        avg_comments: profile?.metrics?.avg_comments ?? null,
+        avg_views: profile?.metrics?.avg_views ?? null,
+      };
+      const { data, error } = await supabase.functions.invoke("ai-analytics", {
+        body: { platform, username, metrics },
+      });
+      if (error) throw error;
+      setAnalyticsData(data as PythonAnalyticsData);
+    } catch (err: any) {
+      setAnalyticsData({
+        available: false,
+        reason: "Analytics service unavailable — try again later.",
+        bot_detection: { data_available: false },
+        engagement_anomaly: { data_available: false },
+      });
+      const errMsg = err.message?.includes("Failed to send a request")
+        ? "Analytics service is not running. This feature requires the edge functions to be deployed and reachable."
+        : err.message || "Something went wrong";
+      toast({ title: "Analytics unavailable", description: errMsg, variant: "destructive" });
+    } finally {
+      setAnalyticsLoading(false);
+    }
   };
 
   // Real data from DB
@@ -169,9 +454,9 @@ export default function InfluencerProfilePage() {
         },
       });
 
-      // Handle 7-day cooldown response
-      if (enrichError?.message?.includes("429") || enrichData?.cooldown_remaining_days) {
-        const days = enrichData?.cooldown_remaining_days ?? 7;
+      // Handle structured error codes (all responses now return HTTP 200)
+      if (enrichData?.cooldown_remaining_days) {
+        const days = enrichData.cooldown_remaining_days;
         toast({
           title: "Recently Enriched",
           description: `This profile was enriched recently. Please wait ${days} more day(s) before re-enriching.`,
@@ -180,8 +465,23 @@ export default function InfluencerProfilePage() {
         setEnriching(false);
         return;
       }
+      if (enrichData?.code === "PROCESSING") {
+        toast({ title: "In Progress", description: "Enrichment is already running for this profile. Please wait a moment.", variant: "default" });
+        setEnriching(false);
+        return;
+      }
+      if (enrichData?.code === "BUDGET_LOCKED") {
+        toast({ title: "Budget Limit Reached", description: enrichData.error, variant: "destructive" });
+        setEnriching(false);
+        return;
+      }
+      if (enrichData?.code === "CREDITS_EXHAUSTED") {
+        toast({ title: "Credits Exhausted", description: "Add enrichment credits in Settings → Billing.", variant: "destructive" });
+        setEnriching(false);
+        return;
+      }
 
-      if (enrichError || enrichData?.error) throw new Error(enrichData?.error || enrichError?.message);
+      if (enrichError || enrichData?.error) throw new Error(enrichData?.technical_detail || enrichData?.error || enrichError?.message);
       await reload();
       const latestMetrics = enrichData.profile?.metrics || {};
       await evaluate({
@@ -191,7 +491,11 @@ export default function InfluencerProfilePage() {
         bio: enrichData.profile?.bio,
       });
     } catch (err: any) {
-      toast({ title: "Enrichment Failed", description: err.message, variant: "destructive" });
+      const raw: string = err.message || "Unknown error";
+      const enrichMsg = raw.includes("Failed to send a request")
+        ? "Enrichment service is unreachable. Please ensure the edge functions are deployed."
+        : raw;
+      toast({ title: "Enrichment Failed", description: enrichMsg, variant: "destructive" });
       // Still try to evaluate with available data
       await evaluate({
         username, platform,
@@ -211,7 +515,9 @@ export default function InfluencerProfilePage() {
   const loading = profileLoading;
   const metrics = profile?.metrics || {};
   const followers = metrics.followers || metrics.subscriber_count || profile?.follower_count;
-  const following = metrics.following_count ?? profile?.following_count ?? null;
+  const lastSearchUrl = (() => { try { return sessionStorage.getItem("mushin_last_search_url") || ""; } catch { return ""; } })();
+  const snippetStats = !isEnriched ? parseStatsFromBio(profile?.bio) : { following: null, posts: null };
+  const following = metrics.following_count ?? profile?.following_count ?? snippetStats.following ?? null;
   const engagementRate = metrics.engagement_rate ?? profile?.engagement_rate;
   const city = metrics.city || profile?.city_extracted || profile?.city;
   const niche = profile?.primary_niche || evaluation?.niche_categories?.[0] || "Creator";
@@ -246,31 +552,13 @@ export default function InfluencerProfilePage() {
     <div className="space-y-6 max-w-6xl mx-auto">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild>
-          <Link to="/search"><ChevronLeft size={18} strokeWidth={1.5} /></Link>
+          <Link to={`/search${lastSearchUrl}`}><ChevronLeft size={18} strokeWidth={1.5} /></Link>
         </Button>
         <span className="text-sm text-muted-foreground flex-1">Back to Search</span>
-        <Button
-          variant="outline" size="sm"
-          className="text-xs gap-1.5 rounded-lg border-border"
-          onClick={async () => {
-            if (!profile?.id) return;
-            toast({ title: "Finding Similar Creators", description: "Analyzing AI embeddings..." });
-            try {
-              const res = await supabase.functions.invoke("find-lookalikes", { body: { target_profile_id: profile.id, match_count: 5 } });
-              if (res.error) throw res.error;
-              if (res.data?.results) {
-                toast({ title: `Found ${res.data.results.length} similar creators` });
-                navigate(`/search?q=Similar to @${username}`);
-              }
-            } catch (err: any) {
-              toast({ title: "Lookup Failed", description: err.message, variant: "destructive" });
-            }
-          }}
-        >
-          <Sparkles className="h-3 w-3 text-primary" />
-          Find Similar Creators
-        </Button>
       </div>
+
+      {/* ── Similar Creators (inline) ──────────────────────────── */}
+      {profile?.id && <SimilarCreatorsSection profileId={profile.id} currentPlatform={platform} />}
 
       {platform !== "youtube" && (
         <div className="bg-blue-50/50 border border-blue-200/50 text-blue-800 rounded-lg p-3 text-sm flex items-start gap-2 backdrop-blur-sm">
@@ -315,7 +603,7 @@ export default function InfluencerProfilePage() {
                       : <span className="text-xs bg-muted text-muted-foreground rounded-full px-2.5 py-0.5 font-medium">Unscored</span>
                   }
                   {/* Data source badge */}
-                  {isCacheOnly && (
+                  {(!isEnriched && !enrichmentFailed) && (
                     <span title="Metrics sourced from Google search results" className="text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5 flex items-center gap-1">
                       <Globe className="h-2.5 w-2.5" /> Data from Google
                     </span>
@@ -342,10 +630,12 @@ export default function InfluencerProfilePage() {
 
                 <div className="flex items-center gap-4 text-xs sm:text-sm text-muted-foreground mb-4 flex-wrap">
                   {city && <span className="flex items-center gap-1"><MapPin size={14} strokeWidth={1.5} /> {city}</span>}
-                  <span className="flex items-center gap-1">
-                    <Calendar size={14} strokeWidth={1.5} />
-                    Joined {profile?.created_at ? new Date(profile.created_at).getFullYear() : "—"}
-                  </span>
+                  {isEnriched && profile?.created_at && (
+                    <span className="flex items-center gap-1">
+                      <Calendar size={14} strokeWidth={1.5} />
+                      Indexed {new Date(profile.created_at).getFullYear()}
+                    </span>
+                  )}
                   {profileLink && (
                     <a href={profileLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
                       <Globe size={14} strokeWidth={1.5} /> Profile Link
@@ -355,9 +645,9 @@ export default function InfluencerProfilePage() {
 
                 {/* Stats */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-lg">
-                  {[
+                  {[  
                     { label: "Followers", value: followers != null ? formatFollowers(followers) : "—" },
-                    { label: "Posts", value: postsCount != null ? postsCount.toLocaleString() : "—" },
+                    { label: "Posts", value: (isEnriched ? postsCount : (postsCount ?? snippetStats.posts)) != null ? (isEnriched ? postsCount! : (postsCount ?? snippetStats.posts)!).toLocaleString() : "—" },
                     { label: "Following", value: following != null ? formatFollowers(following) : "—" },
                     { label: "Engagement", value: engagementRate != null ? `${engagementRate.toFixed(1)}%` : "—" },
                   ].map(({ label, value }) => (
@@ -367,6 +657,18 @@ export default function InfluencerProfilePage() {
                     </div>
                   ))}
                 </div>
+                {!isEnriched && followers == null && following == null && engagementRate == null && (
+                  <p className="text-[11px] text-amber-600/80 mt-2 flex items-center gap-1">
+                    <Info className="h-3 w-3 shrink-0" />
+                    Full stats load after enrichment — click <span className="font-semibold">Enrich &amp; Evaluate</span> below.
+                  </p>
+                )}
+
+                {/* Bio */}
+                {profile?.bio
+                  ? <p className="text-sm text-muted-foreground mt-3 leading-relaxed max-w-lg line-clamp-3">{profile.bio}</p>
+                  : <p className="text-sm text-muted-foreground/60 italic mt-3">Bio not available — click <span className="not-italic font-medium">Enrich &amp; Evaluate</span> to load the full profile.</p>
+                }
               </div>
 
               {/* Actions */}
@@ -414,6 +716,15 @@ export default function InfluencerProfilePage() {
                 >
                   <RefreshCw className={`h-3 w-3 ${(evalLoading || enriching) ? "animate-spin" : ""}`} />
                   {evaluation ? "Refresh Data" : isEnriched ? "Evaluate" : "Enrich & Evaluate"}
+                </Button>
+                <Button
+                  variant="outline" size="sm"
+                  className="w-full text-xs gap-1.5"
+                  onClick={handleRunAnalytics}
+                  disabled={analyticsLoading || !profile}
+                >
+                  <BarChart3 className={`h-3 w-3 ${analyticsLoading ? "animate-pulse" : ""}`} />
+                  {analyticsLoading ? "Running analytics…" : analyticsData ? "Refresh Analytics" : "Run Statistical Analytics"}
                 </Button>
               </div>
             </div>
@@ -548,7 +859,7 @@ export default function InfluencerProfilePage() {
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-bold text-foreground">AI Evaluation Report</h2>
             <Badge variant="secondary" className="bg-primary/10 text-primary border-0 font-medium">
-              IQ: {evaluation.overall_score}
+              Score: {evaluation.overall_score}
             </Badge>
           </div>
 
@@ -733,10 +1044,10 @@ export default function InfluencerProfilePage() {
               })()}
               <div className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl p-5 shadow-sm">
                 <p className="text-sm font-semibold text-foreground mb-3">Growth Assessment</p>
-                <p className="text-sm text-muted-foreground leading-relaxed">{evaluation.growth_assessment.pattern}</p>
-                {evaluation.growth_assessment.risk_flags.length > 0 && (
+                <p className="text-sm text-muted-foreground leading-relaxed">{evaluation.growth_assessment?.pattern ?? ""}</p>
+                {(evaluation.growth_assessment?.risk_flags?.length ?? 0) > 0 && (
                   <div className="flex flex-wrap gap-1.5 pt-3">
-                    {evaluation.growth_assessment.risk_flags.map((flag, i) => (
+                    {(evaluation.growth_assessment?.risk_flags ?? []).map((flag, i) => (
                       <Badge key={i} variant="outline" className="text-[11px] font-medium bg-amber-50 text-amber-700 border-amber-200">{flag}</Badge>
                     ))}
                   </div>
@@ -763,8 +1074,8 @@ export default function InfluencerProfilePage() {
               {totalPosts > 0 && (
                 <SponsoredVsOrganicPanel
                   data={{
-                    sponsored_er: (evaluation.engagement_rating.rate || 4) * 0.75,
-                    organic_er: (evaluation.engagement_rating.rate || 4) * 1.2,
+                    sponsored_er: (evaluation.engagement_rating?.rate || 4) * 0.75,
+                    organic_er: (evaluation.engagement_rating?.rate || 4) * 1.2,
                     post_count_sponsored: sponsoredPosts,
                     post_count_organic: organicPosts,
                   }}
@@ -772,15 +1083,53 @@ export default function InfluencerProfilePage() {
                 />
               )}
 
+              {/* ── P6.5 Intelligence Panels ──────────────────────── */}
+              <PredictiveGrowthPanel
+                platform={(platform as any) || "instagram"}
+                followerCount={followers ?? null}
+                recentFollowerDelta={null}
+                engagementRate={engagementRate ?? null}
+                postsCount={postsCount ?? null}
+                primaryNiche={niche}
+                className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm"
+              />
+
+              <BrandFitMeterPanel
+                platform={(platform as any) || "instagram"}
+                followerCount={followers ?? null}
+                engagementRate={engagementRate ?? null}
+                botProbability={botProbability}
+                creatorNiche={niche}
+                className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm"
+              />
+
+              <CampaignResponsePanel
+                platform={(platform as any) || "instagram"}
+                followerCount={followers ?? null}
+                engagementRate={engagementRate ?? null}
+                botProbability={botProbability}
+                creatorNiche={niche}
+                className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm"
+              />
+
+              <AudienceStabilityPanel
+                platform={platform || "instagram"}
+                followerCount={followers ?? null}
+                engagementRate={engagementRate ?? null}
+                botProbability={botProbability}
+                postsCount={postsCount ?? null}
+                className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl shadow-sm"
+              />
+
               {/* Niche & Recommendations */}
               <div className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl p-5 shadow-sm">
                 <p className="text-sm font-semibold text-foreground mb-3">Niche & Recommendations</p>
                 <div className="mb-4">
-                  <NicheTagsDisplay categories={evaluation.niche_categories} />
+                  <NicheTagsDisplay categories={evaluation.niche_categories ?? []} />
                 </div>
                 <div className="bg-muted/50 rounded-xl p-4">
                   <ul className="space-y-2">
-                    {evaluation.recommendations.map((rec, i) => (
+                    {(evaluation.recommendations ?? []).map((rec, i) => (
                       <li key={i} className="text-xs text-muted-foreground flex items-start gap-2 leading-relaxed">
                         <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0 mt-1 opacity-70" />
                         {rec}
@@ -791,6 +1140,20 @@ export default function InfluencerProfilePage() {
               </div>
             </div>
           </div>
+        </motion.div>
+      )}
+
+      {/* ── Statistical Analytics — always visible once data is loaded ─── */}
+      {analyticsLoading && (
+        <div className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl p-5 animate-pulse space-y-3">
+          <div className="h-4 bg-muted/60 rounded w-1/3" />
+          <div className="h-2.5 bg-muted/60 rounded-full" />
+          <div className="h-2.5 bg-muted/60 rounded-full w-4/5" />
+        </div>
+      )}
+      {analyticsData && !analyticsLoading && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <PythonAnalyticsPanel data={analyticsData} />
         </motion.div>
       )}
 

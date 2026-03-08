@@ -86,7 +86,10 @@ export function useInfluencerProfile(platform: string | undefined, username: str
     const [daysSinceEnrichment, setDaysSinceEnrichment] = useState<number | null>(null);
 
     const load = useCallback(async () => {
-        if (!platform || !username) return;
+        if (!platform || !username) {
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         setError(null);
 
@@ -116,11 +119,12 @@ export function useInfluencerProfile(platform: string | undefined, username: str
                 // so the profile page can show follower count, snippet bio, and avatar
                 let profileData: any = { ...enriched, secondary_niches: secondaryNiches };
                 if (!fullyEnriched) {
+                    // Cache stores usernames WITH @ prefix; URL params arrive without @ — try both
                     const { data: cached } = await supabase
                         .from("influencers_cache")
                         .select("*")
                         .eq("platform", platform)
-                        .eq("username", username)
+                        .in("username", [username, `@${username}`])
                         .maybeSingle();
                     if (cached) {
                         const d = cached.data as any;
@@ -136,26 +140,28 @@ export function useInfluencerProfile(platform: string | undefined, username: str
                                 ...(enriched.metrics as object || {}),
                                 followers: enriched.follower_count ?? d?.followers ?? null,
                                 engagement_rate: enriched.engagement_rate ?? d?.engagement_rate ?? null,
+                                following_count: (enriched.metrics as any)?.following_count ?? enriched.following_count ?? d?.following_count ?? null,
+                                posts_count: (enriched.metrics as any)?.posts_count ?? d?.posts_count ?? null,
                             },
                         };
                     }
                 }
                 setProfile(profileData as unknown as InfluencerProfile);
 
-                // 2. Follower history
-                const { data: history } = await supabase
-                    .from("follower_history")
-                    .select("*")
-                    .eq("profile_id", enriched.id)
-                    .order("recorded_at", { ascending: true });
-                if (history) setFollowerHistory(history);
+                // 2+3+4. Fetch follower history, posts, and audience analysis in parallel
+                const [historyRes, postsRes, analysisRes] = await Promise.all([
+                    supabase.from("follower_history").select("*").eq("profile_id", enriched.id).order("recorded_at", { ascending: true }),
+                    supabase.from("influencer_posts").select("id, caption, is_sponsored").eq("profile_id", enriched.id),
+                    supabase.from("audience_analysis" as any).select("signals").eq("profile_id", enriched.id).maybeSingle(),
+                ]);
 
-                // 3. Posts: count + content-type breakdown
-                const { data: posts } = await supabase
-                    .from("influencer_posts")
-                    .select("id, caption, is_sponsored")
-                    .eq("profile_id", enriched.id);
+                if (historyRes.error) console.warn("[profile] follower_history error:", historyRes.error.message);
+                if (postsRes.error) console.warn("[profile] influencer_posts error:", postsRes.error.message);
+                if (analysisRes.error) console.warn("[profile] audience_analysis error:", analysisRes.error.message);
 
+                if (historyRes.data) setFollowerHistory(historyRes.data);
+
+                const posts = postsRes.data;
                 if (posts && posts.length > 0) {
                     setPostsCount(posts.length);
                     // Aggregate by inferred post type from caption
@@ -181,82 +187,28 @@ export function useInfluencerProfile(platform: string | undefined, username: str
                     setContentPerformance([]);
                 }
 
-                // 4. Audience Analysis (Phase 6 Bot Signals)
-                const { data: analysis } = await supabase
-                    .from("audience_analysis" as any)
-                    .select("signals")
-                    .eq("profile_id", enriched.id)
-                    .maybeSingle();
-
-                if (analysis) {
-                    setProfile(prev => prev ? { ...prev, audience_analysis: analysis } as InfluencerProfile : null);
-                }
-
-                // 5. Call detect-bot-entendre — only for fully enriched profiles with real data
-                // Skip stubs: null follower/engagement data produces meaningless bot scores
-                if (!fullyEnriched) return;
-
-                // C-2 fix: check bot_signals_computed_at before invoking the edge function
-                const cachedAge = enriched.bot_signals_computed_at
-                    ? Date.now() - new Date(enriched.bot_signals_computed_at as string).getTime()
-                    : Infinity;
-                const BOT_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-                if (cachedAge < BOT_CACHE_TTL_MS && enriched.bot_signals) {
-                    // Use cached signals — no edge function call needed
-                    setProfile(prev => prev ? {
-                        ...prev,
-                        bot_signals: enriched.bot_signals as any,
-                    } : prev);
-                } else {
-                    try {
-                        const botResult = await supabase.functions.invoke("detect-bot-entendre", {
-                            body: {
-                                username: enriched.username,
-                                platform: enriched.platform,
-                                follower_count: enriched.follower_count,
-                                following_count: enriched.following_count,
-                                posts_count: enriched.posts_count,
-                                engagement_rate: enriched.engagement_rate,
-                                bio: enriched.bio,
-                            },
-                        });
-
-                        if (botResult.data) {
-                            const signals = botResult.data.signals || [];
-                            setProfile(prev => prev ? {
-                                ...prev,
-                                bot_probability_entendre: botResult.data.bot_probability_entendre != null
-                                    ? botResult.data.bot_probability_entendre / 100
-                                    : prev.bot_probability_entendre,
-                                bot_signals: signals,
-                                bot_signals_triggered: botResult.data.signals_triggered,
-                                bot_total_signals_checked: botResult.data.total_signals_checked,
-                                bot_confidence_tier: botResult.data.confidence_tier,
-                                bot_interpretation: botResult.data.interpretation,
-                            } : prev);
-                            // Persist to DB so next load uses cache
-                            await supabase
-                                .from("influencer_profiles")
-                                .update({ bot_signals: signals, bot_signals_computed_at: new Date().toISOString() })
-                                .eq("id", enriched.id);
-                        }
-                    } catch (botErr) {
-                        // Non-critical: bot signals are supplementary, don't block render
-                        console.warn("Bot signal fetch failed:", botErr);
-                    }
-                }
+                // Merge audience analysis into profile in a single state update
+                setProfile(prev => {
+                    if (!prev) return prev;
+                    const updates: Partial<InfluencerProfile> = {};
+                    if (analysisRes.data) updates.audience_analysis = analysisRes.data;
+                    if (enriched.bot_signals && fullyEnriched) updates.bot_signals = enriched.bot_signals as any;
+                    return Object.keys(updates).length > 0 ? { ...prev, ...updates } as InfluencerProfile : prev;
+                });
             } else {
                 // Fallback to influencers_cache
+                // Cache stores usernames WITH @ prefix; URL params arrive without @ — try both
                 const { data: cached } = await supabase
                     .from("influencers_cache")
                     .select("*")
                     .eq("platform", platform)
-                    .eq("username", username)
+                    .in("username", [username, `@${username}`])
                     .maybeSingle();
 
                 if (cached) {
                     const d = cached.data as any;
+                    // followers is stored as `followers` by search-influencers upsert
+                    const cachedFollowers: number | null = d?.followers ?? null;
                     setProfile({
                         id: cached.id,
                         platform: cached.platform,
@@ -265,11 +217,15 @@ export function useInfluencerProfile(platform: string | undefined, username: str
                         bio: d?.snippet || null,
                         primary_niche: d?.niche || null,
                         secondary_niches: [],
-                        metrics: {},
+                        metrics: {
+                            followers: cachedFollowers ?? undefined,
+                            engagement_rate: d?.engagement_rate ?? undefined,
+                        },
                         overall_score: null,
                         enriched_at: null,
                         created_at: cached.created_at,
                         isCached: true,
+                        follower_count: cachedFollowers,
                         link: d?.link,
                         snippet: d?.snippet,
                         city_extracted: cached.city_extracted,

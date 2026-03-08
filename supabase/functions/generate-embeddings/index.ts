@@ -23,12 +23,13 @@ Deno.serve(async (req: Request) => {
         });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-        return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
+    const HUGGINGFACE_API_KEY = Deno.env.get("HUGGINGFACE_API_KEY");
+    if (!HUGGINGFACE_API_KEY) {
+        return new Response(JSON.stringify({ error: "HUGGINGFACE_API_KEY not configured" }), {
             status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
     }
+    const { generateEmbedding } = await import("../\_shared/huggingface.ts");
 
     const serviceClient = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey, {
         auth: { autoRefreshToken: false, persistSession: false }
@@ -69,25 +70,8 @@ Deno.serve(async (req: Request) => {
                 profile.bio || "",
             ].filter(Boolean).join(" | ").slice(0, 2000); // Stay within token limits
 
-            // Generate embedding via Lovable AI gateway (OpenAI text-embedding-3-small)
-            const embeddingRes = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${LOVABLE_API_KEY}`,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    input: text,
-                    model: "text-embedding-3-small",
-                }),
-            });
-
-            if (!embeddingRes.ok) {
-                throw new Error(`Embedding API returned ${embeddingRes.status}: ${await embeddingRes.text()}`);
-            }
-
-            const embeddingData = await embeddingRes.json();
-            const vector = embeddingData.data?.[0]?.embedding;
+            // Generate 1024-dim embedding via HuggingFace BGE-large-en-v1.5
+            const vector = await generateEmbedding(text, HUGGINGFACE_API_KEY);
             if (!vector || !Array.isArray(vector)) {
                 throw new Error("Invalid embedding response — no vector returned");
             }
@@ -110,8 +94,8 @@ Deno.serve(async (req: Request) => {
             success++;
             console.log(`[embeddings] Generated for ${profile.platform}/${profile.username}`);
 
-            // Rate limit: 20 embeddings/sec is safe for OpenAI tier-1
-            await new Promise(r => setTimeout(r, 100));
+            // HuggingFace free tier is slower; give 500ms between requests to avoid 429
+            await new Promise(r => setTimeout(r, 500));
 
         } catch (err: any) {
             failed++;

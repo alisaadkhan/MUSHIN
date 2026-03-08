@@ -19,6 +19,9 @@ verify_jwt = true
 [functions.ai-insights]
 verify_jwt = true
 
+[functions.ai-analytics]
+verify_jwt = true
+
 [functions.create-checkout]
 verify_jwt = true
 

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { generateText, extractJsonFromText } from "../_shared/huggingface.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,167 +7,37 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-3-flash-preview";
+// ─── Prompt builders (HuggingFace / Mistral-7B compatible) ───────────────────
+// Each builder returns { system, user } strings for generateText().
+// JSON schemas are embedded in the system prompt so Mistral returns valid JSON.
 
-function buildSummarizeMessages(data: any) {
+function buildSummarize(data: any): { system: string; user: string } {
   return {
-    messages: [
-      { role: "system", content: "You are an influencer marketing analyst. Given an influencer's profile data, write a concise 2-3 sentence summary highlighting their strengths, niche, audience size, and engagement quality. Be direct and actionable." },
-      { role: "user", content: `Analyze this influencer profile:\n${JSON.stringify(data)}` },
-    ],
+    system: "You are an influencer marketing analyst. Given an influencer profile, write a concise 2-3 sentence summary highlighting strengths, niche, audience size, and engagement quality. Be direct and actionable. Return only plain text, no JSON.",
+    user: `Analyze this influencer profile:\n${JSON.stringify(data).slice(0, 2000)}`,
   };
 }
 
-function buildFraudCheckMessages(data: any) {
+function buildFraudCheck(data: any): { system: string; user: string } {
   return {
-    messages: [
-      { role: "system", content: "You are a social media fraud detection expert. Analyze the influencer metrics provided and identify any red flags indicating fake followers, engagement manipulation, or suspicious patterns." },
-      { role: "user", content: `Check this influencer for fraud indicators:\n${JSON.stringify(data)}` },
-    ],
-    tools: [{
-      type: "function",
-      function: {
-        name: "fraud_analysis",
-        description: "Return a fraud risk assessment for the influencer",
-        parameters: {
-          type: "object",
-          properties: {
-            risk: { type: "string", enum: ["low", "medium", "high"] },
-            flags: { type: "array", items: { type: "string" } },
-            summary: { type: "string" },
-          },
-          required: ["risk", "flags", "summary"],
-          additionalProperties: false,
-        },
-      },
-    }],
-    tool_choice: { type: "function", function: { name: "fraud_analysis" } },
+    system: `You are a social media fraud detection expert. Analyze influencer metrics and return ONLY a JSON object:\n{"risk":"low","flags":[],"summary":"..."}\nrisk must be "low", "medium", or "high". Return ONLY the JSON.`,
+    user: `Check this influencer for fraud indicators:\n${JSON.stringify(data).slice(0, 2000)}`,
   };
 }
 
-function buildRecommendMessages(data: any) {
+function buildRecommend(data: any): { system: string; user: string } {
   return {
-    messages: [
-      { role: "system", content: "You are a campaign strategy advisor. Given the current state of an influencer marketing campaign, provide 3-5 actionable recommendations to improve campaign performance." },
-      { role: "user", content: `Analyze this campaign and give recommendations:\n${JSON.stringify(data)}` },
-    ],
-    tools: [{
-      type: "function",
-      function: {
-        name: "campaign_recommendations",
-        description: "Return actionable campaign recommendations",
-        parameters: {
-          type: "object",
-          properties: {
-            recommendations: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  title: { type: "string" },
-                  description: { type: "string" },
-                  priority: { type: "string", enum: ["high", "medium", "low"] },
-                  category: { type: "string", enum: ["outreach", "budget", "timeline", "strategy"] },
-                },
-                required: ["title", "description", "priority", "category"],
-                additionalProperties: false,
-              },
-            },
-          },
-          required: ["recommendations"],
-          additionalProperties: false,
-        },
-      },
-    }],
-    tool_choice: { type: "function", function: { name: "campaign_recommendations" } },
+    system: `You are a campaign strategy advisor. Return ONLY a JSON object:\n{"recommendations":[{"title":"...","description":"...","priority":"high","category":"strategy"}]}\npriority: "high","medium","low". category: "outreach","budget","timeline","strategy". 3-5 items. Return ONLY the JSON.`,
+    user: `Analyze this campaign and give recommendations:\n${JSON.stringify(data).slice(0, 2000)}`,
   };
 }
 
-function buildEvaluateMessages(data: any) {
-  const systemPrompt = `You are an expert influencer marketing analyst. Evaluate the influencer based on all available data. Consider:
-
-- Engagement rate benchmarks per platform: Instagram ~1-3%, TikTok ~3-6%, YouTube ~2-5%
-- Authenticity: analyze follower-to-engagement ratios for suspicious patterns
-- Demographics: infer likely audience age range, gender split, and top countries from content niche, language, and bio clues
-- Niche: classify into relevant categories based on bio and content
-- Brand safety: scan bio/snippet for controversial content, profanity, or risky topics
-- Composite score: 40% engagement quality, 30% authenticity, 20% content quality/relevance, 10% growth signals
-
-Be analytical but fair. If data is limited, note that in your assessment and provide best estimates.`;
-
+function buildEvaluate(data: any): { system: string; user: string } {
   return {
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: `Evaluate this influencer comprehensively:\n${JSON.stringify(data)}` },
-    ],
-    tools: [{
-      type: "function",
-      function: {
-        name: "influencer_evaluation",
-        description: "Return a comprehensive influencer evaluation with scores and analysis",
-        parameters: {
-          type: "object",
-          properties: {
-            overall_score: { type: "integer", description: "Composite score 0-100" },
-            engagement_rating: {
-              type: "object",
-              properties: {
-                rate: { type: "number", description: "Engagement rate as percentage" },
-                benchmark_comparison: { type: "string", description: "e.g. 'Above average', 'Below benchmark'" },
-                verdict: { type: "string", description: "Brief assessment of engagement quality" },
-              },
-              required: ["rate", "benchmark_comparison", "verdict"],
-              additionalProperties: false,
-            },
-            authenticity: {
-              type: "object",
-              properties: {
-                score: { type: "integer", description: "Authenticity score 0-100" },
-                risk_level: { type: "string", enum: ["low", "medium", "high"] },
-                flags: { type: "array", items: { type: "string" }, description: "Suspicious pattern flags" },
-                summary: { type: "string" },
-              },
-              required: ["score", "risk_level", "flags", "summary"],
-              additionalProperties: false,
-            },
-            growth_assessment: {
-              type: "object",
-              properties: {
-                pattern: { type: "string", description: "Growth pattern description" },
-                risk_flags: { type: "array", items: { type: "string" } },
-              },
-              required: ["pattern", "risk_flags"],
-              additionalProperties: false,
-            },
-            estimated_demographics: {
-              type: "object",
-              properties: {
-                age_range: { type: "string", description: "e.g. '18-34'" },
-                gender_split: { type: "string", description: "e.g. '60% female, 40% male'" },
-                top_countries: { type: "array", items: { type: "string" }, description: "Top 3-5 likely countries" },
-              },
-              required: ["age_range", "gender_split", "top_countries"],
-              additionalProperties: false,
-            },
-            niche_categories: { type: "array", items: { type: "string" }, description: "2-5 niche categories" },
-            brand_safety: {
-              type: "object",
-              properties: {
-                rating: { type: "string", enum: ["safe", "caution", "risk"] },
-                flags: { type: "array", items: { type: "string" } },
-              },
-              required: ["rating", "flags"],
-              additionalProperties: false,
-            },
-            recommendations: { type: "array", items: { type: "string" }, description: "3-5 actionable recommendations" },
-          },
-          required: ["overall_score", "engagement_rating", "authenticity", "growth_assessment", "estimated_demographics", "niche_categories", "brand_safety", "recommendations"],
-          additionalProperties: false,
-        },
-      },
-    }],
-    tool_choice: { type: "function", function: { name: "influencer_evaluation" } },
+    system: `You are an expert influencer marketing analyst. Evaluate the influencer and return ONLY a JSON object with this exact structure:
+{"overall_score":75,"engagement_rating":{"rate":2.5,"benchmark_comparison":"Above average","verdict":"Good engagement"},"authenticity":{"score":80,"risk_level":"low","flags":[],"summary":"Authentic audience"},"growth_assessment":{"pattern":"Steady organic growth","risk_flags":[]},"estimated_demographics":{"age_range":"18-34","gender_split":"55% female, 45% male","top_countries":["Pakistan","UAE"]},"niche_categories":["Lifestyle","Fashion"],"brand_safety":{"rating":"safe","flags":[]},"recommendations":["Increase posting frequency"]}
+Return ONLY the JSON. Engagement benchmarks: Instagram 1-3%, TikTok 3-6%, YouTube 2-5%. Score 0-100.`,
+    user: `Evaluate this influencer comprehensively:\n${JSON.stringify(data).slice(0, 2500)}`,
   };
 }
 
@@ -199,10 +70,10 @@ Deno.serve(async (req) => {
 
     const userId = user.id;
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const HUGGINGFACE_API_KEY = Deno.env.get("HUGGINGFACE_API_KEY");
+    if (!HUGGINGFACE_API_KEY) {
+      return new Response(JSON.stringify({ error: "AI features are temporarily unavailable. Please try again later.", code: "AI_KEY_MISSING", status: 503 }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -216,8 +87,8 @@ Deno.serve(async (req) => {
       .single();
 
     if (!membership) {
-      return new Response(JSON.stringify({ error: "No workspace found" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: "No workspace found", code: "NO_WORKSPACE", status: 400 }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -228,23 +99,25 @@ Deno.serve(async (req) => {
       .single();
 
     if (!ws || ws.ai_credits_remaining <= 0) {
-      return new Response(JSON.stringify({ error: "AI credits exhausted. Upgrade your plan to continue using AI features." }), {
-        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: "AI credits exhausted. Upgrade your plan to continue using AI features.", code: "CREDITS_EXHAUSTED", status: 402 }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const { type, data } = await req.json();
 
-    let config: { messages: any[]; tools?: any[]; tool_choice?: any };
+    let promptConfig: { system: string; user: string } | null = null;
+    let isSummarize = false;
 
     if (type === "summarize") {
-      config = buildSummarizeMessages(data);
+      promptConfig = buildSummarize(data);
+      isSummarize = true;
     } else if (type === "fraud-check") {
-      config = buildFraudCheckMessages(data);
+      promptConfig = buildFraudCheck(data);
     } else if (type === "recommend") {
-      config = buildRecommendMessages(data);
+      promptConfig = buildRecommend(data);
     } else if (type === "evaluate") {
-      config = buildEvaluateMessages(data);
+      promptConfig = buildEvaluate(data);
     } else {
       return new Response(JSON.stringify({ error: "Invalid type. Use: summarize, fraud-check, recommend, evaluate" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -252,83 +125,59 @@ Deno.serve(async (req) => {
     }
 
     // Deduct credit BEFORE AI call to prevent race condition double-spend.
-    // We restore the credit if the AI call fails.
     const { error: creditErr } = await adminClient.rpc("consume_ai_credit", { ws_id: membership.workspace_id });
     if (creditErr) {
       console.error("[ai-insights] Pre-deduction failed:", creditErr);
-      // If we can't deduct, reject to prevent free usage
-      return new Response(JSON.stringify({ error: "Credit deduction failed. Please try again." }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: "Credit deduction failed. Please try again.", code: "CREDIT_DEDUCT_FAILED", status: 500 }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const body: any = { model: MODEL, messages: config.messages };
-    if (config.tools) body.tools = config.tools;
-    if (config.tool_choice) body.tool_choice = config.tool_choice;
-
-    const aiRes = await fetch(AI_GATEWAY, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!aiRes.ok) {
-      const errText = await aiRes.text();
-      console.error("AI gateway error:", aiRes.status, errText);
-      // Restore credit on AI failure
-      await adminClient.rpc("restore_ai_credit", { ws_id: membership.workspace_id }).catch(console.error);
-      if (aiRes.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (aiRes.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      return new Response(JSON.stringify({ error: "AI service error" }), {
-        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const aiData = await aiRes.json();
-    const choice = aiData.choices?.[0];
 
     let result: any;
+    try {
+      const rawText = await generateText(
+        promptConfig.system,
+        promptConfig.user,
+        HUGGINGFACE_API_KEY,
+        { maxTokens: isSummarize ? 256 : 600, temperature: 0.2, timeoutMs: 50_000 },
+      );
 
-    if (type === "summarize") {
-      result = { summary: choice?.message?.content || "Unable to generate summary." };
-    } else {
-      const toolCall = choice?.message?.tool_calls?.[0];
-      if (toolCall?.function?.arguments) {
-        try {
-          result = JSON.parse(toolCall.function.arguments);
-        } catch {
-          result = { error: "Failed to parse AI response" };
-        }
+      if (isSummarize) {
+        result = { summary: rawText.trim() };
       } else {
-        result = { content: choice?.message?.content || "No response" };
+        const parsed = extractJsonFromText(rawText) as any;
+        result = parsed;
+        if (type === "evaluate" && result && !result.error) {
+          result.evaluation_version = 1;
+        }
       }
-
-      // Phase 6: Inject evaluation version for frontend validation
-      if (type === "evaluate" && result && !result.error) {
-        result.evaluation_version = 1;
-      }
+    } catch (aiErr: any) {
+      console.error("[ai-insights] AI call failed:", aiErr.message);
+      // Restore credit on AI failure
+      await adminClient.rpc("restore_ai_credit", { ws_id: membership.workspace_id }).catch(console.error);
+      const isRateLimit = aiErr.message?.includes("429");
+      return new Response(JSON.stringify({
+        error: isRateLimit
+          ? "Rate limit exceeded. Please try again in a moment."
+          : "AI service error. Please try again shortly.",
+        code: isRateLimit ? "RATE_LIMIT" : "AI_ERROR",
+        status: isRateLimit ? 429 : 502,
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // Credit was already deducted before the AI call (race-condition safe)
-    return new Response(JSON.stringify(result), {
+    // Credit was already deducted before the AI call (race-condition safe).
+    // Return success — if result is falsy the outer catch will handle it.
+    return new Response(JSON.stringify(result ?? { error: "No result" }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("ai-insights error:", error);
     const msg = error instanceof Error ? error.message : "Unknown error";
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ error: msg, code: "INTERNAL_ERROR", status: 500 }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

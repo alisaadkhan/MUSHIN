@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
         }
 
         const name = profile.full_name || username;
-        const desc = profile.bio || `View ${escHtml(name)}'s influencer profile, statistics, and brand safety analysis on Influence IQ.`;
+        const desc = profile.bio || `View ${escHtml(name)}'s influencer profile, statistics, and brand safety analysis on Mushin.`;
         const score = profile.influencer_evaluations?.[0]?.overall_score || "N/A";
 
         // Standard OpenGraph and Twitter tags for social sharing and SEO indexing
@@ -67,16 +67,16 @@ Deno.serve(async (req) => {
       <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>${escHtml(name)} - Influence IQ Profile</title>
+          <title>${escHtml(name)} - Mushin Creator Profile</title>
           <meta name="description" content="${escHtml(desc)}">
           
-          <meta property="og:title" content="${escHtml(name)} - Influence IQ">
+          <meta property="og:title" content="${escHtml(name)} - Mushin">
           <meta property="og:description" content="${escHtml(desc)}">
           <meta property="og:type" content="profile">
           <meta property="profile:username" content="${escHtml(username)}">
           
           <meta name="twitter:card" content="summary_large_image">
-          <meta name="twitter:title" content="${escHtml(name)} - Influence IQ Score: ${escHtml(score)}">
+          <meta name="twitter:title" content="${escHtml(name)} - Mushin Relevance Score: ${escHtml(score)}">
           <meta name="twitter:description" content="${escHtml(desc)}">
           
           <script>
@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
           <h1>${escHtml(name)} (@${escHtml(sanitizedUsername)})</h1>
           <p><strong>Platform:</strong> ${escHtml(platform)}</p>
           <p><strong>Niche:</strong> ${escHtml(profile.primary_niche)}</p>
-          <p><strong>Influence IQ Score:</strong> ${escHtml(score)}</p>
+          <p><strong>Mushin Relevance Score:</strong> ${escHtml(score)}</p>
           <p>${escHtml(profile.bio)}</p>
           <p><em>Loading full interactive profile...</em></p>
       </body>

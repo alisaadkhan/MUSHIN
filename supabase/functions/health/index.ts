@@ -50,6 +50,7 @@ Deno.serve(async (req: Request) => {
     checks.serper_configured = { status: Deno.env.get("SERPER_API_KEY") ? "ok" : "down" };
     checks.apify_configured = { status: Deno.env.get("APIFY_API_KEY") ? "ok" : "degraded" };
     checks.youtube_configured = { status: Deno.env.get("YOUTUBE_API_KEY") ? "ok" : "degraded" };
+    checks.huggingface_configured = { status: Deno.env.get("HUGGINGFACE_API_KEY") ? "ok" : "degraded" };
 
     const allOk = Object.values(checks).every(c => c.status === "ok" || c.status === "degraded");
     const criticalDown = checks.database?.status === "down";

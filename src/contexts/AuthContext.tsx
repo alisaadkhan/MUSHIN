@@ -34,6 +34,14 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Consumer email domains blocked from Google OAuth (business-only platform)
+// This is a client-side UX guard; server-side enforcement is recommended via Supabase Auth hooks.
+const CONSUMER_DOMAINS = new Set([
+  'gmail.com','yahoo.com','hotmail.com','outlook.com','live.com',
+  'icloud.com','aol.com','protonmail.com','ymail.com','googlemail.com','yahoo.co.uk',
+  'yahoo.in','yahoo.com.pk','hotmail.co.uk','msn.com','me.com','mail.com','gmx.com',
+]);
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -70,12 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, fetchProfileAndWorkspace]);
 
   useEffect(() => {
-    let refreshInFlight = false;
-
-    // Consumer email domains blocked from Google OAuth
-    const CONSUMER_DOMAINS = ['gmail.com','yahoo.com','hotmail.com','outlook.com','live.com',
-      'icloud.com','aol.com','protonmail.com','ymail.com','googlemail.com','yahoo.co.uk',
-      'yahoo.in','yahoo.com.pk','hotmail.co.uk','msn.com','me.com','mail.com','gmx.com'];
+    let lastTokenRefreshAt = 0;
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
@@ -94,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (provider === 'google') {
             const email = newSession.user.email || '';
             const domain = email.split('@')[1]?.toLowerCase() || '';
-            if (CONSUMER_DOMAINS.includes(domain)) {
+            if (CONSUMER_DOMAINS.has(domain)) {
               await supabase.auth.signOut();
               localStorage.setItem('auth_google_blocked', domain);
               setSession(null); setUser(null); setProfile(null); setWorkspace(null);
@@ -104,16 +107,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        // Deduplicate rapid TOKEN_REFRESHED events
-        if (event === 'TOKEN_REFRESHED' && refreshInFlight) {
-          return;
+        // Deduplicate rapid TOKEN_REFRESHED events (guard against duplicate fires within 2s)
+        if (event === 'TOKEN_REFRESHED') {
+          const now = Date.now();
+          if (now - lastTokenRefreshAt < 2000) return;
+          lastTokenRefreshAt = now;
         }
 
         if (newSession) {
-          if (event === 'TOKEN_REFRESHED') {
-            refreshInFlight = true;
-            setTimeout(() => { refreshInFlight = false; }, 2000);
-          }
           setSession(newSession);
           setUser(newSession.user);
           if (newSession.user.email_confirmed_at) {

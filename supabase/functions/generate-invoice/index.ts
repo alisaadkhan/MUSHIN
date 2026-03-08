@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
             currency: 'USD',
             plan: subscription.plan,
             billing_period: `${new Date(subscription.current_period_start).toLocaleDateString()} – ${new Date(subscription.current_period_end).toLocaleDateString()}`,
-            workspace_name: subscription.workspaces?.name || "InfluenceIQ Workspace",
+            workspace_name: subscription.workspaces?.name || "Mushin Workspace",
             invoice_number: `INV-${Date.now()}`,
         };
 
@@ -50,13 +50,13 @@ Deno.serve(async (req) => {
         const page = pdfDoc.addPage([600, 800]);
         const { width, height } = page.getSize();
 
-        page.drawText('INFLUENCE IQ - INVOICE', { x: 50, y: height - 50, size: 24, color: rgb(0.48, 0.22, 0.92) });
+        page.drawText('MUSHIN - INVOICE', { x: 50, y: height - 50, size: 24, color: rgb(0.48, 0.22, 0.92) });
         page.drawText(`Invoice ID: ${payment.id.substring(0, 8).toUpperCase()}`, { x: 50, y: height - 90, size: 12 });
         page.drawText(`Date: ${new Date(payment.created_at).toLocaleDateString()}`, { x: 50, y: height - 110, size: 12 });
         page.drawText(`Status: ${payment.status.toUpperCase()}`, { x: 50, y: height - 130, size: 12 });
 
         page.drawText(`To: ${payment.workspace_name}`, { x: 50, y: height - 170, size: 14 });
-        page.drawText(`From: InfluenceIQ Inc.`, { x: 350, y: height - 170, size: 14 });
+        page.drawText(`From: Mushin Inc.`, { x: 350, y: height - 170, size: 14 });
 
         page.drawText(`Plan: ${payment.plan.toUpperCase()} Plan`, { x: 50, y: height - 230, size: 14 });
         page.drawText(`Period: ${payment.billing_period}`, { x: 50, y: height - 260, size: 14 });

@@ -33,31 +33,41 @@ export function useCampaigns() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["campaigns"] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["campaigns", workspace?.workspace_id] }),
   });
 
   const updateCampaign = useMutation({
-    mutationFn: async ({ id, ...values }: { id: string; name?: string; description?: string; status?: "draft" | "active" | "completed" | "archived"; budget?: number; start_date?: string; end_date?: string }) => {
-      const { error } = await supabase.from("campaigns").update(values).eq("id", id);
+    mutationFn: async ({ id, values }: { id: string; values: Record<string, unknown> }) => {
+      if (!workspace) throw new Error("No workspace");
+      const { error } = await supabase
+        .from("campaigns")
+        .update(values)
+        .eq("id", id)
+        .eq("workspace_id", workspace.workspace_id);
       if (error) throw error;
 
-      // Fire webhook on status change
+      // Fire webhook on status change (fire-and-forget, log rejection)
       if (values.status && workspace) {
         notifyIntegrations(workspace.workspace_id, "campaign_status_changed", {
           campaign_id: id,
           new_status: values.status,
-        });
+        }).catch((e: unknown) => console.warn("[campaigns] notifyIntegrations failed:", e));
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["campaigns"] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["campaigns", workspace?.workspace_id] }),
   });
 
   const deleteCampaign = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("campaigns").delete().eq("id", id);
+      if (!workspace) throw new Error("No workspace");
+      const { error } = await supabase
+        .from("campaigns")
+        .delete()
+        .eq("id", id)
+        .eq("workspace_id", workspace.workspace_id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["campaigns"] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["campaigns", workspace?.workspace_id] }),
   });
 
   return { ...campaignsQuery, createCampaign, updateCampaign, deleteCampaign };

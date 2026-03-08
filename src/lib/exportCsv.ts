@@ -9,7 +9,7 @@ export function exportCsv(data: Record<string, unknown>[], filename: string) {
         .map((h) => {
           const val = row[h];
           const str = val === null || val === undefined ? "" : String(val);
-          return str.includes(",") || str.includes('"') || str.includes("\n")
+          return str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")
             ? `"${str.replace(/"/g, '""')}"`
             : str;
         })
@@ -23,5 +23,6 @@ export function exportCsv(data: Record<string, unknown>[], filename: string) {
   link.href = url;
   link.download = filename;
   link.click();
-  URL.revokeObjectURL(url);
+  // Delay revocation to give the browser time to initiate the download
+  setTimeout(() => URL.revokeObjectURL(url), 100);
 }

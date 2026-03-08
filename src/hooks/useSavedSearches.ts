@@ -32,15 +32,20 @@ export function useSavedSearches() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["saved-searches"] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["saved-searches", workspace?.workspace_id] }),
   });
 
   const deleteSavedSearch = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("saved_searches").delete().eq("id", id);
+      if (!workspace) throw new Error("No workspace");
+      const { error } = await supabase
+        .from("saved_searches")
+        .delete()
+        .eq("id", id)
+        .eq("workspace_id", workspace.workspace_id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["saved-searches"] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["saved-searches", workspace?.workspace_id] }),
   });
 
   return { ...query, saveSearch, deleteSavedSearch };

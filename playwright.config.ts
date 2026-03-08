@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 dotenv.config({ path: ".env" });
 
 /**
- * Playwright configuration for InfluenceIQ Pro E2E tests.
+ * Playwright configuration for Mushin E2E tests.
  *
  * Auth strategy:
  *   - `auth.setup.ts` logs in once and saves the browser storage state to
