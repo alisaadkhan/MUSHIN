@@ -451,6 +451,8 @@ export default function InfluencerProfilePage() {
           extracted_followers: profile?.metrics?.followers || profile?.metrics?.subscriber_count || profile?.follower_count,
           // Pass niche from cache so enrich-influencer doesn't overwrite with Lifestyle
           primary_niche: profile?.primary_niche || profile?.niche || evaluation?.niche_categories?.[0],
+          // force_refresh when user has already evaluated (they explicitly want fresh data)
+          force_refresh: !!evaluation,
         },
       });
 
@@ -458,37 +460,35 @@ export default function InfluencerProfilePage() {
       if (enrichData?.cooldown_remaining_days) {
         const days = enrichData.cooldown_remaining_days;
         toast({
-          title: "Recently Enriched",
-          description: `This profile was enriched recently. Please wait ${days} more day(s) before re-enriching.`,
-          variant: "destructive",
+          title: "Profile Data Is Fresh",
+          description: `Data was enriched recently — running AI evaluation on current data. Re-enrichment available in ${days} day(s).`,
         });
-        setEnriching(false);
-        return;
-      }
-      if (enrichData?.code === "PROCESSING") {
-        toast({ title: "In Progress", description: "Enrichment is already running for this profile. Please wait a moment.", variant: "default" });
-        setEnriching(false);
-        return;
-      }
-      if (enrichData?.code === "BUDGET_LOCKED") {
+        // Don't return — fall through to evaluate() with existing profile data
+      } else if (enrichData?.code === "PROCESSING") {
+        toast({ title: "Enrichment In Progress", description: "Data fetch is running — showing evaluation on current data.", variant: "default" });
+        // Fall through to evaluate with current data
+      } else if (enrichData?.code === "BUDGET_LOCKED") {
         toast({ title: "Budget Limit Reached", description: enrichData.error, variant: "destructive" });
         setEnriching(false);
         return;
-      }
-      if (enrichData?.code === "CREDITS_EXHAUSTED") {
+      } else if (enrichData?.code === "CREDITS_EXHAUSTED") {
         toast({ title: "Credits Exhausted", description: "Add enrichment credits in Settings → Billing.", variant: "destructive" });
         setEnriching(false);
         return;
       }
 
-      if (enrichError || enrichData?.error) throw new Error(enrichData?.technical_detail || enrichData?.error || enrichError?.message);
-      await reload();
-      const latestMetrics = enrichData.profile?.metrics || {};
+      // If no blocking error code and no real error, reload and evaluate
+      const hasBlockingError = enrichData?.code === "BUDGET_LOCKED" || enrichData?.code === "CREDITS_EXHAUSTED";
+      if (!hasBlockingError && (enrichError || enrichData?.error) && !enrichData?.cooldown_remaining_days && enrichData?.code !== "PROCESSING") {
+        throw new Error(enrichData?.technical_detail || enrichData?.error || enrichError?.message);
+      }
+      if (!hasBlockingError) await reload();
+      const latestMetrics = (enrichData?.profile?.metrics) || {};
       await evaluate({
         username, platform,
-        followers: latestMetrics.followers ?? enrichData.profile?.follower_count,
-        engagement_rate: latestMetrics.engagement_rate ?? enrichData.profile?.engagement_rate,
-        bio: enrichData.profile?.bio,
+        followers: latestMetrics.followers ?? enrichData?.profile?.follower_count ?? profile?.metrics?.followers ?? profile?.follower_count,
+        engagement_rate: latestMetrics.engagement_rate ?? enrichData?.profile?.engagement_rate ?? profile?.metrics?.engagement_rate ?? profile?.engagement_rate,
+        bio: enrichData?.profile?.bio ?? profile?.bio,
       });
     } catch (err: any) {
       const raw: string = err.message || "Unknown error";
@@ -584,11 +584,27 @@ export default function InfluencerProfilePage() {
           ) : (
             <div className="flex flex-col sm:flex-row items-start gap-6">
               {/* Avatar */}
-              <div className="w-20 h-20 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 text-2xl font-bold overflow-hidden">
-                {avatarUrl
-                  ? <img src={avatarUrl} alt={profile?.full_name || username} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                  : avatarInitials
-                }
+              <div className="w-20 h-20 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 text-2xl font-bold overflow-hidden relative">
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={profile?.full_name || username}
+                    className="w-full h-full object-cover absolute inset-0"
+                    onError={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      img.style.display = 'none';
+                      // Show initials fallback
+                      const fallback = img.nextElementSibling as HTMLElement | null;
+                      if (fallback) fallback.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <span
+                  className="w-full h-full flex items-center justify-center text-2xl font-bold"
+                  style={{ display: avatarUrl ? 'none' : 'flex' }}
+                >
+                  {avatarInitials}
+                </span>
               </div>
 
               <div className="flex-1 min-w-0">

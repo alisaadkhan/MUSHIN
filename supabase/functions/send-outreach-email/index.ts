@@ -1,7 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const APP_URL = Deno.env.get("APP_URL") ?? "";
 const corsHeaders = {
-  "Access-Control-Allow-Origin": Deno.env.get("APP_URL") || "*",
+  "Access-Control-Allow-Origin": APP_URL || "https://mushin.app", // Never fall back to *
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };

@@ -33,13 +33,20 @@ Deno.serve(async (req) => {
     const { data: userData, error: userError } = await supabase.auth.getUser(token);
     if (userError || !userData.user?.email) throw new Error("Not authenticated");
 
-    // Get workspace ID for this user
+    // Get workspace ID and stripe_customer_id for this user
     const { data: memberData } = await supabase
       .from("workspace_members")
       .select("workspace_id")
       .eq("user_id", userData.user.id)
       .limit(1)
       .single();
+
+    // Try to get stripe_customer_id from workspace
+    const { data: workspaceData } = memberData ? await supabase
+      .from("workspaces")
+      .select("stripe_customer_id")
+      .eq("id", memberData.workspace_id)
+      .maybeSingle() : { data: null };
 
     // ── DB-only path: when Stripe key is absent (local dev / test envs) ────────
     if (!stripeKey) {
@@ -89,7 +96,19 @@ Deno.serve(async (req) => {
 
     // ── Full Stripe path ───────────────────────────────────────────────────────
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
-    const customers = await stripe.customers.list({ email: userData.user.email, limit: 1 });
+
+    // Prefer stripe_customer_id lookup (O(1)) over email scan (O(n))
+    let stripeCustomer: any = null;
+    if (workspaceData?.stripe_customer_id) {
+      try {
+        stripeCustomer = await stripe.customers.retrieve(workspaceData.stripe_customer_id);
+      } catch {
+        // Customer may have been deleted — fall back to email lookup
+      }
+    }
+    const customers = stripeCustomer
+      ? { data: [stripeCustomer] }
+      : await stripe.customers.list({ email: userData.user.email, limit: 1 });
 
     if (customers.data.length === 0) {
       // Check for manually provisioned subscription (test accounts)
