@@ -28,7 +28,34 @@ const G = () => <style>{`
 @keyframes beam-travel{0%{stroke-dashoffset:400}100%{stroke-dashoffset:-400}}
 .shiny-text{background:linear-gradient(120deg,#fff 20%,#a855f7 40%,#c084fc 50%,#a855f7 60%,#fff 80%);background-size:200% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 3s linear infinite}
 .aurora-text{background:linear-gradient(270deg,#a855f7,#c084fc,#7c3aed,#d946ef,#a855f7);background-size:400% 400%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:aurora 5s ease infinite}
+@keyframes star-twinkle{0%,100%{opacity:0.1;transform:scale(1)}50%{opacity:1;transform:scale(1.6)}}
 `}</style>;
+
+/* ─── Star Field (post-hero background) ─────────────────────────────────────── */
+const STARS = Array.from({ length: 130 }, (_, i) => ({
+  id: i,
+  x: ((i * 137.508 + 11) % 100).toFixed(3),
+  y: ((i * 97.323 + 7) % 100).toFixed(3),
+  size: i % 3 === 0 ? 2.4 : i % 3 === 1 ? 1.5 : 0.9,
+  dur: (2.5 + (i % 7) * 0.65).toFixed(2),
+  delay: (-(i % 13) * 0.55).toFixed(2),
+  color: i % 9 === 0 ? '#f0abfc' : i % 6 === 0 ? '#c084fc' : i % 4 === 0 ? '#a78bfa' : '#ffffff',
+  baseOpacity: 0.18 + (i % 5) * 0.11,
+}));
+const StarField = () => (
+  <div className="pointer-events-none fixed inset-0" style={{ zIndex: 1 }} aria-hidden="true">
+    {STARS.map(s => (
+      <div key={s.id} style={{
+        position: 'absolute', left: `${s.x}%`, top: `${s.y}%`,
+        width: s.size, height: s.size, borderRadius: '50%',
+        background: s.color,
+        boxShadow: s.size > 2 ? `0 0 ${s.size * 3}px ${s.color}` : undefined,
+        animation: `star-twinkle ${s.dur}s ${s.delay}s ease-in-out infinite`,
+        opacity: s.baseOpacity,
+      }} />
+    ))}
+  </div>
+);
 
 /* ─── Grain Overlay ─────────────────────────────────────────────────────────── */
 const GrainOverlay = () => (
@@ -204,7 +231,7 @@ const AtomOrbit = () => {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         animation: 'hub-pulse 3s ease-in-out infinite', zIndex: 10,
       }}>
-        <span style={{ fontWeight: 900, fontSize: 15, color: '#c084fc', letterSpacing: '-0.02em' }}>Mushin</span>
+        <img src="/favicon.png" alt="Mushin" style={{ width: 58, height: 58, objectFit: 'contain', borderRadius: '50%', filter: 'drop-shadow(0 0 10px rgba(168,85,247,0.7)) brightness(1.1)' }} />
       </div>
     </div>
   );
@@ -505,7 +532,7 @@ export default function LandingPage() {
       <nav aria-label="Main navigation" className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] transition-all duration-300">
         <div role="menubar" className={`flex items-center gap-1.5 backdrop-blur-2xl border rounded-full px-2 py-1.5 transition-all duration-300 ${
           navScrolled ? 'bg-black/90 border-white/15 shadow-[0_8px_48px_rgba(0,0,0,0.7)]' : 'bg-black/60 border-white/8 shadow-[0_4px_24px_rgba(0,0,0,0.3)]'
-        }`}>
+        }`} style={{ padding: '8px 12px', gap: '8px' }}>
           {navItems.map(item => {
             const active = activeNav === item.id;
             return (
@@ -513,15 +540,15 @@ export default function LandingPage() {
                 aria-label={`Scroll to ${item.label} section`}
                 aria-current={active ? 'true' : undefined}
                 onClick={() => { setActiveNav(item.id); document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth' }); }}
-                className={`flex items-center gap-1.5 rounded-full transition-all duration-200 ${active ? 'bg-white text-black px-4 py-1.5' : 'w-8 h-8 justify-center text-white/40 hover:text-white/70'}`}>
+                className={`flex items-center gap-1.5 rounded-full transition-all duration-200 ${active ? 'bg-white text-black px-5 py-2' : 'w-10 h-10 justify-center text-white/40 hover:text-white/70'}`}>
                 {item.icon}
                 <AnimatePresence>{active && <motion.span initial={{ width: 0, opacity: 0 }} animate={{ width: 'auto', opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="text-sm font-bold overflow-hidden whitespace-nowrap">{item.label}</motion.span>}</AnimatePresence>
               </motion.button>
             );
           })}
-          <div className="w-px h-5 bg-white/10 mx-1" aria-hidden="true" />
+          <div className="w-px h-6 bg-white/10 mx-1" aria-hidden="true" />
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: .95 }} style={{ borderRadius: 999 }}>
-            <Link to="/auth" aria-label="Start free trial" className="bg-purple-600 hover:bg-purple-500 transition-colors text-white text-xs font-bold px-4 py-1.5 rounded-full whitespace-nowrap block">Start Free</Link>
+            <Link to="/auth" aria-label="Start free trial" className="bg-purple-600 hover:bg-purple-500 transition-colors text-white text-sm font-bold px-5 py-2 rounded-full whitespace-nowrap block">Start Free</Link>
           </motion.div>
         </div>
       </nav>
@@ -580,6 +607,7 @@ export default function LandingPage() {
       </div>
 
       {/* ── Sections — revealed after hero scroll is complete ── */}
+      {heroComplete && <StarField />}
       {heroComplete && (
       <motion.div
         initial={{ opacity: 0, y: 24 }}
