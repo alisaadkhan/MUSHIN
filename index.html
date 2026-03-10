@@ -2,18 +2,80 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
+
+    <!-- Primary SEO -->
     <title>MUSHIN – Pakistan's Creator Intelligence Platform</title>
     <meta name="description" content="Find verified Pakistani creators, detect fraud, and run outreach campaigns from one workspace. Used by 2,800+ marketing teams." />
     <meta name="author" content="MUSHIN" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://mushin.app/" />
 
+    <!-- Open Graph -->
     <meta property="og:title" content="MUSHIN – Creator Intelligence That Pays for Itself" />
     <meta property="og:description" content="Find verified Pakistani creators, detect fraud, and run outreach campaigns from one workspace." />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://mushin.app/" />
+    <meta property="og:site_name" content="MUSHIN" />
 
+    <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@MUSHIN" />
+    <meta name="twitter:title" content="MUSHIN – Creator Intelligence Platform" />
+    <meta name="twitter:description" content="Find verified Pakistani creators, detect fraud, and run outreach campaigns from one workspace." />
+
+    <!-- DNS preconnect — eliminates TLS handshake latency for critical third-party origins -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://ui-avatars.com" />
+    <link rel="dns-prefetch" href="https://xfeikbhprbqwzdhyjnou.supabase.co" />
+
+    <!--
+      Google Fonts loaded via <link> with display=swap (not CSS @import).
+      This allows the browser to render text immediately with fallback fonts
+      while the custom font loads in the background — eliminates render blocking.
+      Only the weights actually used in the app are requested.
+    -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Roboto:wght@400;500;700;900&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Roboto:wght@400;500;700;900&display=swap"
+      />
+    </noscript>
+
+    <!-- Structured data for rich search results -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "MUSHIN",
+      "applicationCategory": "BusinessApplication",
+      "description": "Pakistan's Creator Intelligence Platform — find verified Pakistani creators, detect fraud, and run outreach campaigns.",
+      "url": "https://mushin.app",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD",
+        "description": "Free tier available"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "MUSHIN",
+        "url": "https://mushin.app"
+      }
+    }
+    </script>
   </head>
 
   <body>

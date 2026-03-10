@@ -1,14 +1,11 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
 User-agent: *
 Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /onboarding
+Disallow: /update-password
+
+# Crawl-delay for well-behaved bots
+Crawl-delay: 10
+
+Sitemap: https://mushin.app/sitemap.xml

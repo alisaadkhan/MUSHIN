@@ -6,8 +6,7 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/
 
 /* --- Global Styles ------------------------------------------------------------ */
 const G = () => <style>{`
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-*{font-family:'Inter',sans-serif}
+*{font-family:'Inter','Roboto',sans-serif}
 @keyframes marquee-x{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 @keyframes marquee-x-rev{0%{transform:translateX(-50%)}100%{transform:translateX(0)}}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
@@ -15,7 +14,7 @@ const G = () => <style>{`
 @keyframes aring-ccw{from{transform:rotate(0deg) translateZ(0)}to{transform:rotate(-360deg) translateZ(0)}}
 @keyframes icon-ucw{from{transform:translateZ(0) rotate(0deg)}to{transform:translateZ(0) rotate(-360deg)}}
 @keyframes icon-uccw{from{transform:translateZ(0) rotate(0deg)}to{transform:translateZ(0) rotate(360deg)}}
-@keyframes hub-pulse{0%,100%{box-shadow:0 0 0 0 rgba(168,85,247,0.4),0 0 32px rgba(168,85,247,0.2)}50%{box-shadow:0 0 0 12px rgba(168,85,247,0),0 0 48px rgba(168,85,247,0.35)}}
+@keyframes hub-pulse{0%,100%{transform:scale(1);opacity:0.85}50%{transform:scale(1.08);opacity:1}}
 @media(max-width:640px){.ao-r1{animation-duration:22s!important}.ao-r2{animation-duration:34s!important}}
 @keyframes shimmer{0%{background-position:200% center}100%{background-position:-200% center}}
 @keyframes aurora{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
@@ -32,30 +31,62 @@ const G = () => <style>{`
 `}</style>;
 
 /* --- Star Field (post-hero background) --------------------------------------- */
-const STARS = Array.from({ length: 130 }, (_, i) => ({
-  id: i,
-  x: ((i * 137.508 + 11) % 100).toFixed(3),
-  y: ((i * 97.323 + 7) % 100).toFixed(3),
-  size: i % 3 === 0 ? 2.4 : i % 3 === 1 ? 1.5 : 0.9,
-  dur: (2.5 + (i % 7) * 0.65).toFixed(2),
-  delay: (-(i % 13) * 0.55).toFixed(2),
-  color: i % 9 === 0 ? '#f0abfc' : i % 6 === 0 ? '#c084fc' : i % 4 === 0 ? '#a78bfa' : '#ffffff',
-  baseOpacity: 0.18 + (i % 5) * 0.11,
-}));
-const StarField = () => (
-  <div className="pointer-events-none fixed inset-0" style={{ zIndex: 1 }} aria-hidden="true">
-    {STARS.map(s => (
-      <div key={s.id} style={{
-        position: 'absolute', left: `${s.x}%`, top: `${s.y}%`,
-        width: s.size, height: s.size, borderRadius: '50%',
-        background: s.color,
-        boxShadow: s.size > 2 ? `0 0 ${s.size * 3}px ${s.color}` : undefined,
-        animation: `star-twinkle ${s.dur}s ${s.delay}s ease-in-out infinite`,
-        opacity: s.baseOpacity,
-      }} />
-    ))}
-  </div>
-);
+/* --- Star Field â€” canvas-based to avoid 130 DOM nodes ----------------------- */
+const StarField = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const COLORS = ['#ffffff', '#a78bfa', '#c084fc', '#f0abfc'];
+    const stars = Array.from({ length: 90 }, (_, i) => ({
+      x: (i * 137.508 + 11) % 100,
+      y: (i * 97.323 + 7) % 100,
+      r: i % 3 === 0 ? 1.2 : i % 3 === 1 ? 0.75 : 0.45,
+      color: COLORS[i % COLORS.length],
+      base: 0.15 + (i % 5) * 0.08,
+      phase: (i % 13) * 0.48,
+      speed: 2.5 + (i % 7) * 0.65,
+    }));
+
+    let raf: number;
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize, { passive: true });
+
+    const draw = (t: number) => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (const s of stars) {
+        const opacity = s.base + Math.sin(t / (s.speed * 1000) + s.phase) * s.base * 0.9;
+        ctx.beginPath();
+        ctx.arc(s.x / 100 * canvas.width, s.y / 100 * canvas.height, s.r, 0, Math.PI * 2);
+        ctx.fillStyle = s.color;
+        ctx.globalAlpha = Math.max(0, opacity);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      raf = requestAnimationFrame(draw);
+    };
+    raf = requestAnimationFrame(draw);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
+  return (
+    <canvas
+      ref={canvasRef}
+      aria-hidden="true"
+      className="pointer-events-none fixed inset-0"
+      style={{ zIndex: 1, opacity: 0.85 }}
+    />
+  );
+};
 
 /* --- Grain Overlay ----------------------------------------------------------- */
 const GrainOverlay = () => (
@@ -273,7 +304,7 @@ const BentoCard = ({ children, className = '', glow = false }: { children: React
 /* --- Section Spotlight ------------------------------------------------------- */
 /**
  * Applies the same mouse-follow radial gradient used inside BentoCard
- * at section level — giving every major section a subtle ambient glow
+ * at section level ï¿½ giving every major section a subtle ambient glow
  * that follows the cursor, reinforcing spatial depth without distraction.
  */
 const SectionSpotlight = ({
@@ -325,15 +356,15 @@ const MockSearch = () => (
         <span className="px-2.5 py-1 rounded-md bg-purple-600 text-white font-bold">Search</span>
       </div>
       <div className="flex gap-2">
-        {['Travel', 'Karachi', 'Instagram'].map(f => <span key={f} className="px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-white/40">{f}</span>)}
+        {['Travel', 'Karachi', 'Instagram'].map(f => <span key={f} className="px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-white/60">{f}</span>)}
       </div>
-      <div className="text-white/20 text-[10px]">3 verified creators · sorted by Relevance</div>
-      <div className="text-white/15 text-[9px] text-right pb-1 italic">Illustrative · not real data</div>
+      <div className="text-white/20 text-[10px]">3 verified creators ï¿½ sorted by Relevance</div>
+      <div className="text-white/15 text-[9px] text-right pb-1 italic">Illustrative ï¿½ not real data</div>
       <div className="space-y-1">
         {[
-          { n: 'Sana Malik',   av: 'SM', bg: '7c3aed', s: 'Lifestyle · Lahore',  f: '421K', e: '7.3%', hi: true },
-          { n: 'Usman Tariq',  av: 'UT', bg: '0891b2', s: 'Travel · Karachi',    f: '892K', e: '5.8%' },
-          { n: 'Mehreen Raza', av: 'MR', bg: '059669', s: 'Fashion · Islamabad', f: '1.1M', e: '6.4%' },
+          { n: 'Sana Malik',   av: 'SM', bg: '7c3aed', s: 'Lifestyle ï¿½ Lahore',  f: '421K', e: '7.3%', hi: true },
+          { n: 'Usman Tariq',  av: 'UT', bg: '0891b2', s: 'Travel ï¿½ Karachi',    f: '892K', e: '5.8%' },
+          { n: 'Mehreen Raza', av: 'MR', bg: '059669', s: 'Fashion ï¿½ Islamabad', f: '1.1M', e: '6.4%' },
         ].map(c => (
           <div key={c.n} className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg border ${c.hi ? 'bg-purple-600/10 border-purple-500/20' : 'border-transparent'}`}>
             <img src={`https://ui-avatars.com/api/?name=${c.av}&background=${c.bg}&color=fff&bold=true&size=64&rounded=true`} alt={c.n}
@@ -351,16 +382,16 @@ const MockProfile = () => (
   <div className="rounded-2xl border border-white/10 overflow-hidden bg-zinc-950/80 shadow-2xl backdrop-blur-sm select-none text-xs">
     <div className="flex items-center gap-1.5 px-4 py-3 border-b border-white/[0.08] bg-black/40">
       <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
-      <span className="ml-2 text-white/30">Creator Trust Score — Sana Malik</span>
+      <span className="ml-2 text-white/30">Creator Trust Score ï¿½ Sana Malik</span>
     </div>
     <div className="p-4">
-      <div className="text-white/15 text-[9px] text-right pb-1 italic">Illustrative · not real data</div>
+      <div className="text-white/15 text-[9px] text-right pb-1 italic">Illustrative ï¿½ not real data</div>
       <div className="flex items-start gap-3 mb-4">
         <img src="https://ui-avatars.com/api/?name=SM&background=7c3aed&color=fff&bold=true&size=96&rounded=true" alt="Sana Malik"
           className="w-12 h-12 rounded-full flex-shrink-0 object-cover border border-purple-500/30" />
         <div className="flex-1">
           <div className="text-white/80 font-semibold text-sm">Sana Malik</div>
-          <div className="text-white/30 text-[10px] mb-1.5">@sana_pk · Lifestyle · Lahore</div>
+          <div className="text-white/30 text-[10px] mb-1.5">@sana_pk ï¿½ Lifestyle ï¿½ Lahore</div>
           <div className="flex gap-1">
             {['Verified', 'Real Eng', 'PK'].map(t => <span key={t} className="px-1.5 py-0.5 rounded text-[9px] font-bold" style={{ background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc' }}>{t}</span>)}
           </div>
@@ -370,12 +401,12 @@ const MockProfile = () => (
       <div className="space-y-0">
         {[{ l: 'Followers', v: '421K' }, { l: 'Engagement', v: '7.3%' }, { l: 'Fake Followers', v: '< 1.2%' }, { l: 'Total Views', v: '48M' }, { l: 'Avg Views', v: '114K' }].map((r, i, a) => (
           <div key={r.l} className={`flex justify-between py-2 ${i < a.length - 1 ? 'border-b border-white/[0.05]' : ''}`}>
-            <span className="text-white/40">{r.l}</span><span className="text-white/70 font-semibold">{r.v}</span>
+            <span className="text-white/60">{r.l}</span><span className="text-white/70 font-semibold">{r.v}</span>
           </div>
         ))}
       </div>
       <div className="mt-3 flex items-center gap-1.5 text-[10px] text-green-400">
-        <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" /><span>Verified audience · Lowest fake-follower ratio</span>
+        <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" /><span>Verified audience ï¿½ Lowest fake-follower ratio</span>
       </div>
     </div>
   </div>
@@ -385,7 +416,7 @@ const MockKanban = () => (
   <div className="rounded-2xl border border-white/10 overflow-hidden bg-zinc-950/80 shadow-2xl backdrop-blur-sm select-none text-xs">
     <div className="flex items-center gap-1.5 px-4 py-3 border-b border-white/[0.08] bg-black/40">
       <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
-      <span className="ml-2 text-white/30">Campaign Kanban — Summer 2025</span>
+      <span className="ml-2 text-white/30">Campaign Kanban ï¿½ Summer 2025</span>
     </div>
     <div className="p-3 grid grid-cols-3 gap-2">
       {[
@@ -466,7 +497,7 @@ export default function LandingPage() {
   const [activeNav, setActiveNav]   = useState<string | null>(null);
   const [navScrolled, setNavScrolled] = useState(false);
   const [pricePeriod, setPricePeriod] = useState<'m' | 'a'>('m');
-  // heroComplete starts true — sections are in DOM immediately but naturally
+  // heroComplete starts true ï¿½ sections are in DOM immediately but naturally
   // hidden below the 300vh hero. The scroll event updates it for the fade-in.
   const [heroComplete, setHeroComplete] = useState(true);
 
@@ -484,7 +515,7 @@ export default function LandingPage() {
     if (v >= 0.98) setHeroComplete(true);
   });
 
-  // -- Scroll transforms — identical to Version 2 ----------------------------
+  // -- Scroll transforms ï¿½ identical to Version 2 ----------------------------
   const hOp       = useTransform(scrollYProgress, [0, 0.12], [1, 0]);
   const hY        = useTransform(scrollYProgress, [0, 0.12], [0, -50]);
   const textScale = useTransform(scrollYProgress, [0, 0.5],  [1, 1.4]);
@@ -512,9 +543,9 @@ export default function LandingPage() {
 
   const faqs = [
     { q: 'Which Pakistani cities do you cover?',    a: 'We index creators from Karachi, Lahore, Islamabad, Faisalabad, Peshawar, Multan, Quetta, and 12+ more cities across Pakistan.' },
-            { q: 'How accurate is the fraud detection?',    a: 'Our AI fraud scoring delivers high accuracy using engagement velocity analysis, follower growth patterns, and audience overlap detection — calibrated for Pakistani social media behaviour.' },
-    { q: 'Can I search for Urdu content creators?', a: 'Yes. You can filter by content language (Urdu/English/Mixed) and niche categories specific to Pakistani culture — cricket, drama, Islamic content, food, and more.' },
-    { q: 'Do I need a credit card to start?',       a: 'No. The free plan gives you 50 searches per month forever — no time limit, no card required.' },
+            { q: 'How accurate is the fraud detection?',    a: 'Our AI fraud scoring delivers high accuracy using engagement velocity analysis, follower growth patterns, and audience overlap detection ï¿½ calibrated for Pakistani social media behaviour.' },
+    { q: 'Can I search for Urdu content creators?', a: 'Yes. You can filter by content language (Urdu/English/Mixed) and niche categories specific to Pakistani culture ï¿½ cricket, drama, Islamic content, food, and more.' },
+    { q: 'Do I need a credit card to start?',       a: 'No. The free plan gives you 50 searches per month forever ï¿½ no time limit, no card required.' },
     { q: 'How fresh is the data?',                  a: "Creator profiles refresh every 24 hours. You're never working with data that's weeks old." },
     { q: 'Can my team collaborate on campaigns?',   a: 'Business plan includes multi-seat access, shared campaign boards, and team analytics dashboards.' },
   ];
@@ -540,7 +571,7 @@ export default function LandingPage() {
                 aria-label={`Scroll to ${item.label} section`}
                 aria-current={active ? 'true' : undefined}
                 onClick={() => { setActiveNav(item.id); document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth' }); }}
-                className={`flex items-center gap-1.5 rounded-full transition-all duration-200 ${active ? 'bg-white text-black px-5 py-2' : 'w-10 h-10 justify-center text-white/40 hover:text-white/70'}`}>
+                className={`flex items-center gap-1.5 rounded-full transition-all duration-200 ${active ? 'bg-white text-black px-5 py-2' : 'w-10 h-10 justify-center text-white/60 hover:text-white/70'}`}>
                 {item.icon}
                 <AnimatePresence>{active && <motion.span initial={{ width: 0, opacity: 0 }} animate={{ width: 'auto', opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="text-sm font-bold overflow-hidden whitespace-nowrap">{item.label}</motion.span>}</AnimatePresence>
               </motion.button>
@@ -553,18 +584,19 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* -- VIDEO HERO — 300vh matches Version 2 -- */}
+      {/* -- VIDEO HERO ï¿½ 300vh matches Version 2 -- */}
       <div ref={vwRef} className="relative h-[100vh]">
         <div className="sticky top-0 h-screen overflow-hidden" style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 30%, #2d0a5e 0%, #0a0114 50%, #060608 100%)' }}>
           <video
             ref={vRef}
             aria-hidden="true"
             src="/A_seamless_cinematic_transition_from_a_dark_obsidian_c.mp4"
-            autoPlay playsInline muted preload="auto" loop
+            autoPlay playsInline muted preload="metadata" loop
+            poster="/hero-poster.jpg"
             className="absolute inset-0 w-full h-full object-cover opacity-40"
             style={{ willChange: 'contents', transform: 'translateZ(0)' }}
           />
-          {/* Purple ambient overlay — ensures page never looks fully black */}
+          {/* Purple ambient overlay ï¿½ ensures page never looks fully black */}
           <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 70% 55% at 50% 40%, rgba(109,40,217,0.35) 0%, rgba(88,28,135,0.15) 45%, transparent 75%)' }} />
 
           {/* Watermark */}
@@ -572,7 +604,7 @@ export default function LandingPage() {
             <div className="font-black text-center leading-none select-none" style={{ fontSize: 'clamp(3rem,12vw,10rem)', color: 'rgba(255,255,255,0.06)', letterSpacing: '-0.04em' }}>MUSHIN</div>
           </motion.div>
 
-          {/* Hero content — no opacity transform on wrapper; individual elements animate in.
+          {/* Hero content ï¿½ no opacity transform on wrapper; individual elements animate in.
               hOp (scroll-driven fade) is intentionally omitted here because framer-motion's
               useScroll can initialise scrollYProgress > 0 on Vercel before layout settles,
               which makes the wrapper invisible on first paint. Each child handles its own
@@ -606,7 +638,7 @@ export default function LandingPage() {
         </div>
       </div>
 
-      {/* -- Sections — revealed after hero scroll is complete -- */}
+      {/* -- Sections ï¿½ revealed after hero scroll is complete -- */}
       {heroComplete && <StarField />}
       {heroComplete && (
       <motion.div
@@ -628,8 +660,8 @@ export default function LandingPage() {
           </div>
           <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { icon: <Building2 className="w-5 h-5 text-purple-400" />, title: 'Agencies',          desc: 'Manage multiple brand campaigns, deliver verified creator lists, and produce client-ready reports — all from one workspace.' },
-              { icon: <ShoppingBag className="w-5 h-5 text-pink-400" />,  title: 'E-commerce Brands', desc: 'Find product creators in your exact niche and city who drive real sales — not just impressions and likes.' },
+              { icon: <Building2 className="w-5 h-5 text-purple-400" />, title: 'Agencies',          desc: 'Manage multiple brand campaigns, deliver verified creator lists, and produce client-ready reports ï¿½ all from one workspace.' },
+              { icon: <ShoppingBag className="w-5 h-5 text-pink-400" />,  title: 'E-commerce Brands', desc: 'Find product creators in your exact niche and city who drive real sales ï¿½ not just impressions and likes.' },
               { icon: <TrendingUp className="w-5 h-5 text-green-400" />, title: 'Performance Teams', desc: 'Measure estimated ROAS before first rupee is spent. Eliminate zero-return placements with data-first selection.' },
               { icon: <Users className="w-5 h-5 text-blue-400" />,       title: 'Corporate Brands',  desc: 'Multi-seat dashboards, approval workflows, and compliance-grade audit trails for enterprise brand safety.' },
             ].map(({ icon, title, desc }, i) => (
@@ -664,7 +696,7 @@ export default function LandingPage() {
                     <div className="text-7xl md:text-8xl font-black text-white tracking-tight"><Ticker v={95} s="%" /></div>
                   </div>
                   <div>
-                    <p className="text-zinc-500 text-sm leading-relaxed mt-4">AI fraud analysis using engagement velocity, follower growth patterns, and audience anomalies — estimated on benchmark datasets.</p>
+                    <p className="text-zinc-500 text-sm leading-relaxed mt-4">AI fraud analysis using engagement velocity, follower growth patterns, and audience anomalies ï¿½ estimated on benchmark datasets.</p>
                     <div className="mt-4 flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                       <span className="text-green-400 text-xs font-medium">Live monitoring active</span>
@@ -673,7 +705,7 @@ export default function LandingPage() {
                 </div>
               </BentoCard>
             </motion.div>
-            {[{ v: 10, s: 'K+', l: 'Pakistani Creators', delay: .08 },             { v: 4, s: '.2×', l: 'ROAS Improvement', delay: .12 }, { v: 12, s: '+', l: 'Cities Covered', delay: .16 },             { v: 2800, s: '+', l: 'Indexed Creators', delay: .20 }].map((item, i) => (
+            {[{ v: 10, s: 'K+', l: 'Pakistani Creators', delay: .08 },             { v: 4, s: '.2ï¿½', l: 'ROAS Improvement', delay: .12 }, { v: 12, s: '+', l: 'Cities Covered', delay: .16 },             { v: 2800, s: '+', l: 'Indexed Creators', delay: .20 }].map((item, i) => (
               <motion.div key={i} initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: item.delay }}>
                 <BentoCard className="p-6 h-full">
                   <div className="text-purple-400 text-[10px] uppercase tracking-widest mb-1 font-medium">{item.l}</div>
@@ -705,7 +737,7 @@ export default function LandingPage() {
           </div>
           <div className="space-y-3 pt-2">
             {[
-              { problem: 'Fake followers inflate reach by 30–60%',         impact: 'Avg. 2.4× wasted budget per campaign' },
+              { problem: 'Fake followers inflate reach by 30ï¿½60%',         impact: 'Avg. 2.4ï¿½ wasted budget per campaign' },
               { problem: 'Manual spreadsheet research takes 2+ weeks',     impact: 'Opportunities expire before outreach ever happens' },
               { problem: 'No city-level or Urdu language targeting',       impact: 'Karachi brands paying for Lahore audiences' },
               { problem: 'Zero demographic transparency post-campaign',    impact: "You never know who's actually seeing your content" },
@@ -730,7 +762,7 @@ export default function LandingPage() {
           <motion.div initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-16">
             <div className="text-purple-400 text-xs font-medium uppercase tracking-widest mb-4">Platform Coverage</div>
             <h2 className="text-4xl md:text-6xl font-black tracking-tighter mb-4">Find Creators on<br />Every Platform.</h2>
-            <p className="text-zinc-400 text-lg max-w-xl">Search Instagram, TikTok, and YouTube simultaneously. Filter by Pakistani city, niche, and language — real-time.</p>
+            <p className="text-zinc-400 text-lg max-w-xl">Search Instagram, TikTok, and YouTube simultaneously. Filter by Pakistani city, niche, and language ï¿½ real-time.</p>
           </motion.div>
           <div className="grid md:grid-cols-3 gap-5">
             {platforms.map((pl, pi) => (
@@ -754,7 +786,7 @@ export default function LandingPage() {
         </div>
       </SectionSpotlight>
 
-      {/* INTELLIGENCE ENGINE — ATOM ORBIT */}
+      {/* INTELLIGENCE ENGINE ï¿½ ATOM ORBIT */}
       <SectionSpotlight aria-label="Intelligence engine section" className="py-24 px-6 border-t border-white/[0.06] z-20">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-16">
@@ -765,7 +797,7 @@ export default function LandingPage() {
               <RevealText text="for Pakistani Creators." delay={0.22} />
             </h2>
             <motion.p initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.4 }}
-              className="text-zinc-400 text-lg max-w-xl mx-auto">Every signal — search, fraud detection, outreach, ROAS — unified in one orbit.</motion.p>
+              className="text-zinc-400 text-lg max-w-xl mx-auto">Every signal ï¿½ search, fraud detection, outreach, ROAS ï¿½ unified in one orbit.</motion.p>
           </div>
           <motion.div initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
             className="flex justify-center items-center" style={{ minHeight: 520 }}>
@@ -811,7 +843,7 @@ export default function LandingPage() {
               <div>
                 <div className="font-black text-[7rem] leading-none mb-4 select-none" style={{ color: 'rgba(168,85,247,0.10)' }}>01</div>
                 <h3 className="text-2xl md:text-3xl font-black tracking-tight mb-4">Discover Verified Creators</h3>
-                <p className="text-zinc-400 text-lg leading-relaxed">Enter a niche and city. Get live Pakistani creator profiles from the web — not a stale database.</p>
+                <p className="text-zinc-400 text-lg leading-relaxed">Enter a niche and city. Get live Pakistani creator profiles from the web ï¿½ not a stale database.</p>
               </div>
               <div className="shadow-[0_24px_80px_rgba(0,0,0,.6)]"><MockSearch /></div>
             </motion.div>
@@ -829,7 +861,7 @@ export default function LandingPage() {
               <div>
                 <div className="font-black text-[7rem] leading-none mb-4 select-none" style={{ color: 'rgba(168,85,247,0.10)' }}>03</div>
                 <h3 className="text-2xl md:text-3xl font-black tracking-tight mb-4">Close the Deal</h3>
-                <p className="text-zinc-400 text-lg leading-relaxed">Save to lists, manage on a visual Kanban, and send outreach — all from one workspace.</p>
+                <p className="text-zinc-400 text-lg leading-relaxed">Save to lists, manage on a visual Kanban, and send outreach ï¿½ all from one workspace.</p>
               </div>
               <div className="shadow-[0_24px_80px_rgba(0,0,0,.6)]"><MockKanban /></div>
             </motion.div>
@@ -892,38 +924,38 @@ export default function LandingPage() {
               <RevealText text="Teams Love" className="aurora-text" />{' '}
               <RevealText text="What We Built." delay={0.2} />
             </h2>
-            <p className="text-white/30 text-xs mt-4">* Testimonials below are illustrative scenarios — not attributed to specific companies.</p>
+            <p className="text-white/30 text-xs mt-4">* Testimonials below are illustrative scenarios ï¿½ not attributed to specific companies.</p>
           </div>
           <div className="mb-8">
             <MarqueeRow speed={28} items={['Fintech','E-commerce','Telecom','Fashion Retail','FMCG','Digital Agency','D2C Brand','Media House','Startup','Food & Beverage','Beauty & Skincare','EdTech'].map((b, i) => (
-              <div key={i} className="px-5 py-2 rounded-full border border-white/10 bg-white/[0.03] text-white/40 text-sm font-semibold whitespace-nowrap hover:border-purple-500/30 hover:text-purple-400 transition-colors cursor-pointer">{b}</div>
+              <div key={i} className="px-5 py-2 rounded-full border border-white/10 bg-white/[0.03] text-white/60 text-sm font-semibold whitespace-nowrap hover:border-purple-500/30 hover:text-purple-400 transition-colors cursor-pointer">{b}</div>
             ))} />
           </div>
           <div className="space-y-4">
             <MarqueeRow speed={38} items={[
-              { name: 'Sarah K.',  role: 'Brand Manager · Fintech',         text: 'Found 3 mega-creators for our Eid campaign in under 10 minutes. The ROAS was exceptional.' },
-              { name: 'Ahmed R.',  role: 'Growth Lead · E-commerce',        text: 'The fraud detection alone saved us from 2 fake-follower influencers with 800K combined followers.' },
-              { name: 'Fatima Z.', role: 'CMO · Fashion Retail',            text: 'We replaced 3 separate tools with Mushin. The Kanban board is a game changer.' },
-              { name: 'Usman T.', role: 'Digital Director · Fintech',       text: 'Karachi-specific filtering is insane. Found 47 verified nano-influencers in our exact market.' },
+              { name: 'Sarah K.',  role: 'Brand Manager ï¿½ Fintech',         text: 'Found 3 mega-creators for our Eid campaign in under 10 minutes. The ROAS was exceptional.' },
+              { name: 'Ahmed R.',  role: 'Growth Lead ï¿½ E-commerce',        text: 'The fraud detection alone saved us from 2 fake-follower influencers with 800K combined followers.' },
+              { name: 'Fatima Z.', role: 'CMO ï¿½ Fashion Retail',            text: 'We replaced 3 separate tools with Mushin. The Kanban board is a game changer.' },
+              { name: 'Usman T.', role: 'Digital Director ï¿½ Fintech',       text: 'Karachi-specific filtering is insane. Found 47 verified nano-influencers in our exact market.' },
             ].map((t, i) => (
               <div key={i} className="w-72 flex-shrink-0 bg-white/[0.03] border border-white/10 rounded-2xl p-5 hover:border-purple-500/20 transition-all">
                 <div className="flex gap-1 mb-3">{[...Array(5)].map((_, j) => <Star key={j} className="w-3 h-3 fill-purple-400 text-purple-400" />)}</div>
                 <p className="text-white/70 text-sm leading-relaxed mb-4">"{t.text}"</p>
                 <div className="text-sm font-bold text-white">{t.name}</div>
-                <div className="text-white/40 text-xs">{t.role}</div>
+                <div className="text-white/60 text-xs">{t.role}</div>
               </div>
             ))} />
             <MarqueeRow reverse speed={42} items={[
-              { name: 'Nadia M.',  role: 'Influencer Lead · Fashion Retail', text: "The Relevance Score is the most reliable metric for Pakistani creator quality I've ever used." },
-              { name: 'Bilal A.',  role: 'CEO · Digital Agency',             text: 'Clients trust our recommendations more now that we back everything with Mushin data.' },
-              { name: 'Anosha B.', role: 'Marketing Head · D2C Brand',       text: 'Went from 2 weeks of manual research to 30 minutes of verified outreach. Remarkable.' },
-              { name: 'Zaid H.',   role: 'Founder · Media House',            text: 'City-level niche filters are something no other platform offers for Pakistan. Game-changing.' },
+              { name: 'Nadia M.',  role: 'Influencer Lead ï¿½ Fashion Retail', text: "The Relevance Score is the most reliable metric for Pakistani creator quality I've ever used." },
+              { name: 'Bilal A.',  role: 'CEO ï¿½ Digital Agency',             text: 'Clients trust our recommendations more now that we back everything with Mushin data.' },
+              { name: 'Anosha B.', role: 'Marketing Head ï¿½ D2C Brand',       text: 'Went from 2 weeks of manual research to 30 minutes of verified outreach. Remarkable.' },
+              { name: 'Zaid H.',   role: 'Founder ï¿½ Media House',            text: 'City-level niche filters are something no other platform offers for Pakistan. Game-changing.' },
             ].map((t, i) => (
               <div key={i} className="w-72 flex-shrink-0 bg-white/[0.03] border border-white/10 rounded-2xl p-5 hover:border-purple-500/20 transition-all">
                 <div className="flex gap-1 mb-3">{[...Array(5)].map((_, j) => <Star key={j} className="w-3 h-3 fill-purple-400 text-purple-400" />)}</div>
                 <p className="text-white/70 text-sm leading-relaxed mb-4">"{t.text}"</p>
                 <div className="text-sm font-bold text-white">{t.name}</div>
-                <div className="text-white/40 text-xs">{t.role}</div>
+                <div className="text-white/60 text-xs">{t.role}</div>
               </div>
             ))} />
           </div>
@@ -966,9 +998,9 @@ export default function LandingPage() {
           </div>
           <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             {[
-              { icon: <Shield className="w-5 h-5 text-green-400" />,   title: 'No Lock-In',         desc: 'Month-to-month billing. Cancel instantly from your dashboard — no questions asked.' },
+              { icon: <Shield className="w-5 h-5 text-green-400" />,   title: 'No Lock-In',         desc: 'Month-to-month billing. Cancel instantly from your dashboard ï¿½ no questions asked.' },
               { icon: <CheckCircle className="w-5 h-5 text-blue-400" />, title: 'Transparent Pricing', desc: 'The price listed is the price you pay. Zero hidden overages or surprise fees.' },
-              { icon: <Zap className="w-5 h-5 text-yellow-400" />,     title: 'Real Human Support',  desc: 'Every plan includes support via email and chat — not a bot, not a knowledge base article.' },
+              { icon: <Zap className="w-5 h-5 text-yellow-400" />,     title: 'Real Human Support',  desc: 'Every plan includes support via email and chat ï¿½ not a bot, not a knowledge base article.' },
               { icon: <Users className="w-5 h-5 text-purple-400" />,   title: '10,000+ Creators',   desc: '10,000+ indexed Pakistani creator profiles. If they are active, we are tracking them.' },
             ].map((item, i) => (
               <div key={i} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
@@ -996,9 +1028,9 @@ export default function LandingPage() {
               <RevealText text="Simple, Honest" />{' '}
               <RevealText text="Pricing." delay={0.15} />
             </h2>
-            <div className="flex items-center justify-center gap-3 mt-6">
-              <button onClick={() => setPricePeriod('m')} className={`text-xs font-bold px-4 py-1.5 rounded-full transition-all ${pricePeriod === 'm' ? 'bg-white text-black' : 'text-white/40 hover:text-white/70'}`}>Monthly</button>
-              <button onClick={() => setPricePeriod('a')} className={`text-xs font-bold px-4 py-1.5 rounded-full transition-all ${pricePeriod === 'a' ? 'bg-white text-black' : 'text-white/40 hover:text-white/70'}`}>Annual <span className="text-green-400">-20%</span></button>
+            <div className="flex items-center justify-center gap-3 mt-6" role="group" aria-label="Billing period">
+              <button aria-pressed={pricePeriod === 'm'} onClick={() => setPricePeriod('m')} className={`text-xs font-bold px-4 py-1.5 rounded-full transition-all ${pricePeriod === 'm' ? 'bg-white text-black' : 'text-white/60 hover:text-white/80'}`}>Monthly</button>
+              <button aria-pressed={pricePeriod === 'a'} onClick={() => setPricePeriod('a')} className={`text-xs font-bold px-4 py-1.5 rounded-full transition-all ${pricePeriod === 'a' ? 'bg-white text-black' : 'text-white/60 hover:text-white/80'}`}>Annual <span className="text-green-400">-20%</span></button>
             </div>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
@@ -1064,7 +1096,7 @@ export default function LandingPage() {
             <RevealText text="Your Next Campaign" /><br />
             <RevealText text="Starts Here." delay={0.2} />
           </h2>
-          <p className="text-zinc-400 text-lg mb-10 max-w-xl mx-auto">Join Pakistani marketing teams already using Mushin to find, verify, and close creators — faster.</p>
+          <p className="text-zinc-400 text-lg mb-10 max-w-xl mx-auto">Join Pakistani marketing teams already using Mushin to find, verify, and close creators ï¿½ faster.</p>
           <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: .97 }}
             transition={{ type: 'spring', stiffness: 400, damping: 20 }} className="conic-wrap inline-block">
             <Link to="/auth" className="conic-inner flex items-center gap-3 px-12 py-4 text-white font-bold text-sm tracking-[0.18em] uppercase">
@@ -1087,15 +1119,15 @@ export default function LandingPage() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-8 text-sm">
               <div>
-                <div className="text-white/40 font-semibold uppercase tracking-widest text-[10px] mb-3">Product</div>
+                <div className="text-white/60 font-semibold uppercase tracking-widest text-[10px] mb-3">Product</div>
                 <div className="space-y-2">{['Features','Pricing','API','Changelog'].map(l => <div key={l} className="text-zinc-500 hover:text-white transition-colors cursor-pointer">{l}</div>)}</div>
               </div>
               <div>
-                <div className="text-white/40 font-semibold uppercase tracking-widest text-[10px] mb-3">Company</div>
+                <div className="text-white/60 font-semibold uppercase tracking-widest text-[10px] mb-3">Company</div>
                 <div className="space-y-2">{['About','Blog','Careers','Press'].map(l => <Link key={l} to={l === 'About' ? '/about' : l === 'Blog' ? '/blog' : '#'} className="block text-zinc-500 hover:text-white transition-colors">{l}</Link>)}</div>
               </div>
               <div>
-                <div className="text-white/40 font-semibold uppercase tracking-widest text-[10px] mb-3">Legal</div>
+                <div className="text-white/60 font-semibold uppercase tracking-widest text-[10px] mb-3">Legal</div>
                 <div className="space-y-2">
                   <Link to="/privacy" className="block text-zinc-500 hover:text-white transition-colors">Privacy</Link>
                   <Link to="/terms"   className="block text-zinc-500 hover:text-white transition-colors">Terms</Link>
@@ -1105,7 +1137,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="border-t border-white/[0.06] pt-6 flex flex-col sm:flex-row justify-between items-center gap-3">
-            <div className="text-zinc-600 text-xs">© 2026 Mushin. All rights reserved. Made in Pakistan ????</div>
+            <div className="text-zinc-600 text-xs">ï¿½ 2026 Mushin. All rights reserved. Made in Pakistan ????</div>
             <div className="flex items-center gap-4">
               <Instagram className="w-4 h-4 text-zinc-600 hover:text-white transition-colors cursor-pointer" />
               <Youtube   className="w-4 h-4 text-zinc-600 hover:text-white transition-colors cursor-pointer" />
