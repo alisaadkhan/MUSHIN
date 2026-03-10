@@ -592,7 +592,7 @@ export default function LandingPage() {
             aria-hidden="true"
             src="/A_seamless_cinematic_transition_from_a_dark_obsidian_c.mp4"
             autoPlay playsInline muted preload="metadata" loop
-            poster="/hero-poster.jpg"
+            poster="/hero-poster.png"
             className="absolute inset-0 w-full h-full object-cover opacity-40"
             style={{ willChange: 'contents', transform: 'translateZ(0)' }}
           />
