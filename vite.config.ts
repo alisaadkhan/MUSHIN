@@ -34,14 +34,13 @@ export default defineConfig(() => ({
           // Supabase client
           "vendor-supabase": ["@supabase/supabase-js"],
           // Radix UI / shadcn components shared across the app
-          // Note: @radix-ui/react-accordion is intentionally excluded — it's
-          // lazy-loaded via LandingFaq for deferred parsing on landing page.
           "vendor-ui": [
             "@radix-ui/react-dialog",
             "@radix-ui/react-dropdown-menu",
             "@radix-ui/react-tooltip",
             "@radix-ui/react-tabs",
             "@radix-ui/react-select",
+            "@radix-ui/react-accordion",
             "@radix-ui/react-popover",
           ],
           // Charting library — only used in Analytics/Admin pages
