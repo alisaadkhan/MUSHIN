@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform, useInView, animate, AnimatePresence, MotionConfig, useMotionValueEvent } from 'framer-motion';
 import { CheckCircle, DollarSign, Info, Sparkles, ArrowRight, Search, Star, Shield, Zap, Users, Instagram, Youtube, TrendingUp, Globe, MapPin, X, Building2, ShoppingBag } from 'lucide-react';
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
+
+const LazyFaq = lazy(() => import('@/components/landing/LandingFaq'));
 
 /* --- Global Styles ------------------------------------------------------------ */
 const G = () => <style>{`
@@ -24,7 +25,6 @@ const G = () => <style>{`
 .conic-inner{position:relative;z-index:1;background:#000;border-radius:9999px}
 @keyframes pulse-ring{0%{transform:scale(.9);opacity:.8}70%{transform:scale(1.5);opacity:0}100%{transform:scale(.9);opacity:0}}
 .reveal-word{display:inline-block;overflow:hidden;vertical-align:bottom;margin-right:0.24em}
-@keyframes beam-travel{0%{stroke-dashoffset:400}100%{stroke-dashoffset:-400}}
 .shiny-text{background:linear-gradient(120deg,#fff 20%,#a855f7 40%,#c084fc 50%,#a855f7 60%,#fff 80%);background-size:200% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 3s linear infinite}
 .aurora-text{background:linear-gradient(270deg,#a855f7,#c084fc,#7c3aed,#d946ef,#a855f7);background-size:400% 400%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:aurora 5s ease infinite}
 @keyframes star-twinkle{0%,100%{opacity:0.1;transform:scale(1)}50%{opacity:1;transform:scale(1.6)}}
@@ -152,30 +152,25 @@ const MouseGlow = () => {
 };
 
 /* --- Border Beam -------------------------------------------------------------- */
+/* Uses transform:rotate (compositor-friendly) instead of CSS @property --bangle */
 const BorderBeam = ({ color = '#a855f7', size = 1.5, dur = 3 }: { color?: string; size?: number; dur?: number }) => (
-  <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none" style={{ zIndex: 1 }}>
-    {/* Static mask/position props live in CSS; only dynamic values stay inline */}
-    <div
-      className="border-beam"
-      style={{
-        padding: size,
-        background: `conic-gradient(from var(--bangle,0deg),transparent 70%,${color} 80%,${color}99 85%,transparent 90%)`,
-        animation: `beamspin ${dur}s linear infinite`,
-      }}
-    />
-    <style>{`
-      .border-beam {
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-        mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-        -webkit-mask-composite: xor;
-        mask-composite: exclude;
-      }
-      @keyframes beamspin { to { --bangle: 360deg; } }
-      @property --bangle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
-    `}</style>
+  <div style={{
+    position: 'absolute', inset: 0, borderRadius: 'inherit', overflow: 'hidden',
+    pointerEvents: 'none', zIndex: 1, padding: `${size}px`,
+    WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+    mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+    WebkitMaskComposite: 'xor',
+    maskComposite: 'exclude',
+  } as React.CSSProperties}>
+    <div style={{
+      position: 'absolute',
+      top: '50%', left: '50%',
+      width: '200%', height: '200%',
+      background: `conic-gradient(transparent 70%, ${color} 80%, ${color}99 85%, transparent 90%)`,
+      animation: `bb-spin ${dur}s linear infinite`,
+      willChange: 'transform',
+    }} />
+    <style>{`@keyframes bb-spin{from{transform:translate(-50%,-50%) rotate(0deg)}to{transform:translate(-50%,-50%) rotate(360deg)}}`}</style>
   </div>
 );
 
@@ -239,15 +234,20 @@ const AtomOrbit = () => {
 
   return (
     <div style={{ position: 'relative', width: SZ, height: SZ, maxWidth: '100%', margin: '0 auto' }}>
+      {/* SVG lines: static dashed + animateMotion dot (compositor-friendly, no stroke-dashoffset) */}
       <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none', opacity: 0.35 }}
         viewBox={`0 0 ${SZ} ${SZ}`}>
         {outer.map(({ deg, color }, i) => {
           const p = pos(R2, deg);
+          const dur = `${(1.4 + i * 0.18).toFixed(2)}s`;
           return (
             <g key={i}>
-              <line x1={C} y1={C} x2={p.x} y2={p.y} stroke={color} strokeWidth={1}
-                strokeDasharray="3 6"
-                style={{ animation: `beam-travel ${1.4 + i * 0.18}s linear infinite` }} />
+              <line x1={C} y1={C} x2={p.x} y2={p.y} stroke={color} strokeWidth={0.5}
+                strokeDasharray="3 6" strokeOpacity={0.4} />
+              <circle r="2.5" fill={color} fillOpacity={0.9}>
+                <animateMotion dur={dur} repeatCount="indefinite"
+                  path={`M${C},${C} L${p.x},${p.y} L${C},${C}`} />
+              </circle>
             </g>
           );
         })}
@@ -1075,14 +1075,9 @@ export default function LandingPage() {
               <RevealText text="Questions, Answered." />
             </h2>
           </div>
-          <Accordion type="single" collapsible className="space-y-2">
-            {faqs.map((faq, i) => (
-              <AccordionItem key={i} value={`faq-${i}`} className="border border-white/10 rounded-xl overflow-hidden">
-                <AccordionTrigger className="px-5 py-4 text-sm font-semibold text-white/80 hover:text-white text-left hover:no-underline">{faq.q}</AccordionTrigger>
-                <AccordionContent className="px-5 pb-4 text-sm text-zinc-400 leading-relaxed">{faq.a}</AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
+          <Suspense fallback={<div className="space-y-2">{Array.from({length:6},(_,i)=><div key={i} className="h-14 rounded-xl border border-white/10 animate-pulse bg-white/[0.03]" />)}</div>}>
+            <LazyFaq faqs={faqs} />
+          </Suspense>
         </div>
       </SectionSpotlight>
 
