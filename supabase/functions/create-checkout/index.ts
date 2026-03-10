@@ -1,10 +1,13 @@
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimit } from "../_shared/rate_limit.ts";
 
+// Restrict origin to the application domain — never allow wildcard on billing endpoints
+const ALLOWED_ORIGIN = Deno.env.get("APP_URL") || "https://mushin.app";
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "authorization, x-client-info, apikey, content-type",
 };
 
 // Whitelist of valid Stripe Price IDs — any priceId not in this list is rejected
@@ -19,6 +22,16 @@ const VALID_PRICE_IDS = new Set([
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Rate limit: max 10 checkout attempts per hour per IP (prevents billing abuse)
+  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const rl = await checkRateLimit(clientIp, 'general', { perMin: 5, perHour: 10 });
+  if (!rl.allowed) {
+    return new Response(JSON.stringify({ error: "Too many requests" }), {
+      status: 429,
+      headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": String(rl.retryAfter ?? 60) },
+    });
   }
 
   try {
@@ -37,8 +50,15 @@ Deno.serve(async (req) => {
     const { data: userData, error: userError } = await supabase.auth.getUser(token);
     if (userError || !userData.user?.email) throw new Error("Not authenticated");
 
-    const { priceId } = await req.json();
-    if (!priceId) throw new Error("priceId is required");
+    const { priceId } = await req.json().catch(() => ({}));
+    if (!priceId || typeof priceId !== 'string') throw new Error("priceId is required");
+    // Sanitise: priceId must look like a Stripe Price ID (price_*)
+    if (!/^price_[a-zA-Z0-9]{10,}$/.test(priceId)) {
+      return new Response(JSON.stringify({ error: "Invalid price ID format" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Security: reject any priceId not in the explicit whitelist
     if (VALID_PRICE_IDS.size > 0 && !VALID_PRICE_IDS.has(priceId)) {

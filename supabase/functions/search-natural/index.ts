@@ -4,7 +4,7 @@ import { Redis } from "https://esm.sh/@upstash/redis";
 import { generateEmbedding } from "../_shared/huggingface.ts";
 
 const corsHeaders = {
-    "Access-Control-Allow-Origin": Deno.env.get("APP_URL") || "*",
+    "Access-Control-Allow-Origin": Deno.env.get("APP_URL") || "https://mushin.app",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 

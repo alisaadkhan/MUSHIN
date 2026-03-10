@@ -1,19 +1,24 @@
+// Never fall back to wildcard — if APP_URL is not configured fail safe to production URL
+const ALLOWED_ORIGIN = Deno.env.get("APP_URL") || "https://mushin.app";
 export const corsHeaders = {
-    "Access-Control-Allow-Origin": Deno.env.get("APP_URL") || "*",
+    "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 // supabase/functions/_shared/rate_limit.ts
 // Per-IP rate limiting with sliding windows for multiple time horizons.
-// Protects: search (30/min, 100/hour), enrich (10/min, 30/hour), evaluate (20/min, 60/hour)
+// Protects: signup (5/min, 20/hour), login (10/min, 50/hour),
+//           search (30/min, 100/hour), enrich (10/min, 30/hour), evaluate (20/min, 60/hour)
 
-type Action = 'search' | 'enrich' | 'evaluate' | 'general';
+type Action = 'signup' | 'login' | 'search' | 'enrich' | 'evaluate' | 'general';
 
 const LIMITS: Record<Action, { perMin: number; perHour: number }> = {
-    search: { perMin: 30, perHour: 100 },
-    enrich: { perMin: 10, perHour: 30 },
-    evaluate: { perMin: 20, perHour: 60 },
-    general: { perMin: 60, perHour: 300 },
+    signup:   { perMin: 5,  perHour: 20  },
+    login:    { perMin: 10, perHour: 50  },
+    search:   { perMin: 30, perHour: 100 },
+    enrich:   { perMin: 10, perHour: 30  },
+    evaluate: { perMin: 20, perHour: 60  },
+    general:  { perMin: 60, perHour: 300 },
 };
 
 export async function checkRateLimit(
