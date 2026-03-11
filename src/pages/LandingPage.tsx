@@ -228,7 +228,6 @@ const AtomOrbit = () => {
               background: `radial-gradient(circle, ${color}18 0%, rgba(4,4,8,0.9) 60%)`,
               border: `1px solid ${color}45`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              backdropFilter: 'blur(8px)',
               boxShadow: `0 0 12px ${color}22`,
               transform: `rotate(${-deg}deg)`,
             }}>{icon}</div>
@@ -345,8 +344,8 @@ const SectionSpotlight = ({
 
 /* --- Mock UIs ---------------------------------------------------------------- */
 const MockSearch = () => (
-  <div className="rounded-2xl border border-white/10 overflow-hidden bg-zinc-950/80 shadow-2xl backdrop-blur-sm select-none text-xs">
-    <div className="flex items-center gap-1.5 px-4 py-3 border-b border-white/[0.08] bg-black/40">
+  <div className="rounded-2xl border border-white/10 overflow-hidden bg-[#0d0d14] shadow-2xl select-none text-xs">
+    <div className="flex items-center gap-1.5 px-4 py-3 border-b border-white/[0.08] bg-black/25">
       <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
       <span className="ml-2 text-white/30">Creator Search</span>
     </div>
@@ -380,8 +379,8 @@ const MockSearch = () => (
 );
 
 const MockProfile = () => (
-  <div className="rounded-2xl border border-white/10 overflow-hidden bg-zinc-950/80 shadow-2xl backdrop-blur-sm select-none text-xs">
-    <div className="flex items-center gap-1.5 px-4 py-3 border-b border-white/[0.08] bg-black/40">
+  <div className="rounded-2xl border border-white/10 overflow-hidden bg-[#0d0d14] shadow-2xl select-none text-xs">
+    <div className="flex items-center gap-1.5 px-4 py-3 border-b border-white/[0.08] bg-black/25">
       <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
       <span className="ml-2 text-white/30">Creator Trust Score � Sana Malik</span>
     </div>
@@ -414,8 +413,8 @@ const MockProfile = () => (
 );
 
 const MockKanban = () => (
-  <div className="rounded-2xl border border-white/10 overflow-hidden bg-zinc-950/80 shadow-2xl backdrop-blur-sm select-none text-xs">
-    <div className="flex items-center gap-1.5 px-4 py-3 border-b border-white/[0.08] bg-black/40">
+  <div className="rounded-2xl border border-white/10 overflow-hidden bg-[#0d0d14] shadow-2xl select-none text-xs">
+    <div className="flex items-center gap-1.5 px-4 py-3 border-b border-white/[0.08] bg-black/25">
       <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
       <span className="ml-2 text-white/30">Campaign Kanban � Summer 2025</span>
     </div>
@@ -562,8 +561,8 @@ export default function LandingPage() {
 
       {/* -- NAV -- */}
       <nav aria-label="Main navigation" className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] transition-all duration-300">
-        <div role="menubar" className={`flex items-center gap-1.5 backdrop-blur-2xl border rounded-full px-2 py-1.5 transition-all duration-300 ${
-          navScrolled ? 'bg-black/90 border-white/15 shadow-[0_8px_48px_rgba(0,0,0,0.7)]' : 'bg-black/60 border-white/8 shadow-[0_4px_24px_rgba(0,0,0,0.3)]'
+        <div role="menubar" className={`flex items-center gap-1.5 border rounded-full transition-all duration-300 ${
+          navScrolled ? 'bg-[#0a0314]/95 border-white/15 shadow-[0_8px_48px_rgba(0,0,0,0.7)]' : 'bg-[#0a0314]/85 border-white/8 shadow-[0_4px_24px_rgba(0,0,0,0.3)]'
         }`} style={{ padding: '8px 12px', gap: '8px' }}>
           {navItems.map(item => {
             const active = activeNav === item.id;
@@ -882,7 +881,8 @@ export default function LandingPage() {
             </h2>
           </div>
           <motion.div initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="rounded-2xl border border-white/10 overflow-hidden">
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[520px]">
               <thead>
                 <tr className="border-b border-white/10 bg-white/[0.02]">
                   <th className="text-left py-4 px-5 text-zinc-500 font-semibold w-1/2">Capability</th>
@@ -911,6 +911,7 @@ export default function LandingPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </motion.div>
         </div>
       </SectionSpotlight>
