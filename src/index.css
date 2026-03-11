@@ -53,6 +53,10 @@
 }
 
 @layer utilities {
+  /* Hide scrollbar while keeping scroll functionality */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
   .aurora-text {
     background: linear-gradient(135deg, #A855F7 0%, #C084FC 50%, #7C3AED 100%);
     -webkit-background-clip: text;

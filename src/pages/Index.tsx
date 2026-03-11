@@ -104,7 +104,7 @@ export default function Index() {
 
       {/* Activity chart + Recent events */}
       <div className="grid lg:grid-cols-3 gap-4">
-        <div style={{ ...card, padding: "20px 22px", gridColumn: "span 2" }}>
+        <div style={{ ...card, padding: "20px 22px" }} className="lg:col-span-2">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
             <div><div style={{ fontSize: 13, fontWeight: 600, color: S.text }}>Platform Activity</div><div style={{ fontSize: 11, color: S.muted, marginTop: 2 }}>Credit events · last 30 days</div></div>
             <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 22, fontWeight: 800, color: S.purple }}>{totalEvents}</div>
@@ -145,19 +145,23 @@ export default function Index() {
             <span style={{ fontSize:13, fontWeight:600, color:S.text }}>Active Campaigns</span>
             <Link to="/campaigns"><button style={{ padding:"6px 14px", background:S.purple, border:"none", borderRadius:8, color:"#fff", fontSize:11, fontWeight:700, cursor:"pointer" }}>+ New Campaign</button></Link>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 80px 80px 90px", padding: "8px 20px", fontSize:9, fontWeight:700, color:S.muted, textTransform:"uppercase", letterSpacing:"0.08em", borderBottom:`1px solid ${S.border}` }}>
-            <span>Campaign</span><span>Status</span><span>Creators</span><span>Budget</span>
-          </div>
-          {campaigns.map((c,i) => (
-            <Link to={`/campaigns/${c.id}`} key={c.id}>
-              <div style={{ display: "grid", gridTemplateColumns: "2fr 80px 80px 90px", padding: "11px 20px", alignItems:"center", borderBottom: i < campaigns.length-1 ? `1px solid ${S.border}` : "none", fontSize:13, cursor:"pointer" }}>
-                <span style={{ color:S.text, fontWeight:500 }}>{c.name}</span>
-                <span><span style={{ padding:"2px 8px", borderRadius:6, fontSize:9, fontWeight:700, background: sBg[c.status as keyof typeof sBg] || S.surface, color: sClr[c.status as keyof typeof sClr] || S.muted }}>{c.status}</span></span>
-                <span style={{ color:S.muted }}>{c.pipeline_cards?.[0]?.count ?? 0}</span>
-                <span style={{ color: S.muted }}>${((c.budget || 0) / 1000).toFixed(1)}K</span>
+          <div className="overflow-x-auto">
+            <div style={{ minWidth: 340 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 80px 80px 90px", padding: "8px 20px", fontSize:9, fontWeight:700, color:S.muted, textTransform:"uppercase", letterSpacing:"0.08em", borderBottom:`1px solid ${S.border}` }}>
+                <span>Campaign</span><span>Status</span><span>Creators</span><span>Budget</span>
               </div>
-            </Link>
-          ))}
+              {campaigns.map((c,i) => (
+                <Link to={`/campaigns/${c.id}`} key={c.id}>
+                  <div style={{ display: "grid", gridTemplateColumns: "2fr 80px 80px 90px", padding: "11px 20px", alignItems:"center", borderBottom: i < campaigns.length-1 ? `1px solid ${S.border}` : "none", fontSize:13, cursor:"pointer" }}>
+                    <span style={{ color:S.text, fontWeight:500 }}>{c.name}</span>
+                    <span><span style={{ padding:"2px 8px", borderRadius:6, fontSize:9, fontWeight:700, background: sBg[c.status as keyof typeof sBg] || S.surface, color: sClr[c.status as keyof typeof sClr] || S.muted }}>{c.status}</span></span>
+                    <span style={{ color:S.muted }}>{c.pipeline_cards?.[0]?.count ?? 0}</span>
+                    <span style={{ color: S.muted }}>${((c.budget || 0) / 1000).toFixed(1)}K</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>

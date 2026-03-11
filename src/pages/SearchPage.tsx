@@ -3,12 +3,12 @@ import { motion } from "framer-motion";
 import {
   Search as SearchIcon, Filter, ExternalLink, Loader2, Bookmark,
   AlertCircle, Lock, Sparkles, Plus, MoreHorizontal, MapPin, Instagram, Youtube, ShieldCheck,
+  X as XIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
@@ -18,6 +18,9 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter,
+} from "@/components/ui/sheet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -60,6 +63,179 @@ const FOLLOWER_RANGES = [
 
 // Maximum number of niches a user can select simultaneously
 const MAX_NICHES = 3;
+
+// ─── FilterPanel — shared between desktop sidebar and mobile Sheet ────────────
+interface FilterPanelProps {
+  selectedPlatforms: string[];
+  togglePlatform: (p: string) => void;
+  selectedCity: string;
+  setSelectedCity: (v: string) => void;
+  selectedNiches: string[];
+  toggleNiche: (n: string) => void;
+  followerRange: string;
+  setFollowerRange: (v: string) => void;
+  tagFilter: string;
+  setTagFilter: (v: string) => void;
+  engagementRange: string;
+  setEngagementRange: (v: string) => void;
+  contentLanguage: string;
+  setContentLanguage: (v: string) => void;
+}
+
+function FilterPanel({
+  selectedPlatforms, togglePlatform,
+  selectedCity, setSelectedCity,
+  selectedNiches, toggleNiche,
+  followerRange, setFollowerRange,
+  tagFilter, setTagFilter,
+  engagementRange, setEngagementRange,
+  contentLanguage, setContentLanguage,
+}: FilterPanelProps) {
+  return (
+    <div className="bg-background/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-5 space-y-5">
+      <div className="flex items-center gap-2">
+        <Filter size={15} strokeWidth={1.5} className="text-primary" />
+        <h3 className="text-sm font-semibold text-foreground">Filters</h3>
+      </div>
+
+      {/* Platform — chips */}
+      <div>
+        <p className="text-xs font-medium text-foreground mb-2">Platform</p>
+        <div className="flex flex-wrap gap-2">
+          {PLATFORMS.map((p) => {
+            const active = selectedPlatforms.includes(p);
+            return (
+              <button
+                key={p}
+                data-testid={`platform-${p.toLowerCase()}`}
+                onClick={() => togglePlatform(p)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors touch-manipulation ${
+                  active
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                }`}
+              >
+                <PlatformIcon platform={p} /> {p}
+              </button>
+            );
+          })}
+        </div>
+        {selectedPlatforms.length === 0 && (
+          <p className="text-[10px] text-amber-500/80 mt-1.5">⚠️ Select a platform to search</p>
+        )}
+      </div>
+
+      {/* Location */}
+      <div>
+        <p className="text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
+          <MapPin className="h-3 w-3 text-primary" /> Location
+        </p>
+        <select
+          value={selectedCity}
+          onChange={(e) => setSelectedCity(e.target.value)}
+          className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          {PK_CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
+
+      {/* Niche */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-medium text-foreground">Niche</p>
+          {selectedNiches.length > 0 && (
+            <span
+              data-testid="niche-counter"
+              className={`text-xs font-medium ${selectedNiches.length >= MAX_NICHES ? "text-amber-500" : "text-muted-foreground"}`}
+            >
+              {selectedNiches.length}/{MAX_NICHES}{selectedNiches.length >= MAX_NICHES && " — limit reached"}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {PK_NICHES.map((n) => {
+            const isActive = selectedNiches.includes(n);
+            const isDisabled = !isActive && selectedNiches.length >= MAX_NICHES;
+            return (
+              <button
+                key={n}
+                data-testid={`niche-btn-${n.toLowerCase()}`}
+                data-active={isActive}
+                disabled={isDisabled}
+                onClick={() => toggleNiche(n)}
+                title={isDisabled ? "Max 3 niches — deselect one first" : undefined}
+                className={`px-2 py-1 text-xs rounded-full border transition-colors touch-manipulation ${
+                  isActive
+                    ? "border-primary text-primary bg-primary/5"
+                    : isDisabled
+                      ? "border-border text-muted-foreground/40 cursor-not-allowed opacity-40"
+                      : "border-border text-muted-foreground hover:border-primary hover:text-primary"
+                }`}
+              >
+                {n}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Follower range */}
+      <div>
+        <p className="text-xs font-medium text-foreground mb-2">Follower Range</p>
+        <select
+          value={followerRange}
+          onChange={(e) => setFollowerRange(e.target.value)}
+          className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          {FOLLOWER_RANGES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+        </select>
+      </div>
+
+      {/* Tag filter */}
+      <div>
+        <p className="text-xs font-medium text-foreground mb-2">Tag Filter</p>
+        <input
+          type="text"
+          value={tagFilter}
+          onChange={(e) => setTagFilter(e.target.value)}
+          placeholder="#tech, #beauty..."
+          className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+      </div>
+
+      {/* Engagement rate */}
+      <div>
+        <p className="text-xs font-medium text-foreground mb-2">Engagement Rate</p>
+        <select
+          value={engagementRange}
+          onChange={(e) => setEngagementRange(e.target.value)}
+          className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          <option value="any">Any rate</option>
+          <option value="0-2">Low (0–2%)</option>
+          <option value="2-5">Good (2–5%)</option>
+          <option value="5-10">High (5–10%)</option>
+          <option value="10+">Viral (10%+)</option>
+        </select>
+      </div>
+
+      {/* Content language */}
+      <div>
+        <p className="text-xs font-medium text-foreground mb-2">Content Language</p>
+        <select
+          value={contentLanguage}
+          onChange={(e) => setContentLanguage(e.target.value)}
+          className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          <option value="any">Any language</option>
+          <option value="urdu">Urdu / Roman Urdu</option>
+          <option value="english">English</option>
+          <option value="bilingual">Bilingual</option>
+        </select>
+      </div>
+    </div>
+  );
+}
 
 // ─── Cache key for back-navigation result restoration ───────────────────────
 function buildCacheKey(q: string, platform: string | string[], city: string, range: string) {
@@ -146,6 +322,8 @@ export default function SearchPage() {
   const [searched, setSearched] = useState(false);
   const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null);
   const [tagFilter, setTagFilter] = useState("");
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(12);
 
   const { data: workspaceCredits } = useWorkspaceCredits();
   const { evaluate: evaluateInfluencer, loading: evalLoading } = useInfluencerEvaluation();
@@ -228,6 +406,7 @@ export default function SearchPage() {
 
     setLoading(true);
     setSearched(true);
+    setVisibleCount(12);
     syncParams();
 
     const platforms = selectedPlatforms.length > 0
@@ -400,154 +579,66 @@ export default function SearchPage() {
       )}
 
       <div className="flex gap-6">
-        {/* ── Sidebar Filters ───────────────────────────────────── */}
+        {/* ── Sidebar Filters (desktop: lg+) ──────────────────── */}
         <aside className="w-64 flex-shrink-0 hidden lg:block space-y-4">
-          <div className="bg-background/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-5 space-y-5">
-            <div className="flex items-center gap-2">
-              <Filter size={15} strokeWidth={1.5} className="text-primary" />
-              <h3 className="text-sm font-semibold text-foreground">Filters</h3>
-            </div>
-
-            {/* Platform — Instagram / TikTok / YouTube / Twitch */}
-            <div>
-              <p className="text-xs font-medium text-foreground mb-2">Platform</p>
-              <div className="space-y-1.5">
-                {PLATFORMS.map((p) => (
-                  <label key={p} className="flex items-center gap-2.5 text-sm text-muted-foreground hover:text-foreground cursor-pointer">
-                    <Checkbox data-testid={`platform-${p.toLowerCase()}`} checked={selectedPlatforms.includes(p)} onCheckedChange={() => togglePlatform(p)} className="rounded border-border" />
-                    <PlatformIcon platform={p} />
-                    {p}
-                  </label>
-                ))}
-              </div>
-              {selectedPlatforms.length === 0 && (
-                <p className="text-[10px] text-amber-500/80 mt-1.5">
-                  ⚠️ Select a platform to search
-                </p>
-              )}
-            </div>
-
-            {/* Location — Pakistan cities */}
-            <div>
-              <p className="text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
-                <MapPin className="h-3 w-3 text-primary" /> Location
-              </p>
-              <select
-                value={selectedCity}
-                onChange={(e) => setSelectedCity(e.target.value)}
-                className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                {PK_CITIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Niche */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-medium text-foreground">Niche</p>
-                {selectedNiches.length > 0 && (
-                  <span
-                    data-testid="niche-counter"
-                    className={`text-xs font-medium ${selectedNiches.length >= MAX_NICHES ? "text-amber-500" : "text-muted-foreground"}`}
-                  >
-                    {selectedNiches.length}/{MAX_NICHES}
-                    {selectedNiches.length >= MAX_NICHES && " — limit reached"}
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {PK_NICHES.map((n) => {
-                  const isActive = selectedNiches.includes(n);
-                  const isDisabled = !isActive && selectedNiches.length >= MAX_NICHES;
-                  return (
-                    <button
-                      key={n}
-                      data-testid={`niche-btn-${n.toLowerCase()}`}
-                      data-active={isActive}
-                      disabled={isDisabled}
-                      onClick={() => toggleNiche(n)}
-                      title={isDisabled ? "Max 3 niches — deselect one first" : undefined}
-                      className={`px-2 py-1 text-xs rounded-full border transition-colors
-                        ${isActive
-                          ? "border-primary text-primary bg-primary/5"
-                          : isDisabled
-                            ? "border-border text-muted-foreground/40 cursor-not-allowed opacity-40"
-                            : "border-border text-muted-foreground hover:border-primary hover:text-primary"
-                        }`}
-                    >
-                      {n}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Follower range */}
-            <div>
-              <p className="text-xs font-medium text-foreground mb-2">Follower Range</p>
-              <select
-                value={followerRange}
-                onChange={(e) => setFollowerRange(e.target.value)}
-                className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                {FOLLOWER_RANGES.map((r) => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Tag filter */}
-            <div>
-              <p className="text-xs font-medium text-foreground mb-2">Tag Filter</p>
-              <input
-                type="text"
-                value={tagFilter}
-                onChange={(e) => setTagFilter(e.target.value)}
-                placeholder="#tech, #beauty..."
-                className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-
-            {/* Engagement rate */}
-            <div>
-              <p className="text-xs font-medium text-foreground mb-2">Engagement Rate</p>
-              <select
-                value={engagementRange}
-                onChange={(e) => setEngagementRange(e.target.value)}
-                className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="any">Any rate</option>
-                <option value="0-2">Low (0–2%)</option>
-                <option value="2-5">Good (2–5%)</option>
-                <option value="5-10">High (5–10%)</option>
-                <option value="10+">Viral (10%+)</option>
-              </select>
-            </div>
-
-            {/* Content language */}
-            <div>
-              <p className="text-xs font-medium text-foreground mb-2">Content Language</p>
-              <select
-                value={contentLanguage}
-                onChange={(e) => setContentLanguage(e.target.value)}
-                className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="any">Any language</option>
-                <option value="urdu">Urdu / Roman Urdu</option>
-                <option value="english">English</option>
-                <option value="bilingual">Bilingual</option>
-              </select>
-            </div>
-          </div>
+          <FilterPanel
+            selectedPlatforms={selectedPlatforms}
+            togglePlatform={togglePlatform}
+            selectedCity={selectedCity}
+            setSelectedCity={setSelectedCity}
+            selectedNiches={selectedNiches}
+            toggleNiche={toggleNiche}
+            followerRange={followerRange}
+            setFollowerRange={setFollowerRange}
+            tagFilter={tagFilter}
+            setTagFilter={setTagFilter}
+            engagementRange={engagementRange}
+            setEngagementRange={setEngagementRange}
+            contentLanguage={contentLanguage}
+            setContentLanguage={setContentLanguage}
+          />
         </aside>
 
+        {/* ── Mobile Filter Sheet ───────────────────────────────── */}
+        <Sheet open={showMobileFilters} onOpenChange={setShowMobileFilters}>
+          <SheetContent side="bottom" className="h-[88dvh] rounded-t-2xl overflow-y-auto px-4 py-5 lg:hidden">
+            <SheetHeader className="mb-4">
+              <SheetTitle className="text-base flex items-center gap-2">
+                <Filter size={15} className="text-primary" /> Filters
+              </SheetTitle>
+            </SheetHeader>
+            <FilterPanel
+              selectedPlatforms={selectedPlatforms}
+              togglePlatform={togglePlatform}
+              selectedCity={selectedCity}
+              setSelectedCity={setSelectedCity}
+              selectedNiches={selectedNiches}
+              toggleNiche={toggleNiche}
+              followerRange={followerRange}
+              setFollowerRange={setFollowerRange}
+              tagFilter={tagFilter}
+              setTagFilter={setTagFilter}
+              engagementRange={engagementRange}
+              setEngagementRange={setEngagementRange}
+              contentLanguage={contentLanguage}
+              setContentLanguage={setContentLanguage}
+            />
+            <SheetFooter className="mt-6 gap-2 flex-col">
+              <Button className="w-full btn-shine" onClick={() => { setShowMobileFilters(false); handleSearch(); }}>
+                <SearchIcon className="h-4 w-4 mr-2" /> Apply &amp; Search
+              </Button>
+              <Button variant="outline" className="w-full" onClick={() => setShowMobileFilters(false)}>
+                Close
+              </Button>
+            </SheetFooter>
+          </SheetContent>
+        </Sheet>
+
         {/* ── Main Content ─────────────────────────────────────── */}
-        <div className="flex-1 space-y-4">
+        <div className="flex-1 space-y-4 min-w-0">
           {/* Search bar row */}
-          <div className="flex items-center gap-3 mb-2">
-            <div className="relative flex-1">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 min-w-0">
               {isAiSearch
                 ? <Sparkles size={16} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary" />
                 : <SearchIcon size={16} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -556,17 +647,33 @@ export default function SearchPage() {
                 data-testid="search-input"
                 type="text"
                 placeholder={isAiSearch
-                  ? "Describe the ideal Pakistani creator (e.g., Urdu food blogger from Lahore)..."
-                  : "Search by name, handle, or niche (e.g. Karachi fashion)..."}
+                  ? "Describe the ideal Pakistani creator..."
+                  : "Search by name, handle, or niche..."}
                 className={`w-full h-10 pl-9 pr-4 rounded-lg border bg-background/80 backdrop-blur-md text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring ${isAiSearch ? "border-primary/50 placeholder:text-primary/50" : "border-border placeholder:text-muted-foreground"}`}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               />
             </div>
+            {/* Mobile filters button */}
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 shrink-0 lg:hidden relative"
+              onClick={() => setShowMobileFilters(true)}
+              aria-label="Open filters"
+            >
+              <Filter size={16} strokeWidth={1.5} />
+              {(selectedPlatforms.length > 0 || selectedNiches.length > 0 || selectedCity !== "All Pakistan" || followerRange !== "any") && (
+                <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-primary text-[9px] text-white flex items-center justify-center font-bold leading-none">
+                  {selectedPlatforms.length + selectedNiches.length + (selectedCity !== "All Pakistan" ? 1 : 0) + (followerRange !== "any" ? 1 : 0)}
+                </span>
+              )}
+            </Button>
+            {/* AI Mode toggle (desktop) */}
             <div
               title="AI Mode — Coming Soon"
-              className="relative flex items-center space-x-2 bg-card/50 border border-white/20 px-3 h-10 rounded-lg shrink-0 opacity-50 cursor-not-allowed select-none"
+              className="hidden sm:flex relative items-center space-x-2 bg-card/50 border border-white/20 px-3 h-10 rounded-lg shrink-0 opacity-50 cursor-not-allowed select-none"
             >
               <Switch
                 id="ai-mode"
@@ -576,7 +683,7 @@ export default function SearchPage() {
                 className="pointer-events-none"
               />
               <Label htmlFor="ai-mode" className="text-xs font-medium flex items-center gap-1 pointer-events-none">
-                <Sparkles className="h-3 w-3" /> AI Mode
+                <Sparkles className="h-3 w-3" /> AI
               </Label>
               <span className="absolute -top-2 -right-2 text-[9px] font-bold bg-amber-500 text-white rounded-full px-1.5 py-0.5 leading-none tracking-wide pointer-events-none">
                 SOON
@@ -589,9 +696,52 @@ export default function SearchPage() {
               onClick={handleSearch}
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SearchIcon className="h-4 w-4" />}
-              Search
+              <span className="hidden sm:inline">Search</span>
             </Button>
           </div>
+
+          {/* Mobile platform chips strip */}
+          <div className="flex gap-2 overflow-x-auto pb-1 lg:hidden no-scrollbar -mx-1 px-1">
+            {PLATFORMS.map((p) => (
+              <button
+                key={p}
+                data-testid={`platform-chip-${p.toLowerCase()}`}
+                onClick={() => togglePlatform(p)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap flex-shrink-0 transition-colors touch-manipulation ${
+                  selectedPlatforms.includes(p)
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-background text-muted-foreground"
+                }`}
+              >
+                <PlatformIcon platform={p} />
+                {p}
+              </button>
+            ))}
+          </div>
+
+          {/* Active filter badges row (mobile) */}
+          {(selectedNiches.length > 0 || selectedCity !== "All Pakistan" || tagFilter.trim()) && (
+            <div className="flex flex-wrap gap-2 lg:hidden">
+              {selectedNiches.map(n => (
+                <button key={n} onClick={() => toggleNiche(n)}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-primary/10 text-primary border border-primary/20">
+                  {n} <XIcon size={10} />
+                </button>
+              ))}
+              {selectedCity !== "All Pakistan" && (
+                <button onClick={() => setSelectedCity("All Pakistan")}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-muted text-muted-foreground border border-border">
+                  <MapPin size={10} /> {selectedCity} <XIcon size={10} />
+                </button>
+              )}
+              {tagFilter.trim() && (
+                <button onClick={() => setTagFilter("")}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-muted text-muted-foreground border border-border">
+                  #{tagFilter} <XIcon size={10} />
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Results meta row */}
           <div className="flex items-center justify-between min-h-[28px]">
@@ -623,7 +773,7 @@ export default function SearchPage() {
 
           {/* Loading skeletons */}
           {loading && (
-            <div data-testid="loading-state" className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div data-testid="loading-state" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-5 space-y-4">
                   <div className="flex items-start gap-3">
@@ -637,39 +787,58 @@ export default function SearchPage() {
           )}
 
           {/* Results */}
-          {!loading && searched && results.length > 0 && (
-            <div data-testid="results-grid" className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-              {(() => {
-                let filtered = selectedNiches.length > 0
-                  ? results.filter((r) => r.niche && selectedNiches.includes(r.niche))
-                  : results;
-                if (tagFilter.trim()) {
-                  const tf = tagFilter.toLowerCase().replace(/^#/, "");
-                  filtered = filtered.filter(r => r.tags?.some(t => t.includes(tf)));
-                }
-                return filtered;
-              })().map((c, i) => (
-                <ResultCard
-                  key={`${c.platform}-${c.username}-${i}`}
-                  c={c}
-                  isFreePlan={isFreePlan}
-                  lists={lists}
-                  cachedScores={cachedScores}
-                  evaluatingUsername={evaluatingUsername}
-                  evalLoading={evalLoading}
-                  canUseAI={canUseAI}
-                  selectedNiches={selectedNiches}
-                  navigate={navigate}
-                  evaluateInfluencer={evaluateInfluencer}
-                  setEvaluatingUsername={setEvaluatingUsername}
-                  setCachedScores={setCachedScores}
-                  handleAddToList={handleAddToList}
-                  setPendingAddResult={setPendingAddResult}
-                  setShowCreateList={setShowCreateList}
-                />
-              ))}
-            </div>
-          )}
+          {!loading && searched && results.length > 0 && (() => {
+            let filtered = selectedNiches.length > 0
+              ? results.filter((r) => r.niche && selectedNiches.includes(r.niche))
+              : results;
+            if (tagFilter.trim()) {
+              const tf = tagFilter.toLowerCase().replace(/^#/, "");
+              filtered = filtered.filter(r => r.tags?.some(t => t.includes(tf)));
+            }
+            const visible = filtered.slice(0, visibleCount);
+            const hasMore = filtered.length > visibleCount;
+            return (
+              <>
+                <div data-testid="results-grid" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {visible.map((c, i) => (
+                    <ResultCard
+                      key={`${c.platform}-${c.username}-${i}`}
+                      c={c}
+                      isFreePlan={isFreePlan}
+                      lists={lists}
+                      cachedScores={cachedScores}
+                      evaluatingUsername={evaluatingUsername}
+                      evalLoading={evalLoading}
+                      canUseAI={canUseAI}
+                      selectedNiches={selectedNiches}
+                      navigate={navigate}
+                      evaluateInfluencer={evaluateInfluencer}
+                      setEvaluatingUsername={setEvaluatingUsername}
+                      setCachedScores={setCachedScores}
+                      handleAddToList={handleAddToList}
+                      setPendingAddResult={setPendingAddResult}
+                      setShowCreateList={setShowCreateList}
+                    />
+                  ))}
+                </div>
+                {hasMore && (
+                  <div className="flex justify-center pt-2">
+                    <Button
+                      variant="outline"
+                      className="gap-2 rounded-xl px-6"
+                      onClick={() => setVisibleCount(v => v + 12)}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Load more ({filtered.length - visibleCount} remaining)
+                    </Button>
+                  </div>
+                )}
+                {!hasMore && filtered.length > 12 && (
+                  <p className="text-center text-xs text-muted-foreground pt-2">All {filtered.length} results shown</p>
+                )}
+              </>
+            );
+          })()}
 
           {/* Initial / empty state */}
           {!loading && !searched && (
@@ -1077,6 +1246,16 @@ function ResultCard({ c, isFreePlan, lists, cachedScores, evaluatingUsername, ev
           )}
         </div>
       </div>
+
+      {/* View Profile CTA */}
+      <Button
+        size="sm"
+        variant="outline"
+        className="w-full mt-4 rounded-xl text-xs gap-1.5 border-border hover:border-primary/50 hover:text-primary"
+        onClick={() => navigate(`/influencer/${c.platform.toLowerCase()}/${c.username.replace("@", "")}`, { state: { from: window.location.search } })}
+      >
+        <ExternalLink className="h-3 w-3" /> View Profile
+      </Button>
     </div>
   );
 }

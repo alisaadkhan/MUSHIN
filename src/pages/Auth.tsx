@@ -1,7 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
+
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "";
 import { AuroraBackground } from "@/components/layout/AuroraBackground";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -33,6 +36,9 @@ export default function Auth() {
   const [submitting, setSubmitting] = useState(false);
   const [mfaCode, setMfaCode] = useState("");
   const [mfaFactorId, setMfaFactorId] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
+  const turnstileSignIn = useRef<TurnstileInstance>(null);
+  const turnstileSignUp = useRef<TurnstileInstance>(null);
 
   // Check if Google OAuth was blocked (consumer domain) after redirect
   useEffect(() => {
@@ -55,8 +61,14 @@ export default function Auth() {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (TURNSTILE_SITE_KEY && !captchaToken) {
+      toast({ title: "Please complete the CAPTCHA", variant: "destructive" });
+      return;
+    }
     setSubmitting(true);
-    const { error } = await signIn(email, password);
+    const { error } = await signIn(email, password, captchaToken || undefined);
+    turnstileSignIn.current?.reset();
+    setCaptchaToken("");
     if (error) {
       setSubmitting(false);
       if (error.message.toLowerCase().includes("email not confirmed")) {
@@ -97,8 +109,14 @@ export default function Auth() {
       });
       return;
     }
+    if (TURNSTILE_SITE_KEY && !captchaToken) {
+      toast({ title: "Please complete the CAPTCHA", variant: "destructive" });
+      return;
+    }
     setSubmitting(true);
-    const { error } = await signUp(email, password);
+    const { error } = await signUp(email, password, captchaToken || undefined);
+    turnstileSignUp.current?.reset();
+    setCaptchaToken("");
     setSubmitting(false);
     if (error) {
       toast({ title: "Sign up failed", description: error.message, variant: "destructive" });
@@ -290,7 +308,16 @@ export default function Auth() {
                 Forgot password?
               </button>
 
-              <Button type="submit" className="w-full btn-primary-alive" disabled={submitting}>
+              {TURNSTILE_SITE_KEY && (
+                <Turnstile
+                  ref={turnstileSignIn}
+                  siteKey={TURNSTILE_SITE_KEY}
+                  onSuccess={setCaptchaToken}
+                  onExpire={() => setCaptchaToken("")}
+                  options={{ theme: "dark", size: "normal" }}
+                />
+              )}
+              <Button type="submit" className="w-full btn-primary-alive" disabled={submitting || (!!TURNSTILE_SITE_KEY && !captchaToken)}>
                 {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                 Sign In →
               </Button>
@@ -340,7 +367,16 @@ export default function Auth() {
                   <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" className="mt-1" required />
                 </div>
               </div>
-              <Button type="submit" className="w-full btn-primary-alive" disabled={submitting}>
+              {TURNSTILE_SITE_KEY && (
+                <Turnstile
+                  ref={turnstileSignUp}
+                  siteKey={TURNSTILE_SITE_KEY}
+                  onSuccess={setCaptchaToken}
+                  onExpire={() => setCaptchaToken("")}
+                  options={{ theme: "dark", size: "normal" }}
+                />
+              )}
+              <Button type="submit" className="w-full btn-primary-alive" disabled={submitting || (!!TURNSTILE_SITE_KEY && !captchaToken)}>
                 {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                 Create Account →
               </Button>

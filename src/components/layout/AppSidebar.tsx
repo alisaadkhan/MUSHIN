@@ -44,9 +44,10 @@ const navGroups = [
 
 interface AppSidebarProps {
   isOpen?: boolean;
+  onClose?: () => void;
 }
 
-export function AppSidebar({ isOpen = true }: AppSidebarProps) {
+export function AppSidebar({ isOpen = true, onClose }: AppSidebarProps) {
   const location = useLocation();
   const { data: credits } = useWorkspaceCredits();
   const { planConfig, plan } = useSubscription();
@@ -59,8 +60,8 @@ export function AppSidebar({ isOpen = true }: AppSidebarProps) {
   return (
     <aside
       className={`${
-        isOpen ? "w-60" : "w-0 overflow-hidden"
-      } border-r border-border bg-[#070707] flex-shrink-0 transition-all duration-200 flex flex-col z-40 fixed left-0 top-0 h-screen sm:relative`}
+        isOpen ? "w-64 lg:w-60" : "w-0 overflow-hidden lg:w-0"
+      } border-r border-border bg-[#070707] flex-shrink-0 transition-all duration-200 flex flex-col z-40 fixed left-0 top-0 h-screen lg:relative`}
     >
       {/* Brand */}
       <div className="flex h-14 items-center gap-2.5 px-4 border-b border-border">
@@ -79,6 +80,7 @@ export function AppSidebar({ isOpen = true }: AppSidebarProps) {
               <li>
                 <Link
                   to="/admin"
+                  onClick={onClose}
                   className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
                     location.pathname.startsWith("/admin")
                       ? "bg-primary/10 text-primary font-semibold border border-primary/20 border border-primary/20"
@@ -107,6 +109,7 @@ export function AppSidebar({ isOpen = true }: AppSidebarProps) {
                   <li key={item.path}>
                     <Link
                       to={item.path}
+                      onClick={onClose}
                       className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
                         active
                           ? "bg-primary/10 text-primary font-semibold border border-primary/20"
