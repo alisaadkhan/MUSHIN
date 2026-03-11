@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
 
     // ── Persist to cache ──────────────────────────────────────────────────────
     const targetWorkspace = workspace_id ?? user.id;
-    await supabase
+    const { error: persistErr } = await supabase
       .from("influencer_evaluations")
       .upsert(
         {
@@ -212,8 +212,8 @@ Deno.serve(async (req) => {
           python_analytics_at: new Date().toISOString(),
         },
         { onConflict: "platform,username,workspace_id", ignoreDuplicates: false }
-      )
-      .catch((e) => console.warn("[ai-analytics] cache persist failed:", e));
+      );
+    if (persistErr) console.warn("[ai-analytics] cache persist failed:", persistErr);
 
     return new Response(
       JSON.stringify({ ...analyticsResult, cached: false }),

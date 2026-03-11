@@ -394,8 +394,9 @@ export default function InfluencerProfilePage() {
         avg_comments: profile?.metrics?.avg_comments ?? null,
         avg_views: profile?.metrics?.avg_views ?? null,
       };
+      const { data: wsData } = await supabase.from("workspace_members").select("workspace_id").limit(1).maybeSingle();
       const { data, error } = await supabase.functions.invoke("ai-analytics", {
-        body: { platform, username, metrics },
+        body: { platform, username, metrics, workspace_id: wsData?.workspace_id },
       });
       if (error) throw error;
       setAnalyticsData(data as PythonAnalyticsData);

@@ -125,9 +125,8 @@ Deno.serve(async (req) => {
     if (!resendRes.ok) {
       console.error("Resend API error:", resendData);
       // Restore the credit since email failed to send
-      await adminClient.rpc("restore_email_credit", { ws_id: membership.workspace_id }).catch((e: Error) =>
-        console.error("[send-outreach-email] Credit restore failed:", e.message)
-      );
+      const { error: restoreEmailErr } = await adminClient.rpc("restore_email_credit", { ws_id: membership.workspace_id });
+      if (restoreEmailErr) console.error("[send-outreach-email] Credit restore failed:", restoreEmailErr.message);
       return new Response(
         JSON.stringify({ error: "Failed to send email", details: resendData }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }

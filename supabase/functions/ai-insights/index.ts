@@ -155,7 +155,8 @@ Deno.serve(async (req) => {
     } catch (aiErr: any) {
       console.error("[ai-insights] AI call failed:", aiErr.message);
       // Restore credit on AI failure
-      await adminClient.rpc("restore_ai_credit", { ws_id: membership.workspace_id }).catch(console.error);
+      const { error: restoreErr } = await adminClient.rpc("restore_ai_credit", { ws_id: membership.workspace_id });
+      if (restoreErr) console.error("[ai-insights] Credit restore failed:", restoreErr);
       const isRateLimit = aiErr.message?.includes("429");
       return new Response(JSON.stringify({
         error: isRateLimit
