@@ -1,7 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// SECURITY: Restrict CORS to the application domain — never use wildcard on
+// privileged endpoints even if other guards (service role key check) exist.
 const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": Deno.env.get("APP_URL") || "https://mushin.app",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -53,9 +55,18 @@ Deno.serve(async (req) => {
 
         // ── Step 2: Create Ali Saad (super_admin, business plan) ─────────────────
         log.push("Creating Ali Saad...");
+        // SECURITY: Seed account credentials are read from env vars — never hardcoded.
+        // Set SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD in Supabase secrets for local/dev only.
+        const seedAdminEmail    = Deno.env.get("SEED_ADMIN_EMAIL");
+        const seedAdminPassword = Deno.env.get("SEED_ADMIN_PASSWORD");
+        if (!seedAdminEmail || !seedAdminPassword) {
+            return new Response(JSON.stringify({ error: "SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD must be set as Supabase secrets" }), {
+                status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+        }
         const { data: aliData, error: aliErr } = await adminClient.auth.admin.createUser({
-            email: "alisaad75878@gmail.com",
-            password: "Test123!",
+            email: seedAdminEmail,
+            password: seedAdminPassword,
             email_confirm: true,
             user_metadata: { full_name: "Ali Saad" },
         });
@@ -180,7 +191,7 @@ Deno.serve(async (req) => {
     } catch (err: any) {
         console.error("Seed error:", err);
         return new Response(
-            JSON.stringify({ success: false, error: err.message, log }),
+            JSON.stringify({ success: false, error: "Seed operation failed", log }),
             {
                 status: 500,
                 headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -176,10 +176,10 @@ Deno.serve(async (req) => {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("ai-insights error:", error);
-    const msg = error instanceof Error ? error.message : "Unknown error";
-    return new Response(JSON.stringify({ error: msg, code: "INTERNAL_ERROR", status: 500 }), {
-      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // HIGH-04: Never expose raw internal error details
+    console.error("ai-insights unhandled error:", error);
+    return new Response(JSON.stringify({ error: "Internal server error", code: "INTERNAL_ERROR" }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

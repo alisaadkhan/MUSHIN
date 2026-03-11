@@ -1,4 +1,4 @@
-﻿import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Redis } from "https://esm.sh/@upstash/redis";
 import { checkRateLimit, corsHeaders } from "../_shared/rate_limit.ts";
 import { inferNiche } from "../_shared/niche.ts";
@@ -595,11 +595,14 @@ Deno.serve(async (req) => {
     }
 
     // Content language filter ─ uses the query-language signal already attached to results.
-    // "urdu": keep results where language was detected as urdu/roman_urdu or snippet contains Urdu chars.
-    // "english": keep results where language was detected as english.
-    // "bilingual": keep results that have both Urdu and English signals (language = "mixed" or "bilingual").
-    // Non-enriched results (no language signal) are kept to avoid hiding too many results.
-    const contentLanguage = requestBody?.contentLanguage;
+    // MED-08: Validate contentLanguage against strict allowlist before use in any filter logic.
+    const ALLOWED_CONTENT_LANGUAGES = ["any", "urdu", "english", "bilingual"] as const;
+    type ContentLanguage = typeof ALLOWED_CONTENT_LANGUAGES[number];
+    const rawContentLanguage: unknown = requestBody?.contentLanguage;
+    const contentLanguage: ContentLanguage | null =
+      typeof rawContentLanguage === "string" && ALLOWED_CONTENT_LANGUAGES.includes(rawContentLanguage as ContentLanguage)
+        ? (rawContentLanguage as ContentLanguage)
+        : null;
     if (contentLanguage && contentLanguage !== "any") {
       const URDU_CHARS = /[\u0600-\u06FF]/;
       filteredResults = filteredResults.filter((r: any) => {

@@ -1,23 +1,23 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { safeErrorResponse } from "../_shared/errors.ts";
 
-const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// Internal cron worker — never called from browser. No CORS headers needed.
+const internalHeaders = { "Content-Type": "application/json" };
 
 // Called by pg_cron daily. Queues enrichment jobs for profiles stale > 30 days.
 // Only re-enriches the top 20 by follower count to control Apify costs.
 
 Deno.serve(async (req: Request) => {
-    if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-
+    // Internal cron worker — no CORS preflight handled
     const authHeader = req.headers.get("Authorization");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     if (!authHeader || authHeader !== `Bearer ${serviceKey}`) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
-            status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            status: 401, headers: internalHeaders
         });
     }
+
+    try {
 
     const serviceClient = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey, {
         auth: { autoRefreshToken: false, persistSession: false }
@@ -33,14 +33,14 @@ Deno.serve(async (req: Request) => {
         .limit(20);
 
     if (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
-            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        return new Response(JSON.stringify({ error: "Failed to query stale profiles" }), {
+            status: 500, headers: internalHeaders
         });
     }
 
     if (!staleProfiles || staleProfiles.length === 0) {
         return new Response(JSON.stringify({ message: "No stale profiles found", queued: 0 }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" }
+            headers: internalHeaders
         });
     }
 
@@ -72,6 +72,9 @@ Deno.serve(async (req: Request) => {
         found_stale: staleProfiles.length,
         queued,
     }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
+        headers: internalHeaders
     });
+    } catch (err: any) {
+        return safeErrorResponse(err, "[refresh-stale-profiles]", internalHeaders);
+    }
 });

@@ -70,15 +70,13 @@ export function IntegrationsTab() {
         _settings: newSettings,
       });
 
-      // Save HubSpot key to workspace_secrets if provided
+      // Save HubSpot key via secure RPC (encrypted server-side; key never stored in plaintext)
       if (hubspotKey.trim()) {
-        const { error: upsertError } = await supabase
-          .from("workspace_secrets" as any)
-          .upsert(
-            { workspace_id: workspace.workspace_id, hubspot_api_key: hubspotKey.trim() },
-            { onConflict: "workspace_id" }
-          );
-        if (upsertError) throw upsertError;
+        const { error: hubspotError } = await supabase.rpc("set_hubspot_key", {
+          p_workspace_id: workspace.workspace_id,
+          p_plaintext_key: hubspotKey.trim(),
+        });
+        if (hubspotError) throw hubspotError;
         setHubspotConfigured(true);
         setHubspotKey(""); // Clear from state after saving
       }

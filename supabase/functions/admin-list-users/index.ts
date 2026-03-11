@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { safeErrorResponse } from "../_shared/errors.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": Deno.env.get("APP_URL") || "https://mushin.app",
@@ -77,6 +78,6 @@ Deno.serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
     } catch (err: any) {
-        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return safeErrorResponse(err, "[admin-list-users]", corsHeaders);
     }
 });

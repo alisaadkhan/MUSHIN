@@ -1,0 +1,208 @@
+name: 🔐 Security CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run full security scan every Monday at 2am UTC
+    - cron: '0 2 * * 1'
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────────
+  # JOB 1: Secret Scanning — catches accidentally committed credentials
+  # ──────────────────────────────────────────────────────────────────────────
+  secret-scan:
+    name: 🔑 Secret Scanning (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history needed for git log scanning
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # optional for private repos
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # JOB 2: Dependency Vulnerability Scan
+  # ──────────────────────────────────────────────────────────────────────────
+  dependency-audit:
+    name: 📦 Dependency Audit (npm audit + Snyk)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: npm audit (high severity)
+        run: npm audit --audit-level=high
+        continue-on-error: false  # Block CI on high-severity CVEs
+
+      - name: Snyk vulnerability scan
+        uses: snyk/actions/node@master
+        continue-on-error: true  # Report but don't block on Snyk (paid plan needed for policy)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --sarif-file-output=snyk.sarif
+
+      - name: Upload Snyk results to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: snyk.sarif
+        continue-on-error: true
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # JOB 3: Static Analysis (SAST) — catches business logic + security bugs
+  # ──────────────────────────────────────────────────────────────────────────
+  sast:
+    name: 🔍 SAST (Semgrep)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Semgrep — OWASP Top 10
+        run: |
+          semgrep \
+            --config p/owasp-top-ten \
+            --config p/javascript \
+            --config p/typescript \
+            --config p/secrets \
+            --sarif \
+            --output semgrep.sarif \
+            --exclude node_modules \
+            --exclude dist \
+            --exclude .git
+        continue-on-error: true
+
+      - name: Upload Semgrep results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+        continue-on-error: true
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # JOB 4: Build Verification + Source Map Check
+  # ──────────────────────────────────────────────────────────────────────────
+  build-check:
+    name: 🏗️ Build Verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (production mode — no source maps)
+        run: npm run build
+        env:
+          NODE_ENV: production
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+
+      - name: ❌ Verify NO source maps in production dist
+        run: |
+          MAP_COUNT=$(find dist -name "*.map" | wc -l)
+          echo "Source map files found: $MAP_COUNT"
+          if [ "$MAP_COUNT" -gt "0" ]; then
+            echo "SECURITY FAILURE: Source maps found in production build!"
+            find dist -name "*.map"
+            exit 1
+          fi
+          echo "✅ No source maps in production build"
+
+      - name: ❌ Verify no secrets in built bundle
+        run: |
+          # Check dist for known sensitive patterns (add patterns as needed)
+          if grep -r "apify_api_" dist/ 2>/dev/null | grep -v ".map"; then
+            echo "SECURITY FAILURE: Apify key found in production bundle!"
+            exit 1
+          fi
+          if grep -r "hf_[A-Za-z]" dist/ 2>/dev/null | grep -v ".map"; then
+            echo "SECURITY FAILURE: HuggingFace key found in production bundle!"
+            exit 1
+          fi
+          echo "✅ No API keys detected in production bundle"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # JOB 5: Unit + Security Logic Tests
+  # ──────────────────────────────────────────────────────────────────────────
+  tests:
+    name: 🧪 Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # JOB 6: TypeScript Type Check (catches type-safety regressions)
+  # ──────────────────────────────────────────────────────────────────────────
+  typecheck:
+    name: 📝 TypeScript Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type check
+        run: npx tsc --noEmit
+
+# ──────────────────────────────────────────────────────────────────────────────
+# HOW TO SET UP REPOSITORY SECRETS
+# Go to: GitHub → Repository → Settings → Secrets and Variables → Actions
+#
+# Required secrets:
+#   VITE_SUPABASE_URL            → your Supabase project URL
+#   VITE_SUPABASE_PUBLISHABLE_KEY → your Supabase anon/public key
+#   SNYK_TOKEN                   → from snyk.io (optional, for paid features)
+#   GITLEAKS_LICENSE             → optional for private repos
+#
+# NEVER add SERPER_API_KEY, APIFY_API_KEY, HUGGINGFACE_API_KEY, or
+# SUPABASE_SERVICE_ROLE_KEY as GitHub Actions env vars — they should only
+# ever exist in Supabase Secrets (supabase secrets set KEY=value) and
+# Vercel Environment Variables.
+# ──────────────────────────────────────────────────────────────────────────────

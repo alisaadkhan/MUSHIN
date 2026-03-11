@@ -1,9 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, rgb } from "https://esm.sh/pdf-lib@1.17.1";
+import { safeErrorResponse } from "../_shared/errors.ts";
 
-
+const APP_URL = Deno.env.get("APP_URL") || "https://mushin.app";
 const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": APP_URL,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -12,25 +13,65 @@ Deno.serve(async (req) => {
 
     try {
         const authHeader = req.headers.get("Authorization");
-        if (!authHeader?.startsWith("Bearer ")) throw new Error("Unauthorized");
+        if (!authHeader?.startsWith("Bearer ")) {
+            return new Response(JSON.stringify({ error: "Unauthorized" }), {
+                status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
 
-        // We expect this to be called from the dashboard by the workspace or an admin
-        const supabase = createClient(
+        // Validate caller JWT — must be a real authenticated user.
+        // A bare service-role client used here previously allowed any bearer token
+        // through without verifying identity (auth bypass VULN fixed 2026-03-11).
+        const anonClient = createClient(
             Deno.env.get("SUPABASE_URL")!,
-            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")! // Using service key to write to storage if needed
+            Deno.env.get("SUPABASE_ANON_KEY")!,
+            { global: { headers: { Authorization: authHeader } } }
+        );
+        const { data: { user }, error: authErr } = await anonClient.auth.getUser();
+        if (authErr || !user) {
+            return new Response(JSON.stringify({ error: "Unauthorized" }), {
+                status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
+
+        const serviceClient = createClient(
+            Deno.env.get("SUPABASE_URL")!,
+            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
         );
 
         const { payment_id } = await req.json();
-        if (!payment_id) throw new Error("Payment ID is required");
+        if (!payment_id || typeof payment_id !== "string") {
+            return new Response(JSON.stringify({ error: "Payment ID is required" }), {
+                status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
 
-        // Fetch subscription from subscriptions table using payment_id as workspace_id
-        const { data: subscription } = await supabase
+        // Verify the caller is a member of the workspace they're requesting
+        const { data: memberCheck } = await serviceClient
+            .from("workspace_members")
+            .select("workspace_id")
+            .eq("workspace_id", payment_id)
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+        if (!memberCheck) {
+            return new Response(JSON.stringify({ error: "Forbidden" }), {
+                status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
+
+        // Fetch subscription scoped to the caller's workspace
+        const { data: subscription } = await serviceClient
             .from("subscriptions")
             .select("*, workspaces(name)")
-            .eq("workspace_id", payment_id)  // payment_id used as workspace_id for invoice lookup
+            .eq("workspace_id", payment_id)
             .single();
 
-        if (!subscription) throw new Error("Subscription not found");
+        if (!subscription) {
+            return new Response(JSON.stringify({ error: "Subscription not found" }), {
+                status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
 
         // Use subscription data to populate invoice
         const payment = {
@@ -81,8 +122,7 @@ Deno.serve(async (req) => {
             filename: `invoice_${payment.id.substring(0, 8)}.pdf`
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    } catch (err: any) {
-        console.error("Generate Invoice Error:", err);
-        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+    } catch (err: unknown) {
+        return safeErrorResponse(err, "[generate-invoice]", corsHeaders);
     }
 });

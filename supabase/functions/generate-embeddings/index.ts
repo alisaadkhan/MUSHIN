@@ -4,8 +4,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // Called by cron or manually. Processes 50 profiles per invocation to stay within memory limits.
 // Safe to call multiple times — skips profiles that already have embeddings.
 
+const APP_URL = Deno.env.get("APP_URL") || "https://mushin.app";
 const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": APP_URL,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -44,7 +45,7 @@ Deno.serve(async (req: Request) => {
         .limit(BATCH_SIZE);
 
     if (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
+        return new Response(JSON.stringify({ error: "Failed to query profiles" }), {
             status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
     }

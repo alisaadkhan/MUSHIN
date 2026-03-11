@@ -17,9 +17,10 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { safeErrorResponse } from "../_shared/errors.ts";
 
 const CORS = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": Deno.env.get("APP_URL") || "https://mushin.app",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -172,8 +173,6 @@ Deno.serve(async (req: Request) => {
       meta: { error: err.message },
     }).eq("id", runId);
 
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500, headers: { ...CORS, "Content-Type": "application/json" },
-    });
+    return safeErrorResponse(err, "[creator-refresh-monitor]", CORS);
   }
 });

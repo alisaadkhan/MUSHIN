@@ -1,0 +1,286 @@
+name: 🚀 Supabase Deploy
+
+# Runs on every push to main.
+# Applies pending DB migrations and deploys updated edge functions to the
+# production Supabase project (xfeikbhprbqwjbcigdzmc).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # Allow manual trigger from GitHub Actions UI
+
+env:
+  SUPABASE_PROJECT_ID: xfeikbhprbqwjbcigdzmc
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 1: Apply database migrations
+  # ────────────────────────────────────────────────────────────────────────────
+  migrate:
+    name: 📦 Apply DB Migrations
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: List pending migrations
+        run: |
+          echo "=== Migration files to apply ==="
+          ls -1 supabase/migrations/*.sql | sort
+        shell: bash
+
+      - name: Push migrations to Supabase
+        run: supabase db push --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Verify RLS is enabled on all tables
+        run: |
+          supabase db execute \
+            --project-ref ${{ env.SUPABASE_PROJECT_ID }} \
+            --query "
+              SELECT schemaname, tablename, rowsecurity
+              FROM pg_tables
+              WHERE schemaname = 'public'
+                AND rowsecurity = false
+                AND tablename NOT IN ('schema_migrations')
+              ORDER BY tablename;
+            "
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        continue-on-error: true   # Report only — do not block deployment
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 2: Deploy edge functions (runs after migrations succeed)
+  # ────────────────────────────────────────────────────────────────────────────
+  deploy-functions:
+    name: ⚡ Deploy Edge Functions
+    runs-on: ubuntu-latest
+    needs: migrate
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Deploy all edge functions that were modified in this session.
+      # Each function is deployed individually to allow partial rollback.
+
+      - name: Deploy search-natural
+        run: supabase functions deploy search-natural --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy search-influencers
+        run: supabase functions deploy search-influencers --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy enrich-influencer
+        run: supabase functions deploy enrich-influencer --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy ai-insights
+        run: supabase functions deploy ai-insights --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy generate-invoice
+        run: supabase functions deploy generate-invoice --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy detect-bot-entendre
+        run: supabase functions deploy detect-bot-entendre --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy find-lookalikes
+        run: supabase functions deploy find-lookalikes --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy generate-public-profile
+        run: supabase functions deploy generate-public-profile --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy sync-hubspot
+        run: supabase functions deploy sync-hubspot --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy export-user-data
+        run: supabase functions deploy export-user-data --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy fetch-campaign-metrics
+        run: supabase functions deploy fetch-campaign-metrics --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy generate-tracking-link
+        run: supabase functions deploy generate-tracking-link --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy track-click
+        run: supabase functions deploy track-click --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy email-webhook
+        run: supabase functions deploy email-webhook --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy check-subscription
+        run: supabase functions deploy check-subscription --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy create-checkout
+        run: supabase functions deploy create-checkout --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy customer-portal
+        run: supabase functions deploy customer-portal --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy delete-account
+        run: supabase functions deploy delete-account --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy admin-adjust-credits
+        run: supabase functions deploy admin-adjust-credits --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy admin-audit-log
+        run: supabase functions deploy admin-audit-log --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy admin-list-users
+        run: supabase functions deploy admin-list-users --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy admin-promote-user
+        run: supabase functions deploy admin-promote-user --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy admin-suspend-user
+        run: supabase functions deploy admin-suspend-user --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy extract-brand-mentions
+        run: supabase functions deploy extract-brand-mentions --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy extract-creator-tags
+        run: supabase functions deploy extract-creator-tags --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy generate-embeddings
+        run: supabase functions deploy generate-embeddings --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy classify-niche
+        run: supabase functions deploy classify-niche --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy process-enrichment-job
+        run: supabase functions deploy process-enrichment-job --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy reset-free-credits
+        run: supabase functions deploy reset-free-credits --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy refresh-stale-profiles
+        run: supabase functions deploy refresh-stale-profiles --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy creator-discovery-worker
+        run: supabase functions deploy creator-discovery-worker --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy creator-refresh-monitor
+        run: supabase functions deploy creator-refresh-monitor --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy trending-niches-analyzer
+        run: supabase functions deploy trending-niches-analyzer --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 3: Post-deploy health check
+  # ────────────────────────────────────────────────────────────────────────────
+  health-check:
+    name: 🩺 Post-Deploy Health Check
+    runs-on: ubuntu-latest
+    needs: deploy-functions
+    steps:
+      - name: Verify Supabase project is reachable
+        run: |
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://${{ env.SUPABASE_PROJECT_ID }}.supabase.co/functions/v1/health" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
+          echo "Health endpoint HTTP status: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" != "200" ] && [ "$HTTP_STATUS" != "401" ]; then
+            echo "⚠️  Unexpected status $HTTP_STATUS — check Supabase dashboard"
+            exit 1
+          fi
+          echo "✅ Supabase project responding"
+        shell: bash
+
+# ──────────────────────────────────────────────────────────────────────────────
+# REQUIRED GITHUB SECRETS
+# Set at: GitHub → Repository → Settings → Secrets and Variables → Actions
+#
+#   SUPABASE_ACCESS_TOKEN         → generate at https://supabase.com/dashboard/account/tokens
+#                                   (Personal Access Token with write access)
+#   SUPABASE_ANON_KEY             → Supabase project anon/public key
+#   VITE_SUPABASE_URL             → https://xfeikbhprbqwjbcigdzmc.supabase.co
+#   VITE_SUPABASE_PUBLISHABLE_KEY → same as SUPABASE_ANON_KEY (for Vite build)
+#
+# REQUIRED SUPABASE EDGE FUNCTION SECRETS (set via Supabase dashboard or CLI):
+#   APP_URL                       → https://mushin.app
+#   HUGGINGFACE_API_KEY
+#   APIFY_API_KEY
+#   YOUTUBE_API_KEY
+#   SERPER_API_KEY
+#   UPSTASH_REDIS_REST_URL
+#   UPSTASH_REDIS_REST_TOKEN
+#   STRIPE_SECRET_KEY
+#   STRIPE_WEBHOOK_SECRET
+#   RESEND_API_KEY
+#   SVIX_WEBHOOK_SECRET
+#   HUBSPOT_ENCRYPTION_PASSWORD   → pgcrypto symmetric key for HubSpot API key
+# ──────────────────────────────────────────────────────────────────────────────

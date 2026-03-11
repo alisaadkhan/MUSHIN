@@ -1,4 +1,4 @@
-﻿import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Redis } from "https://esm.sh/@upstash/redis";
 import { checkRateLimit, corsHeaders } from "../_shared/rate_limit.ts";
 import { extractCityFromBio } from "../_shared/geo.ts";
@@ -487,8 +487,9 @@ Deno.serve(async (req: Request) => {
                 }, { onConflict: "profile_id_a,platform_b,username_b" }).catch(() => { });
             }
         } catch (writeErr: any) {
+            console.error(`[enrich] DB write failed for ${platform}/${username}:`, writeErr.message);
             await serviceClient.from("influencer_profiles").update({ enrichment_status: "failed", enrichment_error: writeErr.message }).eq("platform", platform).eq("username", username);
-            return new Response(JSON.stringify({ error: `Database write failed: ${writeErr.message}`, code: "DB_ERROR" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            return new Response(JSON.stringify({ error: "A database error occurred while saving profile data. Credits were not deducted.", code: "DB_ERROR" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
         // Success -> Deduct Credits Atomically
@@ -563,6 +564,8 @@ Deno.serve(async (req: Request) => {
 
         return new Response(JSON.stringify({ success: true, profile, data_source: dataSource, is_stale: isStale, credits_remaining: (workspace?.enrichment_credits_remaining || 1) - 1 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     } catch (err: any) {
-        return new Response(JSON.stringify({ error: err.message || "Internal server error", code: "INTERNAL_ERROR" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        // HIGH-04: Log internally, return generic safe error to client
+        console.error(`[enrich] Unhandled error for ${req.url}:`, err.message ?? err);
+        return new Response(JSON.stringify({ error: "Internal server error", code: "INTERNAL_ERROR" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 });

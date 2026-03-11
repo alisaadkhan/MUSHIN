@@ -3,10 +3,20 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Redis } from "https://esm.sh/@upstash/redis";
 import { generateEmbedding } from "../_shared/huggingface.ts";
 
+const APP_URL = Deno.env.get("APP_URL") || "https://mushin.app";
+
+// CORS: lock to known app origin — do NOT use wildcard (security: CSRF/data-harvesting prevention)
 const corsHeaders = {
-    "Access-Control-Allow-Origin": Deno.env.get("APP_URL") || "https://mushin.app",
+    "Access-Control-Allow-Origin": APP_URL,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// CSRF origin guard — rejects cross-origin state-mutating requests
+function isOriginAllowed(req: Request): boolean {
+    const origin = req.headers.get("Origin");
+    if (!origin) return true; // server-to-server (no Origin header) — allowed
+    return origin === APP_URL;
+}
 
 // Initialize Redis client if env vars are present (fallback to none if missing)
 let redis: Redis | null = null;
@@ -20,9 +30,20 @@ if (Deno.env.get("UPSTASH_REDIS_REST_URL") && Deno.env.get("UPSTASH_REDIS_REST_T
 Deno.serve(async (req) => {
     if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+    // CSRF: reject requests from unknown origins (MED-07)
+    if (!isOriginAllowed(req)) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+            status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+    }
+
     try {
         const authHeader = req.headers.get("Authorization");
-        if (!authHeader?.startsWith("Bearer ")) throw new Error("Unauthorized");
+        if (!authHeader?.startsWith("Bearer ")) {
+            return new Response(JSON.stringify({ error: "Unauthorized" }), {
+                status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+        }
 
         const token = authHeader.replace("Bearer ", "");
         const supabase = createClient(
@@ -32,9 +53,19 @@ Deno.serve(async (req) => {
         );
 
         const { data: userData, error: userError } = await supabase.auth.getUser(token);
-        if (userError || !userData?.user) throw new Error("Unauthorized");
+        if (userError || !userData?.user) {
+            return new Response(JSON.stringify({ error: "Unauthorized" }), {
+                status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+        }
 
         const { data: workspaceId } = await supabase.rpc("get_user_workspace_id");
+        if (!workspaceId) {
+            return new Response(JSON.stringify({ error: "No workspace found" }), {
+                status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+        }
+
         const serviceClient = createClient(
             Deno.env.get("SUPABASE_URL")!,
             Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -52,8 +83,23 @@ Deno.serve(async (req) => {
             });
         }
 
-        const { query, platform } = await req.json();
-        if (!query) throw new Error("Query is required");
+        const body = await req.json();
+        const rawQuery: string = body?.query ?? "";
+        const platform: string | null = body?.platform ?? null;
+
+        if (!rawQuery || typeof rawQuery !== "string") {
+            return new Response(JSON.stringify({ error: "Query is required" }), {
+                status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+        }
+
+        // Sanitize query: max 500 chars, strip control chars (prompt injection / DoS prevention)
+        const query = rawQuery.trim().replace(/[\x00-\x1F\x7F]/g, "").slice(0, 500);
+        if (query.length < 2) {
+            return new Response(JSON.stringify({ error: "Query too short" }), {
+                status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+        }
 
         // Attempt to Fetch from Cache
         const cacheKey = `search:${query.toLowerCase().trim()}:${platform || 'all'}`;
@@ -62,20 +108,52 @@ Deno.serve(async (req) => {
                 const cached = await redis.get(cacheKey);
                 if (cached) {
                     console.log("Returned cached results for:", query);
-                    return new Response(JSON.stringify({ results: cached, cached: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+                    return new Response(JSON.stringify({ results: cached, cached: true }), {
+                        headers: { ...corsHeaders, "Content-Type": "application/json" }
+                    });
                 }
             } catch (e) { console.warn("Redis Fetch Error", e); }
         }
 
         const HUGGINGFACE_API_KEY = Deno.env.get("HUGGINGFACE_API_KEY");
         if (!HUGGINGFACE_API_KEY) {
-            return new Response(JSON.stringify({ error: "No AI credits remaining" }), {
-                status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            return new Response(JSON.stringify({ error: "AI search is not available" }), {
+                status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" }
             });
         }
 
+        // ============================================================
+        // CRIT-03 FIX: Deduct credit BEFORE the expensive HuggingFace
+        // call. This closes the TOCTOU race window where N simultaneous
+        // requests all pass the balance check and each get a free search.
+        // The consume_ai_credit() SQL function is atomic and raises P0001
+        // on insufficient balance, so no negative balances are possible.
+        // ============================================================
+        try {
+            await serviceClient.rpc("consume_ai_credit", { ws_id: workspaceId });
+        } catch (creditErr: any) {
+            if (creditErr.code === "P0001") {
+                return new Response(JSON.stringify({ error: "No AI credits remaining" }), {
+                    status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" }
+                });
+            }
+            throw creditErr;
+        }
+
         // 1. Generate Embedding for the Search Query via HuggingFace BGE-large
-        const vector = await generateEmbedding(query, HUGGINGFACE_API_KEY);
+        let vector: number[];
+        try {
+            vector = await generateEmbedding(query, HUGGINGFACE_API_KEY);
+        } catch (embErr: any) {
+            // Refund the credit — the embedding failed before any value was delivered
+            await serviceClient.rpc("admin_adjust_credits", {
+                ws_id: workspaceId, credit_type: "ai", delta: 1
+            }).catch(() => null);
+            console.error("HuggingFace embedding error:", embErr?.message);
+            return new Response(JSON.stringify({ error: "AI search temporarily unavailable. Your credit has been refunded." }), {
+                status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+        }
 
         // 2. Perform Similarity Search
         const { data: influencers, error: searchErr } = await serviceClient.rpc(
@@ -88,16 +166,9 @@ Deno.serve(async (req) => {
             }
         );
 
-        if (searchErr) throw searchErr;
-
-        try {
-            await serviceClient.rpc("consume_ai_credit", { ws_id: workspaceId });
-        } catch (creditErr: any) {
-            if (creditErr.code === "P0001") {
-                return new Response(JSON.stringify({ error: "No AI credits remaining" }), {
-                    status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" }
-                });
-            }
+        if (searchErr) {
+            console.error("match_influencers RPC error:", searchErr.message);
+            throw searchErr;
         }
 
         const hydratedResults = influencers || [];
@@ -116,7 +187,10 @@ Deno.serve(async (req) => {
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     } catch (err: any) {
+        // HIGH-04: Never expose raw error messages/stack traces to clients
         console.error("AI Search Error:", err);
-        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+        return new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
     }
 });

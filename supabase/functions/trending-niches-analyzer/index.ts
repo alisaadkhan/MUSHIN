@@ -17,9 +17,10 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { safeErrorResponse } from "../_shared/errors.ts";
 
 const CORS = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": Deno.env.get("APP_URL") || "https://mushin.app",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -183,10 +184,8 @@ Deno.serve(async (req: Request) => {
 
   } catch (err: any) {
     console.error("[trending-analyzer] Fatal:", err);
-    await finishRun(serviceClient, runId, "error", 0, err.message);
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500, headers: { ...CORS, "Content-Type": "application/json" },
-    });
+    await finishRun(serviceClient, runId, "error", 0, "Internal error");
+    return safeErrorResponse(err, "[trending-niches-analyzer]", CORS);
   }
 });
 

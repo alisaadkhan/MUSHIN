@@ -1,7 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { safeErrorResponse } from "../_shared/errors.ts";
 
+const APP_URL = Deno.env.get("APP_URL") || "https://mushin.app";
 const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": APP_URL,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -74,7 +76,6 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ success: true, tracking_link: trackingLink }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     } catch (err: any) {
-        console.error("Generate Link Error:", err);
-        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+        return safeErrorResponse(err, "[generate-tracking-link]", corsHeaders);
     }
 });

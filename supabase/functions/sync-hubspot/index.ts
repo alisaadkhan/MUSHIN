@@ -1,7 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { safeErrorResponse } from "../_shared/errors.ts";
 
+const APP_URL = Deno.env.get("APP_URL") || "https://mushin.app";
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": APP_URL,
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
@@ -45,20 +47,17 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Not a workspace member" }), { status: 403, headers: corsHeaders });
     }
 
-    // Read the HubSpot API key server-side using service role
+    // Read the HubSpot API key using the encrypted store (MED-04)
     const serviceClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { data: secretsData } = await serviceClient
-      .from("workspace_secrets")
-      .select("hubspot_api_key")
-      .eq("workspace_id", workspace_id)
-      .single();
+    const { data: keyData, error: keyErr } = await serviceClient
+      .rpc("get_hubspot_key", { p_workspace_id: workspace_id });
 
-    const hubspot_api_key = secretsData?.hubspot_api_key;
-    if (!hubspot_api_key) {
+    const hubspot_api_key = keyData as string | null;
+    if (keyErr || !hubspot_api_key) {
       return new Response(JSON.stringify({ error: "HubSpot API key not configured" }), {
         status: 400,
         headers: corsHeaders,

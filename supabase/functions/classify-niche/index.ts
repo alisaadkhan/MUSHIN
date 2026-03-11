@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { safeErrorResponse } from "../_shared/errors.ts";
 import { corsHeaders } from "../_shared/rate_limit.ts";
 import { generateText, extractJsonFromText, extractTagsFromBio, normalizeTags } from "../\_shared/huggingface.ts";
 
@@ -132,7 +133,6 @@ Brand safety rating: safe, caution, or risk. Return ONLY the JSON, no explanatio
         return new Response(JSON.stringify({ success: true, analysis }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     } catch (err: any) {
-        console.error(err);
-        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+        return safeErrorResponse(err, "[classify-niche]", corsHeaders);
     }
 });

@@ -1,7 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { safeErrorResponse } from "../_shared/errors.ts";
 
+const APP_URL = Deno.env.get("APP_URL") || "https://mushin.app";
 const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": APP_URL,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -99,7 +101,6 @@ If no brands are found, return {"mentions":[]}. Return ONLY the JSON.`;
         return new Response(JSON.stringify({ success: true, count: analysis.mentions?.length || 0 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     } catch (err: any) {
-        console.error(err);
-        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+        return safeErrorResponse(err, "[extract-brand-mentions]", corsHeaders);
     }
 });

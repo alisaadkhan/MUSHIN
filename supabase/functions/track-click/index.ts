@@ -1,5 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { safeErrorResponse } from "../_shared/errors.ts";
 
+// track-click is embedded in outbound emails and clicked by external recipients.
+// Wildcard CORS is intentional — restricting to APP_URL would break email client requests.
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -75,6 +78,6 @@ Deno.serve(async (req) => {
 
     } catch (err: any) {
         console.error("Track Click Error:", err);
-        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+        return safeErrorResponse(err, "[track-click]", corsHeaders);
     }
 });

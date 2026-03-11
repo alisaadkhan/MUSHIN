@@ -1,9 +1,37 @@
 ﻿import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/rate_limit.ts";
+import { safeErrorResponse } from "../_shared/errors.ts";
 import { analyzeFullBotSignals, type BotAnalysisInput } from "../_shared/bot_signals.ts";
+
+const APP_URL = Deno.env.get("APP_URL") || "https://mushin.app";
+const corsHeaders = {
+    "Access-Control-Allow-Origin": APP_URL,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 Deno.serve(async (req: Request) => {
     if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+    // All paths — analysis and feedback — require a valid JWT.
+    // Previously the main analysis path had no auth check, allowing unauthenticated
+    // callers to write bot_probability scores to influencer_profiles (fixed 2026-03-11).
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+            status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+    }
+
+    const anonClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: { user }, error: authErr } = await anonClient.auth.getUser();
+    if (authErr || !user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+            status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+    }
 
     try {
         const body: Partial<BotAnalysisInput> & { action?: string; verdict?: string; predicted_score?: number; signals_triggered?: string[] } = await req.json();
@@ -155,9 +183,7 @@ Deno.serve(async (req: Request) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
 
-    } catch (err: any) {
-        return new Response(JSON.stringify({ error: err.message }), {
-            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
+    } catch (err: unknown) {
+        return safeErrorResponse(err, "[detect-bot-entendre]", corsHeaders);
     }
 });

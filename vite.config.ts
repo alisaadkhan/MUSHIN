@@ -18,8 +18,9 @@ export default defineConfig(() => ({
     },
   },
   build: {
-    // Source maps for production error monitoring (Sentry, etc.)
-    sourcemap: true,
+    // Source maps only in development — never in production (security: prevents business logic exposure via DevTools)
+    // For production error monitoring, use Sentry's private source-map upload: https://docs.sentry.io/platforms/javascript/guides/react/sourcemaps/
+    sourcemap: process.env.NODE_ENV !== 'production',
     // Increase limit since we're now properly splitting
     chunkSizeWarningLimit: 500,
     rollupOptions: {

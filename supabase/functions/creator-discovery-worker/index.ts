@@ -14,6 +14,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { safeErrorResponse } from "../_shared/errors.ts";
 import { expandSerperQueries } from "../_shared/query_expander.ts";
 import { inferNiche } from "../_shared/niche.ts";
 import { extractCity } from "../_shared/geo.ts";
@@ -21,7 +22,7 @@ import { extractFollowers } from "../_shared/followers.ts";
 import { extractUsername, DOMAIN_MAP } from "../_shared/platform.ts";
 
 const CORS = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": Deno.env.get("APP_URL") || "https://mushin.app",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -259,9 +260,7 @@ Deno.serve(async (req: Request) => {
       }).eq("id", runId);
     }
 
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500, headers: { ...CORS, "Content-Type": "application/json" },
-    });
+    return safeErrorResponse(err, "[creator-discovery-worker]", CORS);
   }
 });
 

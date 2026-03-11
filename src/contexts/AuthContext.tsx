@@ -34,14 +34,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Consumer email domains blocked from Google OAuth (business-only platform)
-// This is a client-side UX guard; server-side enforcement is recommended via Supabase Auth hooks.
-const CONSUMER_DOMAINS = new Set([
-  'gmail.com','yahoo.com','hotmail.com','outlook.com','live.com',
-  'icloud.com','aol.com','protonmail.com','ymail.com','googlemail.com','yahoo.co.uk',
-  'yahoo.in','yahoo.com.pk','hotmail.co.uk','msn.com','me.com','mail.com','gmx.com',
-]);
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -91,15 +83,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // Block consumer email domains for Google OAuth sign-in
+        // Block consumer email domains for Google OAuth sign-in.
+        // We call the server-side check_email_allowed RPC so the authoritative
+        // blocked-domain list (managed in the DB) is always used.
         if (event === 'SIGNED_IN' && newSession) {
           const provider = newSession.user.app_metadata?.provider;
           if (provider === 'google') {
             const email = newSession.user.email || '';
-            const domain = email.split('@')[1]?.toLowerCase() || '';
-            if (CONSUMER_DOMAINS.has(domain)) {
+            const { data: checkResult } = await supabase.rpc('check_email_allowed', { p_email: email });
+            if (checkResult && checkResult.allowed === false) {
               await supabase.auth.signOut();
-              localStorage.setItem('auth_google_blocked', domain);
+              localStorage.setItem('auth_google_blocked', email.split('@')[1] || 'consumer');
               setSession(null); setUser(null); setProfile(null); setWorkspace(null);
               setLoading(false);
               return;

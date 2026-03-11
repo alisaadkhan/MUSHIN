@@ -5,16 +5,15 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-// Guard: if env vars are missing (e.g. Vercel deploy without env vars set),
-// log a clear error instead of crashing the entire module with an exception.
-// createClient throws on undefined/empty URL, which kills the whole JS bundle
-// before React can mount — producing a completely blank page with no error UI.
+// SECURITY: No credential fallbacks. Hardcoded project URLs / anon keys in source
+// code will be embedded in production bundles and can be extracted by anyone who
+// downloads the JS file. If these env vars are missing the app renders a clear
+// configuration error rather than silently using a leaked credential.
 if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
   console.error(
     '[MUSHIN] Missing Supabase environment variables.\n' +
     'Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in your Vercel ' +
-    'project settings (Settings → Environment Variables) and redeploy.\n' +
-    'Get the values from: https://supabase.com/dashboard/project/xfeikbhprbqwzdhyjnou/settings/api'
+    'project settings (Settings → Environment Variables) and redeploy.'
   );
 }
 
@@ -22,8 +21,8 @@ if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(
-  SUPABASE_URL  || 'https://xfeikbhprbqwzdhyjnou.supabase.co',
-  SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmZWlrYmhwcmJxd3pkaHlqbm91Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNjk5NDgsImV4cCI6MjA4NTg0NTk0OH0.gpNbABLOxMH5-ryd1JsBuxLiqJj3zHDL5u7knbejxa4',
+  SUPABASE_URL ?? '',
+  SUPABASE_PUBLISHABLE_KEY ?? '',
   {
     auth: {
       storage: localStorage,

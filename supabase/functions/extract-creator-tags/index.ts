@@ -20,8 +20,9 @@ import {
   normalizeTags,
 } from "../_shared/huggingface.ts";
 
+const APP_URL = Deno.env.get("APP_URL") || "https://mushin.app";
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": APP_URL,
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -262,9 +263,6 @@ Return ONLY the JSON array, no explanation.`;
     });
 
   } catch (err: any) {
-    console.error("[extract-creator-tags] Error:", err.message);
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return safeErrorResponse(err, "[extract-creator-tags]", corsHeaders);
   }
 });
