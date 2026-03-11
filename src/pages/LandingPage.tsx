@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform, useInView, animate, AnimatePresence, MotionConfig, useMotionValueEvent } from 'framer-motion';
 import { CheckCircle, DollarSign, Info, Sparkles, ArrowRight, Search, Star, Shield, Zap, Users, Instagram, Youtube, TrendingUp, Globe, MapPin, X, Building2, ShoppingBag } from 'lucide-react';
+import { MushInLogo, MushInIcon } from '@/components/ui/MushInLogo';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 
 /* --- Global Styles ------------------------------------------------------------ */
@@ -262,7 +263,7 @@ const AtomOrbit = () => {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         animation: 'hub-pulse 3s ease-in-out infinite', zIndex: 10,
       }}>
-        <img src="/favicon.png" alt="Mushin" style={{ width: 58, height: 58, objectFit: 'contain', borderRadius: '50%', filter: 'drop-shadow(0 0 10px rgba(168,85,247,0.7)) brightness(1.1)' }} />
+        <MushInIcon size={58} className="drop-shadow-[0_0_10px_rgba(168,85,247,0.7)]" />
       </div>
     </div>
   );
@@ -1114,7 +1115,7 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between gap-8 mb-10">
             <div className="max-w-xs">
-              <div className="font-black text-lg tracking-tight mb-3">Mushin<span className="text-purple-400">.</span></div>
+              <div className="mb-3"><MushInLogo height={32} /></div>
               <p className="text-zinc-500 text-sm leading-relaxed">Pakistan's first AI-powered influencer intelligence platform. Built to bring signal to a noisy market.</p>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-8 text-sm">

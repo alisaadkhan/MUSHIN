@@ -7,7 +7,7 @@ import {
 import { useWorkspaceCredits } from "@/hooks/useWorkspaceCredits";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAdminPermissions } from "@/hooks/useAdminPermissions";
-import { MushinLogo } from "@/components/mushin-brand";
+import { MushInLogo } from "@/components/ui/MushInLogo";
 
 const navGroups = [
   {
@@ -65,10 +65,7 @@ export function AppSidebar({ isOpen = true, onClose }: AppSidebarProps) {
     >
       {/* Brand */}
       <div className="flex h-14 items-center gap-2.5 px-4 border-b border-border">
-        <MushinLogo size={26} />
-        <span className="font-extrabold tracking-widest text-foreground text-sm uppercase" style={{ fontFamily: "'Syne', sans-serif", letterSpacing: "0.1em" }}>
-          MUSHIN
-        </span>
+        <MushInLogo height={28} />
       </div>
 
       <nav className="flex-1 overflow-y-auto p-3 space-y-6">

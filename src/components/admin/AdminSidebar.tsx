@@ -5,7 +5,7 @@ import {
   Settings, ScrollText, Megaphone, ShieldCheck, ChevronRight,
   ArrowLeft, LifeBuoy,
 } from "lucide-react";
-import { MushinLogo } from "@/components/mushin-brand";
+import { MushInLogo } from "@/components/ui/MushInLogo";
 
 interface NavItem { icon: React.ElementType; label: string; path: string; }
 interface NavGroup { label: string; items: NavItem[]; show: boolean; }
@@ -62,13 +62,8 @@ export function AdminSidebar() {
     <aside className="w-60 flex-shrink-0 bg-[#050505] border-r border-border flex flex-col h-screen fixed left-0 top-0 z-40">
       {/* Header */}
       <div className="flex h-14 items-center gap-2.5 px-4 border-b border-border">
-        <MushinLogo size={24} />
-        <div>
-          <p className="text-xs font-extrabold text-foreground tracking-widest uppercase" style={{ fontFamily: "'Syne', sans-serif" }}>
-            MUSHIN
-          </p>
-          <p className="text-[9px] text-primary tracking-widest">Admin Panel</p>
-        </div>
+        <MushInLogo height={28} />
+        <p className="text-[9px] text-primary tracking-widest ml-1">Admin Panel</p>
       </div>
 
       {/* Role badge */}

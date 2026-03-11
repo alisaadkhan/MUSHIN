@@ -1,0 +1,15 @@
+{
+  "name": "MUSHIN",
+  "short_name": "MUSHIN",
+  "description": "Pakistan's Creator Intelligence Platform",
+  "icons": [
+    { "src": "/mushin-icon-16.png",  "sizes": "16x16",   "type": "image/png" },
+    { "src": "/mushin-icon-32.png",  "sizes": "32x32",   "type": "image/png" },
+    { "src": "/mushin-icon-256.png", "sizes": "256x256", "type": "image/png" },
+    { "src": "/mushin-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "theme_color": "#0A0416",
+  "background_color": "#060608",
+  "display": "standalone",
+  "start_url": "/"
+}
