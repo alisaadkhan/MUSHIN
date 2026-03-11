@@ -3,7 +3,7 @@ import { useAdminPermissions } from "@/hooks/useAdminPermissions";
 import {
   LayoutDashboard, Users, CreditCard, ShieldAlert, BarChart2,
   Settings, ScrollText, Megaphone, ShieldCheck, ChevronRight,
-  ArrowLeft, LifeBuoy,
+  ArrowLeft, LifeBuoy, Coins,
 } from "lucide-react";
 import { MushInLogo } from "@/components/ui/MushInLogo";
 
@@ -29,6 +29,7 @@ export function AdminSidebar() {
       items: [
         { icon: Users, label: "Users", path: "/admin/users" },
         { icon: CreditCard, label: "Subscriptions", path: "/admin/subscriptions" },
+        { icon: Coins, label: "Credits", path: "/admin/credits" },
         { icon: ShieldAlert, label: "Content Moderation", path: "/admin/content" },
       ],
     },

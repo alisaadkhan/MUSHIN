@@ -162,8 +162,13 @@ export function useInfluencerProfile(platform: string | undefined, username: str
                 if (historyRes.data) setFollowerHistory(historyRes.data);
 
                 const posts = postsRes.data;
+                // Use the authoritative posts_count from the profile row when available.
+                // For YouTube this is channel.statistics.videoCount (real total),
+                // not just the ~30 videos we inserted into influencer_posts.
+                const dbPostsCount = (enriched as any).posts_count ?? null;
+                setPostsCount(dbPostsCount ?? (posts && posts.length > 0 ? posts.length : null));
+
                 if (posts && posts.length > 0) {
-                    setPostsCount(posts.length);
                     // Aggregate by inferred post type from caption
                     const typeMap: Record<string, { posts: number; sponsored: number }> = {};
                     for (const post of posts) {
@@ -183,7 +188,6 @@ export function useInfluencerProfile(platform: string | undefined, username: str
                     }
                     setContentPerformance(sorted);
                 } else {
-                    setPostsCount(0);
                     setContentPerformance([]);
                 }
 

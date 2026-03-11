@@ -665,7 +665,7 @@ export default function InfluencerProfilePage() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-lg">
                   {[  
                     { label: "Followers", value: followers != null ? formatFollowers(followers) : "—" },
-                    { label: "Posts", value: (isEnriched ? postsCount : (postsCount ?? snippetStats.posts)) != null ? (isEnriched ? postsCount! : (postsCount ?? snippetStats.posts)!).toLocaleString() : "—" },
+                    { label: platform === "youtube" ? "Videos" : "Posts", value: (isEnriched ? postsCount : (postsCount ?? snippetStats.posts)) != null ? (isEnriched ? postsCount! : (postsCount ?? snippetStats.posts)!).toLocaleString() : "—" },
                     { label: "Following", value: following != null ? formatFollowers(following) : "—" },
                     { label: "Engagement", value: engagementRate != null ? `${engagementRate.toFixed(1)}%` : "—" },
                   ].map(({ label, value }) => (
