@@ -42,6 +42,15 @@ export default function Auth() {
   const turnstileSignIn = useRef<TurnstileInstance>(null);
   const turnstileSignUp = useRef<TurnstileInstance>(null);
 
+  const handleCaptchaError = (errorCode?: string) => {
+    setCaptchaReady(false);
+    setCaptchaToken("");
+    const detail = errorCode ? ` (code: ${errorCode})` : "";
+    setCaptchaError(
+      `CAPTCHA failed to load${detail}. Check: 1) correct Cloudflare site key, 2) hostname allowlist, 3) browser shields/ad blockers.`
+    );
+  };
+
   // Check if Google OAuth was blocked (consumer domain) after redirect
   useEffect(() => {
     const blocked = localStorage.getItem("auth_google_blocked");
@@ -324,11 +333,8 @@ export default function Auth() {
                       setCaptchaReady(true);
                       setCaptchaError("");
                     }}
-                    onError={() => {
-                      setCaptchaReady(false);
-                      setCaptchaToken("");
-                      setCaptchaError("CAPTCHA failed to load. Disable ad blockers and allow challenges.cloudflare.com.");
-                    }}
+                    onError={handleCaptchaError}
+                    onUnsupported={() => handleCaptchaError("unsupported-browser")}
                     options={{ theme: "dark", size: "normal" }}
                   />
                   {!captchaReady && !captchaToken && !captchaError && (
@@ -403,11 +409,8 @@ export default function Auth() {
                       setCaptchaReady(true);
                       setCaptchaError("");
                     }}
-                    onError={() => {
-                      setCaptchaReady(false);
-                      setCaptchaToken("");
-                      setCaptchaError("CAPTCHA failed to load. Disable ad blockers and allow challenges.cloudflare.com.");
-                    }}
+                    onError={handleCaptchaError}
+                    onUnsupported={() => handleCaptchaError("unsupported-browser")}
                     options={{ theme: "dark", size: "normal" }}
                   />
                   {!captchaReady && !captchaToken && !captchaError && (
