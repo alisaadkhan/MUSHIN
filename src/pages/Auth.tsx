@@ -37,6 +37,8 @@ export default function Auth() {
   const [mfaCode, setMfaCode] = useState("");
   const [mfaFactorId, setMfaFactorId] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaReady, setCaptchaReady] = useState(false);
+  const [captchaError, setCaptchaError] = useState("");
   const turnstileSignIn = useRef<TurnstileInstance>(null);
   const turnstileSignUp = useRef<TurnstileInstance>(null);
 
@@ -309,13 +311,33 @@ export default function Auth() {
               </button>
 
               {TURNSTILE_SITE_KEY && (
-                <Turnstile
-                  ref={turnstileSignIn}
-                  siteKey={TURNSTILE_SITE_KEY}
-                  onSuccess={setCaptchaToken}
-                  onExpire={() => setCaptchaToken("")}
-                  options={{ theme: "dark", size: "normal" }}
-                />
+                <div className="space-y-2">
+                  <Turnstile
+                    ref={turnstileSignIn}
+                    siteKey={TURNSTILE_SITE_KEY}
+                    onSuccess={(token) => {
+                      setCaptchaToken(token);
+                      setCaptchaError("");
+                    }}
+                    onExpire={() => setCaptchaToken("")}
+                    onWidgetLoad={() => {
+                      setCaptchaReady(true);
+                      setCaptchaError("");
+                    }}
+                    onError={() => {
+                      setCaptchaReady(false);
+                      setCaptchaToken("");
+                      setCaptchaError("CAPTCHA failed to load. Disable ad blockers and allow challenges.cloudflare.com.");
+                    }}
+                    options={{ theme: "dark", size: "normal" }}
+                  />
+                  {!captchaReady && !captchaToken && !captchaError && (
+                    <p className="text-[11px] text-muted-foreground">Loading CAPTCHA...</p>
+                  )}
+                  {captchaError && (
+                    <p className="text-[11px] text-destructive">{captchaError}</p>
+                  )}
+                </div>
               )}
               <Button type="submit" className="w-full btn-primary-alive" disabled={submitting || (!!TURNSTILE_SITE_KEY && !captchaToken)}>
                 {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -368,13 +390,33 @@ export default function Auth() {
                 </div>
               </div>
               {TURNSTILE_SITE_KEY && (
-                <Turnstile
-                  ref={turnstileSignUp}
-                  siteKey={TURNSTILE_SITE_KEY}
-                  onSuccess={setCaptchaToken}
-                  onExpire={() => setCaptchaToken("")}
-                  options={{ theme: "dark", size: "normal" }}
-                />
+                <div className="space-y-2">
+                  <Turnstile
+                    ref={turnstileSignUp}
+                    siteKey={TURNSTILE_SITE_KEY}
+                    onSuccess={(token) => {
+                      setCaptchaToken(token);
+                      setCaptchaError("");
+                    }}
+                    onExpire={() => setCaptchaToken("")}
+                    onWidgetLoad={() => {
+                      setCaptchaReady(true);
+                      setCaptchaError("");
+                    }}
+                    onError={() => {
+                      setCaptchaReady(false);
+                      setCaptchaToken("");
+                      setCaptchaError("CAPTCHA failed to load. Disable ad blockers and allow challenges.cloudflare.com.");
+                    }}
+                    options={{ theme: "dark", size: "normal" }}
+                  />
+                  {!captchaReady && !captchaToken && !captchaError && (
+                    <p className="text-[11px] text-muted-foreground">Loading CAPTCHA...</p>
+                  )}
+                  {captchaError && (
+                    <p className="text-[11px] text-destructive">{captchaError}</p>
+                  )}
+                </div>
               )}
               <Button type="submit" className="w-full btn-primary-alive" disabled={submitting || (!!TURNSTILE_SITE_KEY && !captchaToken)}>
                 {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
