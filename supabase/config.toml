@@ -1,4 +1,4 @@
-project_id = "xfeikbhprbqwjbcigdzmc"
+project_id = "xfeikbhprbqwzdhyjnou"
 
 # Public endpoints (no auth required)
 [functions.email-webhook]

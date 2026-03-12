@@ -9,7 +9,7 @@ on:
   workflow_dispatch:   # Allow manual trigger from GitHub Actions UI
 
 env:
-  SUPABASE_PROJECT_ID: xfeikbhprbqwjbcigdzmc
+  SUPABASE_PROJECT_ID: xfeikbhprbqwzdhyjnou
 
 jobs:
   # ────────────────────────────────────────────────────────────────────────────
