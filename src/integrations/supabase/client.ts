@@ -10,19 +10,12 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 // downloads the JS file. If these env vars are missing the app renders a clear
 // configuration error rather than silently using a leaked credential.
 if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-  console.error(
-    '[MUSHIN] Missing Supabase environment variables.\n' +
-    'Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in your Vercel ' +
-    'project settings (Settings → Environment Variables) and redeploy.'
-  );
+  throw new Error("Missing Supabase environment variables: VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY");
 }
 
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
-
 export const supabase = createClient<Database>(
-  SUPABASE_URL ?? '',
-  SUPABASE_PUBLISHABLE_KEY ?? '',
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY,
   {
     auth: {
       storage: localStorage,

@@ -129,8 +129,8 @@ Deno.serve(async (req) => {
         // ── Step 3: Create Vecter Prime (user, pro plan) ──────────────────────────
         log.push("Creating Vecter Prime...");
         const { data: vecData, error: vecErr } = await adminClient.auth.admin.createUser({
-            email: "vecterprime1234@gmail.com",
-            password: "Test123!",
+            email: Deno.env.get("SEED_VECTER_EMAIL") || "vecterprime1234@gmail.com",
+            password: Deno.env.get("SEED_VECTER_PASSWORD"),
             email_confirm: true,
             user_metadata: { full_name: "Vecter Prime" },
         });

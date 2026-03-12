@@ -7,7 +7,7 @@ const APP_URL = Deno.env.get("APP_URL") || "https://mushin.app";
 
 // CORS: lock to known app origin — do NOT use wildcard (security: CSRF/data-harvesting prevention)
 const corsHeaders = {
-    "Access-Control-Allow-Origin": APP_URL,
+    "Access-Control-Allow-Origin": Deno.env.get("APP_URL") || "https://mushin.app",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -94,12 +94,14 @@ Deno.serve(async (req) => {
         }
 
         // Sanitize query: max 500 chars, strip control chars (prompt injection / DoS prevention)
-        const query = rawQuery.trim().replace(/[\x00-\x1F\x7F]/g, "").slice(0, 500);
-        if (query.length < 2) {
+        const sanitizedQuery = rawQuery.trim().replace(/[\x00-\x1F\x7F]/g, "").slice(0, 500);
+        if (sanitizedQuery.length < 2) {
             return new Response(JSON.stringify({ error: "Query too short" }), {
                 status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
             });
         }
+        
+        const query = `[USER_INPUT]\n${sanitizedQuery}\n[/USER_INPUT]`;
 
         // Attempt to Fetch from Cache
         const cacheKey = `search:${query.toLowerCase().trim()}:${platform || 'all'}`;
