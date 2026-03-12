@@ -1,0 +1,161 @@
+﻿node.exe : 
+Initialising login 
+role...
+At C:\Program Files\nod
+ejs\npx.ps1:28 char:12
++   $input | & 
+$NODE_EXE $NPX_CLI_JS 
+$args
++            ~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (Initialising    
+ login role...:Stri    
+ng) [], RemoteExce    
+ption
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+Connecting to remote 
+database...
+Skipping migration .202
+60226_enrichment_v2.sql
+_ignored... (file name 
+must match pattern 
+"<timestamp>_name.sql")
+Do you want to push 
+these migrations to 
+the remote database?
+ ΓÇó 20260320_security_
+hardening.sql
+ ΓÇó 20260321_security_
+gaps.sql
+ ΓÇó 20260322_pentest_r
+emediation.sql
+ ΓÇó 20260323_atomic_cr
+edit_locking.sql
+ ΓÇó 20260324_pentest_f
+ixes.sql
+ ΓÇó 20260325134157_wor
+kspace_rls_hardening.sq
+l
+ ΓÇó 20260325_final_har
+dening.sql
+ ΓÇó 20260326_rls_gap_r
+emediation.sql
+
+ [Y/n] y
+Applying migration 2026
+0320_security_hardening
+.sql...
+NOTICE (00000): policy 
+"ws_select" for 
+relation 
+"public.workspaces" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"ws_insert" for 
+relation 
+"public.workspaces" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"ws_update" for 
+relation 
+"public.workspaces" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"ws_delete" for 
+relation 
+"public.workspaces" 
+does not exist, 
+skipping
+NOTICE (00000): 
+trigger "trg_billing_im
+mutability" for 
+relation 
+"public.workspaces" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"ur_service_write" for 
+relation 
+"public.user_roles" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"sub_service_write" 
+for relation 
+"public.subscriptions" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"cu_service_write" for 
+relation 
+"public.credits_usage" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"sh_member_insert" for 
+relation "public.search
+_history" does not 
+exist, skipping
+NOTICE (00000): policy 
+"sh_service_write" for 
+relation "public.search
+_history" does not 
+exist, skipping
+NOTICE (00000): policy 
+"ol_member_insert" for 
+relation 
+"public.outreach_log" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"ol_member_update" for 
+relation 
+"public.outreach_log" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"ol_service_write" for 
+relation 
+"public.outreach_log" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"ca_member_insert" for 
+relation "public.campai
+gn_activity" does not 
+exist, skipping
+NOTICE (42P07): 
+relation 
+"notifications" 
+already exists, 
+skipping
+ERROR: column 
+"read_at" does not 
+exist (SQLSTATE 42703) 
+At statement: 34       
+                       
+          
+CREATE INDEX IF NOT 
+EXISTS idx_notification
+s_user_unread
+  ON public.notificatio
+ns(user_id, created_at 
+DESC)     
+  WHERE read_at IS 
+NULL                   
+              
+        ^              
+                       
+          
+Try rerunning the 
+command with --debug 
+to troubleshoot the 
+error.

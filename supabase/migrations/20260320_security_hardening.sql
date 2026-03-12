@@ -238,6 +238,11 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Ensure columns exist in case the table was created previously without them
+ALTER TABLE public.notifications 
+  ADD COLUMN IF NOT EXISTS link text,
+  ADD COLUMN IF NOT EXISTS read_at timestamptz;
+
 CREATE INDEX IF NOT EXISTS idx_notifications_user_unread
   ON public.notifications(user_id, created_at DESC)
   WHERE read_at IS NULL;

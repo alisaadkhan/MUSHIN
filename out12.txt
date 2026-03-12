@@ -1,0 +1,76 @@
+﻿node.exe : 
+Initialising login 
+role...
+At C:\Program Files\nod
+ejs\npx.ps1:28 char:12
++   $input | & 
+$NODE_EXE $NPX_CLI_JS 
+$args
++            ~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (Initialising    
+ login role...:Stri    
+ng) [], RemoteExce    
+ption
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+Connecting to remote 
+database...
+Skipping migration .202
+60226_enrichment_v2.sql
+_ignored... (file name 
+must match pattern 
+"<timestamp>_name.sql")
+Do you want to push 
+these migrations to 
+the remote database?
+ ΓÇó 20260324_pentest_f
+ixes.sql
+ ΓÇó 20260325134157_wor
+kspace_rls_hardening.sq
+l
+ ΓÇó 20260325_final_har
+dening.sql
+ ΓÇó 20260326_rls_gap_r
+emediation.sql
+
+ [Y/n] y
+Applying migration 2026
+0324_pentest_fixes.sql.
+..
+NOTICE (00000): policy 
+"Workspace owners can 
+manage jobs" for 
+relation "public.enrich
+ment_jobs" does not 
+exist, skipping
+NOTICE (00000): policy 
+"ej_owner_select" for 
+relation "public.enrich
+ment_jobs" does not 
+exist, skipping
+NOTICE (00000): policy 
+"ej_owner_select" for 
+relation "public.enrich
+ment_jobs" does not 
+exist, skipping
+ERROR: syntax error at 
+or near "`" (SQLSTATE 
+42601)        
+At statement: 4        
+                       
+             
+`nCREATE POLICY 
+"ej_owner_select" ON 
+public.enrichment_jobs
+^                      
+                       
+             
+Try rerunning the 
+command with --debug 
+to troubleshoot the 
+error.

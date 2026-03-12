@@ -1,0 +1,51 @@
+﻿node.exe : 
+Initialising login 
+role...
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (Initialising    
+ login role...:Stri    
+ng) [], RemoteExce    
+ption
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+Connecting to remote 
+database...
+Skipping migration .202
+60226_enrichment_v2.sql
+_ignored... (file name 
+must match pattern 
+"<timestamp>_name.sql")
+Remote migration 
+versions not found in 
+local migrations 
+directory.
+
+Make sure your local 
+git repo is 
+up-to-date. If the 
+error persists, try 
+repairing the 
+migration history 
+table:
+supabase migration 
+repair --status 
+reverted 20260312134157
+
+And update local 
+migrations to match 
+remote database:
+supabase db pull
+

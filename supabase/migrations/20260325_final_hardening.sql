@@ -1,4 +1,4 @@
--- ═══════════════════════════════════════════════════════════════════════════════
+-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 -- FINAL SECURITY HARDENING MIGRATION
 -- Applied: 2026-03-25
 -- Addresses all remaining findings from the full penetration testing assessment:
@@ -6,18 +6,18 @@
 --   MED-04:  HubSpot API key encrypted at rest with pgcrypto
 --   LOW-02:  Normalised error message helper used by edge functions (DB-side)
 --   CSP:     Strict nonce-ready helpers recorded here; Vercel config updated separately
--- ═══════════════════════════════════════════════════════════════════════════════
+-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- Enable pgcrypto (required for pgp_sym_encrypt / pgp_sym_decrypt)
 -- Supabase enables this extension by default; the DO block is idempotent.
--- ─────────────────────────────────────────────────────────────────────────────
+-- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 CREATE EXTENSION IF NOT EXISTS "pgcrypto" SCHEMA extensions;
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- MED-03: Server-side consumer email domain blocking
 --
--- Previously only enforced client-side in AuthContext.tsx — any direct API call
+-- Previously only enforced client-side in AuthContext.tsx â€” any direct API call
 -- to /auth/v1/signup bypassed it entirely.
 --
 -- Supabase supports custom Auth Hooks as SECURITY DEFINER functions that are
@@ -25,16 +25,16 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto" SCHEMA extensions;
 -- email domains at the database layer.
 --
 -- CONFIGURATION REQUIRED:
---   In Supabase Dashboard → Authentication → Hooks → "Custom Access Token Hook":
+--   In Supabase Dashboard â†’ Authentication â†’ Hooks â†’ "Custom Access Token Hook":
 --   set to public.block_consumer_email_domains
 --   (Supabase custom auth hooks are project-plan-dependent; the function is
 --    ready to enable when the plan supports it.)
 --
 -- As a belt-and-suspenders measure the trigger version below also fires on
--- INSERT to auth.users — however, note that auth schema triggers require
+-- INSERT to auth.users â€” however, note that auth schema triggers require
 -- pg_net or a different mechanism on managed Supabase. The function is defined
 -- here for completeness and for use with db webhooks.
--- ─────────────────────────────────────────────────────────────────────────────
+-- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 -- The canonical list of blocked consumer email domains
 CREATE TABLE IF NOT EXISTS public.blocked_email_domains (
@@ -44,7 +44,8 @@ CREATE TABLE IF NOT EXISTS public.blocked_email_domains (
 
 ALTER TABLE public.blocked_email_domains ENABLE ROW LEVEL SECURITY;
 
--- No direct access by authenticated users — admin-only via service_role
+-- No direct access by authenticated users â€” admin-only via service_role
+DROP POLICY IF EXISTS "bed_service_only" ON public.blocked_email_domains;
 CREATE POLICY "bed_service_only" ON public.blocked_email_domains
   FOR ALL
   USING  (auth.role() = 'service_role')
@@ -82,7 +83,7 @@ $$;
 REVOKE EXECUTE ON FUNCTION public.is_consumer_email(text) FROM PUBLIC;
 GRANT  EXECUTE ON FUNCTION public.is_consumer_email(text) TO service_role;
 
--- Supabase Auth Hook function — called before user creation.
+-- Supabase Auth Hook function â€” called before user creation.
 -- Must be SECURITY DEFINER with search_path = extensions, public.
 -- Return value: jsonb  { "error": {...} } blocks signup; {} allows it.
 CREATE OR REPLACE FUNCTION public.auth_hook_block_consumer_domains(event jsonb)
@@ -139,7 +140,7 @@ REVOKE EXECUTE ON FUNCTION public.check_email_allowed(text) FROM PUBLIC;
 GRANT  EXECUTE ON FUNCTION public.check_email_allowed(text) TO authenticated, anon;
 
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- MED-04: HubSpot API key encrypted at rest
 --
 -- Previously stored as cleartext text in workspace_secrets.
@@ -149,13 +150,13 @@ GRANT  EXECUTE ON FUNCTION public.check_email_allowed(text) TO authenticated, an
 -- name 'hubspot_encryption_key' to retrieve and decrypt on demand.
 --
 -- Migration plan:
---   1. Add encrypted column alongside hub_spot_api_key (text → bytea)
---   2. Migrate existing rows (re-encrypt on next save — value is already encrypted
+--   1. Add encrypted column alongside hub_spot_api_key (text â†’ bytea)
+--   2. Migrate existing rows (re-encrypt on next save â€” value is already encrypted
 --      if the column was empty, or will be on next user update)
 --   3. Drop the plaintext column
 --
 -- NOTE: pgp_sym_encrypt returns bytea. We store as text using encode/decode.
--- ─────────────────────────────────────────────────────────────────────────────
+-- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 -- Step 1: Add the encrypted column
 ALTER TABLE public.workspace_secrets
@@ -220,7 +221,7 @@ $$;
 REVOKE EXECUTE ON FUNCTION public.set_hubspot_key(uuid, text) FROM PUBLIC;
 GRANT  EXECUTE ON FUNCTION public.set_hubspot_key(uuid, text) TO authenticated;
 
--- Decrypt function — only callable by service_role (edge functions)
+-- Decrypt function â€” only callable by service_role (edge functions)
 CREATE OR REPLACE FUNCTION public.get_hubspot_key(p_workspace_id uuid)
 RETURNS text
 LANGUAGE plpgsql
@@ -261,7 +262,7 @@ REVOKE EXECUTE ON FUNCTION public.get_hubspot_key(uuid) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.get_hubspot_key(uuid) FROM authenticated;
 GRANT  EXECUTE ON FUNCTION public.get_hubspot_key(uuid) TO service_role;
 
--- "Is configured" helper — callable by owner without exposing the key value
+-- "Is configured" helper â€” callable by owner without exposing the key value
 CREATE OR REPLACE FUNCTION public.get_hubspot_configured(
   _workspace_id uuid
 )
@@ -298,7 +299,7 @@ BEGIN
     WHERE name = 'hubspot_encryption_key'
     LIMIT 1;
   EXCEPTION WHEN OTHERS THEN
-    -- vault not yet configured — skip migration
+    -- vault not yet configured â€” skip migration
     RAISE NOTICE 'Vault not configured; skipping HubSpot key migration. Set hubspot_encryption_key in Supabase Vault.';
     RETURN;
   END;
@@ -325,7 +326,7 @@ END;
 $$;
 
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- ADDITIONAL HARDENING: Schema introspection lockdown
 --
 -- The anon and authenticated roles should not be able to enumerate table
@@ -333,7 +334,7 @@ $$;
 --
 -- Supabase already restricts most of this by default. These explicit REVOKEs
 -- close any remaining gaps and are idempotent.
--- ─────────────────────────────────────────────────────────────────────────────
+-- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 -- Prevent anon from querying information_schema
 REVOKE SELECT ON ALL TABLES IN SCHEMA information_schema FROM anon;
@@ -346,7 +347,7 @@ REVOKE USAGE ON SCHEMA information_schema FROM authenticated;
 REVOKE USAGE ON SCHEMA pg_catalog        FROM authenticated;
 
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- ADDITIONAL HARDENING: Webhook URLs validation trigger
 --
 -- workspace.settings may contain zapier_webhook_url, slack_webhook_url, etc.
@@ -354,7 +355,7 @@ REVOKE USAGE ON SCHEMA pg_catalog        FROM authenticated;
 -- when the platform posts webhook data.
 --
 -- Fix: a trigger validates webhook URLs against an allowlist of allowed hosts.
--- ─────────────────────────────────────────────────────────────────────────────
+-- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 CREATE OR REPLACE FUNCTION public.validate_webhook_urls()
 RETURNS trigger
@@ -421,13 +422,13 @@ CREATE TRIGGER trg_validate_webhook_urls
   EXECUTE FUNCTION public.validate_webhook_urls();
 
 
--- ─────────────────────────────────────────────────────────────────────────────
--- ADDITIONAL HARDENING: Profiles table — prevent email column injection
+-- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+-- ADDITIONAL HARDENING: Profiles table â€” prevent email column injection
 --
 -- profiles has a text email column. Ensure it's always derived from auth.users
 -- and cannot be updated by the user to another email (which could be used to
 -- bypass logic that matches on profile.email rather than auth.users.email).
--- ─────────────────────────────────────────────────────────────────────────────
+-- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 CREATE OR REPLACE FUNCTION public.enforce_profile_email_immutability()
 RETURNS trigger
@@ -458,28 +459,30 @@ CREATE TRIGGER trg_profile_email_immutability
   EXECUTE FUNCTION public.enforce_profile_email_immutability();
 
 
--- ─────────────────────────────────────────────────────────────────────────────
--- ADDITIONAL HARDENING: Profiles RLS — add explicit WITH CHECK
+-- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+-- ADDITIONAL HARDENING: Profiles RLS â€” add explicit WITH CHECK
 --
 -- The existing policy "Users can manage own profile" uses a bare USING clause
 -- which PostgreSQL applies for both SELECT and writes. Adding explicit WITH CHECK
 -- prevents a user from inserting/updating a profile for a different user_id
 -- even if the USING clause passes (shouldn't happen, but defence in depth).
--- ─────────────────────────────────────────────────────────────────────────────
+-- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+DROP POLICY IF EXISTS "Users can manage own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can manage own profile" ON public.profiles;
 CREATE POLICY "Users can manage own profile" ON public.profiles
   USING     (auth.uid() = id)
   WITH CHECK (auth.uid() = id);
 
--- ─────────────────────────────────────────────────────────────────────────────
--- ADDITIONAL HARDENING: campaign_activity — prevent impersonation
+-- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+-- ADDITIONAL HARDENING: campaign_activity â€” prevent impersonation
 --
 -- The existing policy allows any workspace member to insert activity rows.
 -- WITH CHECK must also enforce that user_id = auth.uid() so a member cannot
 -- forge activity records as another user.
--- ─────────────────────────────────────────────────────────────────────────────
+-- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+DROP POLICY IF EXISTS "ca_member_insert" ON public.campaign_activity;
 DROP POLICY IF EXISTS "ca_member_insert" ON public.campaign_activity;
 CREATE POLICY "ca_member_insert" ON public.campaign_activity
   FOR INSERT

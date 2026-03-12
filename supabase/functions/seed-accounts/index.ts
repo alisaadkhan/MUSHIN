@@ -128,9 +128,18 @@ Deno.serve(async (req) => {
 
         // ── Step 3: Create Vecter Prime (user, pro plan) ──────────────────────────
         log.push("Creating Vecter Prime...");
+        // SECURITY: Test account credentials are never hardcoded in source.
+        // Set SEED_TEST_EMAIL and SEED_TEST_PASSWORD in Supabase secrets for local/dev only.
+        const seedTestEmail    = Deno.env.get("SEED_TEST_EMAIL");
+        const seedTestPassword = Deno.env.get("SEED_TEST_PASSWORD");
+        if (!seedTestEmail || !seedTestPassword) {
+            return new Response(JSON.stringify({ error: "SEED_TEST_EMAIL and SEED_TEST_PASSWORD must be set as Supabase secrets" }), {
+                status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+        }
         const { data: vecData, error: vecErr } = await adminClient.auth.admin.createUser({
-            email: Deno.env.get("SEED_VECTER_EMAIL") || "vecterprime1234@gmail.com",
-            password: Deno.env.get("SEED_VECTER_PASSWORD"),
+            email: seedTestEmail,
+            password: seedTestPassword,
             email_confirm: true,
             user_metadata: { full_name: "Vecter Prime" },
         });

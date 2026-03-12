@@ -1,0 +1,1137 @@
+﻿node.exe : 
+Initialising login 
+role...
+At C:\Program Files\nod
+ejs\npx.ps1:28 char:12
++   $input | & 
+$NODE_EXE $NPX_CLI_JS 
+$args
++            ~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (Initialising    
+ login role...:Stri    
+ng) [], RemoteExce    
+ption
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+Connecting to remote 
+database...
+Skipping migration .202
+60226_enrichment_v2.sql
+_ignored... (file name 
+must match pattern 
+"<timestamp>_name.sql")
+Do you want to push 
+these migrations to 
+the remote database?
+ ΓÇó 20260320_security_
+hardening.sql
+ ΓÇó 20260321_security_
+gaps.sql
+ ΓÇó 20260322_pentest_r
+emediation.sql
+ ΓÇó 20260323_atomic_cr
+edit_locking.sql
+ ΓÇó 20260324_pentest_f
+ixes.sql
+ ΓÇó 20260325134157_wor
+kspace_rls_hardening.sq
+l
+ ΓÇó 20260325_final_har
+dening.sql
+ ΓÇó 20260326_rls_gap_r
+emediation.sql
+
+ [Y/n] y
+Applying migration 2026
+0320_security_hardening
+.sql...
+NOTICE (00000): policy 
+"ws_select" for 
+relation 
+"public.workspaces" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"ws_insert" for 
+relation 
+"public.workspaces" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"ws_update" for 
+relation 
+"public.workspaces" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"ws_delete" for 
+relation 
+"public.workspaces" 
+does not exist, 
+skipping
+NOTICE (00000): 
+trigger "trg_billing_im
+mutability" for 
+relation 
+"public.workspaces" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"ur_service_write" for 
+relation 
+"public.user_roles" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"sub_service_write" 
+for relation 
+"public.subscriptions" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"cu_service_write" for 
+relation 
+"public.credits_usage" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"sh_member_insert" for 
+relation "public.search
+_history" does not 
+exist, skipping
+NOTICE (00000): policy 
+"sh_service_write" for 
+relation "public.search
+_history" does not 
+exist, skipping
+NOTICE (00000): policy 
+"ol_member_insert" for 
+relation 
+"public.outreach_log" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"ol_member_update" for 
+relation 
+"public.outreach_log" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"ol_service_write" for 
+relation 
+"public.outreach_log" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"ca_member_insert" for 
+relation "public.campai
+gn_activity" does not 
+exist, skipping
+NOTICE (42P07): 
+relation 
+"notifications" 
+already exists, 
+skipping
+NOTICE (42701): column 
+"link" of relation 
+"notifications" 
+already exists, 
+skipping
+NOTICE (00000): policy 
+"notif_own_select" for 
+relation 
+"public.notifications" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"notif_own_update" for 
+relation 
+"public.notifications" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"notif_service_write" 
+for relation 
+"public.notifications" 
+does not exist, 
+skipping
+NOTICE (00000): policy 
+"te_public_insert" for 
+relation "public.tracki
+ng_events" does not 
+exist, skipping
+NOTICE (00000): policy 
+"te_owner_select" for 
+relation "public.tracki
+ng_events" does not 
+exist, skipping
+NOTICE (00000): policy 
+"ic_auth_select" for 
+relation "public.influe
+ncers_cache" does not 
+exist, skipping
+NOTICE (00000): policy 
+"ic_service_write" for 
+relation "public.influe
+ncers_cache" does not 
+exist, skipping
+NOTICE (00000): policy 
+"se_admin_select" for 
+relation "public.securi
+ty_events" does not 
+exist, skipping
+NOTICE (00000): policy 
+"se_service_write" for 
+relation "public.securi
+ty_events" does not 
+exist, skipping
+WARNING (01006): no 
+privileges could be 
+revoked for "tables"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"table_catalog" of 
+relation "tables"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"table_schema" of 
+relation "tables"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"table_name" of 
+relation "tables"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"table_type" of 
+relation "tables"
+WARNING (01006): no 
+privileges could be 
+revoked for column "sel
+f_referencing_column_na
+me" of relation 
+"tables"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"reference_generation" 
+of relation "tables"
+WARNING (01006): no 
+privileges could be 
+revoked for column "use
+r_defined_type_catalog"
+ of relation "tables"
+WARNING (01006): no 
+privileges could be 
+revoked for column "use
+r_defined_type_schema" 
+of relation "tables"
+WARNING (01006): no 
+privileges could be 
+revoked for column "use
+r_defined_type_name" 
+of relation "tables"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"is_insertable_into" 
+of relation "tables"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"is_typed" of relation 
+"tables"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"commit_action" of 
+relation "tables"
+WARNING (01006): no 
+privileges could be 
+revoked for "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"table_catalog" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"table_schema" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"table_name" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"column_name" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"ordinal_position" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"column_default" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"is_nullable" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"data_type" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column "cha
+racter_maximum_length" 
+of relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column "cha
+racter_octet_length" 
+of relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"numeric_precision" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column "num
+eric_precision_radix" 
+of relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"numeric_scale" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"datetime_precision" 
+of relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"interval_type" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"interval_precision" 
+of relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column "cha
+racter_set_catalog" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"character_set_schema" 
+of relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"character_set_name" 
+of relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"collation_catalog" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"collation_schema" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"collation_name" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"domain_catalog" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"domain_schema" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"domain_name" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"udt_catalog" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"udt_schema" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"udt_name" of relation 
+"columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"scope_catalog" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"scope_schema" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"scope_name" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"maximum_cardinality" 
+of relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"dtd_identifier" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"is_self_referencing" 
+of relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"is_identity" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"identity_generation" 
+of relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"identity_start" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"identity_increment" 
+of relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"identity_maximum" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"identity_minimum" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"identity_cycle" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"is_generated" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column "gen
+eration_expression" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"is_updatable" of 
+relation "columns"
+WARNING (01006): no 
+privileges could be 
+revoked for "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"specific_catalog" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"specific_schema" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"specific_name" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"routine_catalog" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"routine_schema" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"routine_name" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"routine_type" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"module_catalog" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"module_schema" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"module_name" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"udt_catalog" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"udt_schema" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"udt_name" of relation 
+"routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"data_type" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "cha
+racter_maximum_length" 
+of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "cha
+racter_octet_length" 
+of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "cha
+racter_set_catalog" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"character_set_schema" 
+of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"character_set_name" 
+of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"collation_catalog" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"collation_schema" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"collation_name" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"numeric_precision" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "num
+eric_precision_radix" 
+of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"numeric_scale" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"datetime_precision" 
+of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"interval_type" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"interval_precision" 
+of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"type_udt_catalog" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"type_udt_schema" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"type_udt_name" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"scope_catalog" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"scope_schema" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"scope_name" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"maximum_cardinality" 
+of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"dtd_identifier" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"routine_body" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"routine_definition" 
+of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"external_name" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"external_language" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"parameter_style" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"is_deterministic" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"sql_data_access" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"is_null_call" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"sql_path" of relation 
+"routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"schema_level_routine" 
+of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "max
+_dynamic_result_sets" 
+of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"is_user_defined_cast" 
+of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "is_
+implicitly_invocable" 
+of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"security_type" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "to_
+sql_specific_catalog" 
+of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "to_
+sql_specific_schema" 
+of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"to_sql_specific_name" 
+of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"as_locator" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"created" of relation 
+"routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"last_altered" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"new_savepoint_level" 
+of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"is_udt_dependent" of 
+relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_from_data_type
+" of relation 
+"routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_as_locator" 
+of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_char_max_lengt
+h" of relation 
+"routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_char_octet_len
+gth" of relation 
+"routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_char_set_catal
+og" of relation 
+"routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_char_set_schem
+a" of relation 
+"routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_char_set_name"
+ of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_collation_cata
+log" of relation 
+"routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_collation_sche
+ma" of relation 
+"routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_collation_name
+" of relation 
+"routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_numeric_precis
+ion" of relation 
+"routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_numeric_precis
+ion_radix" of relation 
+"routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_numeric_scale"
+ of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_datetime_preci
+sion" of relation 
+"routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_interval_type"
+ of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_interval_preci
+sion" of relation 
+"routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_type_udt_catal
+og" of relation 
+"routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_type_udt_schem
+a" of relation 
+"routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_type_udt_name"
+ of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_scope_catalog"
+ of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_scope_schema" 
+of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_scope_name" 
+of relation "routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_maximum_cardin
+ality" of relation 
+"routines"
+WARNING (01006): no 
+privileges could be 
+revoked for column "res
+ult_cast_dtd_identifier
+" of relation 
+"routines"
+WARNING (01006): no 
+privileges could be 
+revoked for "triggers"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"trigger_catalog" of 
+relation "triggers"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"trigger_schema" of 
+relation "triggers"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"trigger_name" of 
+relation "triggers"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"event_manipulation" 
+of relation "triggers"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"event_object_catalog" 
+of relation "triggers"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"event_object_schema" 
+of relation "triggers"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"event_object_table" 
+of relation "triggers"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"action_order" of 
+relation "triggers"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"action_condition" of 
+relation "triggers"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"action_statement" of 
+relation "triggers"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"action_orientation" 
+of relation "triggers"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"action_timing" of 
+relation "triggers"
+WARNING (01006): no 
+privileges could be 
+revoked for column "act
+ion_reference_old_table
+" of relation 
+"triggers"
+WARNING (01006): no 
+privileges could be 
+revoked for column "act
+ion_reference_new_table
+" of relation 
+"triggers"
+WARNING (01006): no 
+privileges could be 
+revoked for column "act
+ion_reference_old_row" 
+of relation "triggers"
+WARNING (01006): no 
+privileges could be 
+revoked for column "act
+ion_reference_new_row" 
+of relation "triggers"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"created" of relation 
+"triggers"
+WARNING (01006): no 
+privileges could be 
+revoked for "views"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"table_catalog" of 
+relation "views"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"table_schema" of 
+relation "views"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"table_name" of 
+relation "views"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"view_definition" of 
+relation "views"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"check_option" of 
+relation "views"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"is_updatable" of 
+relation "views"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"is_insertable_into" 
+of relation "views"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"is_trigger_updatable" 
+of relation "views"
+WARNING (01006): no 
+privileges could be 
+revoked for column 
+"is_trigger_deletable" 
+of relation "views"
+WARNING (01006): no 
+privileges could be 
+revoked for column "is_
+trigger_insertable_into
+" of relation "views"
+NOTICE (00000): policy 
+"ej_member_select" for 
+relation "public.enrich
+ment_jobs" does not 
+exist, skipping
+NOTICE (00000): policy 
+"ej_service_write" for 
+relation "public.enrich
+ment_jobs" does not 
+exist, skipping
+NOTICE (00000): policy 
+"wm_select" for 
+relation "public.worksp
+ace_members" does not 
+exist, skipping
+NOTICE (00000): policy 
+"wm_service_write" for 
+relation "public.worksp
+ace_members" does not 
+exist, skipping
+NOTICE (00000): policy 
+"inv_service_write" 
+for relation 
+"public.invoices" does 
+not exist, skipping
+Applying migration 2026
+0321_security_gaps.sql.
+..
+NOTICE (00000): policy 
+"avatars_public_read" 
+for relation 
+"storage.objects" does 
+not exist, skipping
+Applying migration 2026
+0322_pentest_remediatio
+n.sql...
+ERROR: function name "p
+ublic.correct_influence
+r_niche" is not unique 
+(SQLSTATE 42725)       
+                       
+                       
+                       
+                       
+  
+At statement: 23       
+                       
+                       
+                       
+                       
+                       
+                       
+                       
+  
+-- Comment clarifying 
+intent for future 
+developers             
+                       
+                       
+                       
+                       
+                       
+        
+COMMENT ON FUNCTION pub
+lic.correct_influencer_
+niche IS               
+                       
+                       
+                       
+                       
+                       
+  
+  'Admin-only: 
+corrects the primary 
+niche of a creator 
+profile. Caller 
+identity is derived 
+from auth.uid() ΓÇö 
+the p_correcting_user 
+parameter was removed 
+to prevent audit-trail 
+spoofing.'
+Try rerunning the 
+command with --debug 
+to troubleshoot the 
+error.

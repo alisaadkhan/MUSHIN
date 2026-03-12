@@ -31,12 +31,17 @@ export async function checkRateLimit(
     const token = Deno.env.get('UPSTASH_REDIS_REST_TOKEN');
 
     if (!url || !token) {
-        if (Deno.env.get("ENVIRONMENT") === "production" || Deno.env.get("NODE_ENV") === "production") {
-            console.error("[rate_limit] UPSTASH_REDIS_REST_URL/TOKEN not configured — blocking request (fail CLOSED)");
-            return { allowed: false, remaining: 0, retryAfter: 60 };
+        // SECURITY: Fail CLOSED — never allow unlimited traffic when the rate-limit
+        // backend is unconfigured. An open fail-open here turns a misconfiguration
+        // into a complete bypass of all rate limits across every endpoint.
+        // In local development, set UPSTASH_REDIS_REST_URL and TOKEN via `supabase secrets set`.
+        const isDev = Deno.env.get("ENVIRONMENT") === "development";
+        if (isDev) {
+            console.warn("[rate_limit] Redis not configured — skipping rate limit in dev mode");
+            return { allowed: true, remaining: 999 };
         }
-        console.warn("[rate_limit] Redis not configured — skipping rate limit in dev/local mode");
-        return { allowed: true, remaining: 999 };
+        console.error("[rate_limit] UPSTASH_REDIS_REST_URL/TOKEN not configured — blocking request (fail CLOSED)");
+        return { allowed: false, remaining: 0, retryAfter: 60 };
     }
 
     const limits = {

@@ -1,0 +1,211 @@
+﻿node.exe : 
+Initialising login 
+role...
+At C:\Program Files\nod
+ejs\npx.ps1:28 char:12
++   $input | & 
+$NODE_EXE $NPX_CLI_JS 
+$args
++            ~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (Initialising    
+ login role...:Stri    
+ng) [], RemoteExce    
+ption
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+Connecting to remote 
+database...
+Skipping migration .202
+60226_enrichment_v2.sql
+_ignored... (file name 
+must match pattern 
+"<timestamp>_name.sql")
+Do you want to push 
+these migrations to 
+the remote database?
+ ΓÇó 20260324_pentest_f
+ixes.sql
+ ΓÇó 20260325134157_wor
+kspace_rls_hardening.sq
+l
+ ΓÇó 20260325_final_har
+dening.sql
+ ΓÇó 20260326_rls_gap_r
+emediation.sql
+
+ [Y/n] y
+Applying migration 2026
+0324_pentest_fixes.sql.
+..
+NOTICE (00000): policy 
+"Workspace owners can 
+manage jobs" for 
+relation "public.enrich
+ment_jobs" does not 
+exist, skipping
+NOTICE (00000): policy 
+"ej_owner_select" for 
+relation "public.enrich
+ment_jobs" does not 
+exist, skipping
+NOTICE (00000): policy 
+"ej_owner_select" for 
+relation "public.enrich
+ment_jobs" does not 
+exist, skipping
+NOTICE (00000): policy 
+"ej_service_write" for 
+relation "public.enrich
+ment_jobs" does not 
+exist, skipping
+NOTICE (00000): policy 
+"Workspace members can 
+read follower history" 
+for relation "public.fo
+llower_history" does 
+not exist, skipping
+NOTICE (00000): policy 
+"Service role manages 
+follower history" for 
+relation "public.follow
+er_history" does not 
+exist, skipping
+NOTICE (00000): policy 
+"fh_member_select" for 
+relation "public.follow
+er_history" does not 
+exist, skipping
+NOTICE (00000): policy 
+"fh_service_write" for 
+relation "public.follow
+er_history" does not 
+exist, skipping
+NOTICE (00000): policy 
+"Authenticated can 
+read audience 
+analysis" for relation 
+"public.audience_analys
+is" does not exist, 
+skipping
+NOTICE (00000): policy 
+"Service role manages 
+audience analysis" for 
+relation "public.audien
+ce_analysis" does not 
+exist, skipping
+NOTICE (00000): policy 
+"aa_member_select" for 
+relation "public.audien
+ce_analysis" does not 
+exist, skipping
+NOTICE (00000): policy 
+"Authenticated can 
+read linked accounts" 
+for relation "public.li
+nked_accounts" does 
+not exist, skipping
+NOTICE (00000): policy 
+"Service role manages 
+linked accounts" for 
+relation "public.linked
+_accounts" does not 
+exist, skipping
+NOTICE (00000): policy 
+"la_member_select" for 
+relation "public.linked
+_accounts" does not 
+exist, skipping
+NOTICE (00000): policy 
+"te_service_insert" 
+for relation "public.tr
+acking_events" does 
+not exist, skipping
+NOTICE (00000): policy 
+"sc_service_only" for 
+relation "public.system
+_constants" does not 
+exist, skipping
+Applying migration 2026
+0325134157_workspace_rl
+s_hardening.sql...
+NOTICE (42710): 
+extension "pgcrypto" 
+already exists, 
+skipping
+NOTICE (00000): policy 
+"Workspace members can 
+read follower history" 
+for relation "public.fo
+llower_history" does 
+not exist, skipping
+NOTICE (00000): policy 
+"Service role manages 
+follower history" for 
+relation "public.follow
+er_history" does not 
+exist, skipping
+ERROR: policy 
+"fh_workspace_select" 
+for table 
+"follower_history" 
+already exists 
+(SQLSTATE 42710)
+At statement: 6        
+                       
+                       
+                       
+    
+-- SELECT: restrict to 
+callers who are in a 
+workspace              
+                       
+      
+CREATE POLICY 
+"fh_workspace_select" 
+ON public.follower_hist
+ory                    
+              
+  FOR SELECT           
+                       
+                       
+                       
+    
+  USING (              
+                       
+                       
+                       
+    
+    EXISTS (           
+                       
+                       
+                       
+    
+      SELECT 1 FROM pub
+lic.workspace_members 
+wm                     
+                       
+     
+      WHERE wm.user_id 
+= auth.uid()           
+                       
+                       
+    
+    )                  
+                       
+                       
+                       
+    
+  )                    
+                       
+                       
+                       
+    
+Try rerunning the 
+command with --debug 
+to troubleshoot the 
+error.
