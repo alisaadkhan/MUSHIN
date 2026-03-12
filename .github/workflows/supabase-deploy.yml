@@ -41,8 +41,7 @@ jobs:
 
       - name: Push migrations to Supabase
         run: |
-          supabase migration repair --status reverted 20260312 || true
-          supabase migration repair --status applied 20260312134157 || true
+          supabase migration repair --status applied 20260325134157 || true
           supabase db push --include-all
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
