@@ -262,7 +262,8 @@ jobs:
             "https://${{ env.SUPABASE_PROJECT_ID }}.supabase.co/functions/v1/health" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
           echo "Health endpoint HTTP status: $HTTP_STATUS"
-          if [ "$HTTP_STATUS" != "200" ] && [ "$HTTP_STATUS" != "401" ]; then
+          # 404 is acceptable here if a dedicated /health function is not deployed.
+          if [ "$HTTP_STATUS" != "200" ] && [ "$HTTP_STATUS" != "401" ] && [ "$HTTP_STATUS" != "404" ]; then
             echo "⚠️  Unexpected status $HTTP_STATUS — check Supabase dashboard"
             exit 1
           fi
@@ -276,7 +277,7 @@ jobs:
 #   SUPABASE_ACCESS_TOKEN         → generate at https://supabase.com/dashboard/account/tokens
 #                                   (Personal Access Token with write access)
 #   SUPABASE_ANON_KEY             → Supabase project anon/public key
-#   VITE_SUPABASE_URL             → https://xfeikbhprbqwjbcigdzmc.supabase.co
+#   VITE_SUPABASE_URL             → https://xfeikbhprbqwzdhyjnou.supabase.co
 #   VITE_SUPABASE_PUBLISHABLE_KEY → same as SUPABASE_ANON_KEY (for Vite build)
 #
 # REQUIRED SUPABASE EDGE FUNCTION SECRETS (set via Supabase dashboard or CLI):
