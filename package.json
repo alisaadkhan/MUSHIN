@@ -85,8 +85,6 @@
   "overrides": {
     "lodash": "^4.17.23",
     "@remix-run/router": "^1.23.2",
-    "react-router": "^6.30.3",
-    "react-router-dom": "^6.30.3",
     "glob": "^11.0.1",
     "minimatch": "^9.0.7",
     "esbuild": "^0.25.0"
