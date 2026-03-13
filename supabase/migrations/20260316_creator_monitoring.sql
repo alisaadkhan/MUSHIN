@@ -7,7 +7,6 @@
 
 -- 1. Ensure pg_cron extension is available
 CREATE EXTENSION IF NOT EXISTS pg_cron;
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2. Add missing creator-index fields to influencer_profiles
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -16,21 +15,17 @@ ALTER TABLE public.influencer_profiles
   ADD COLUMN IF NOT EXISTS first_seen_at    TIMESTAMPTZ DEFAULT now(),
   ADD COLUMN IF NOT EXISTS channel_url      TEXT,
   ADD COLUMN IF NOT EXISTS last_updated_at  TIMESTAMPTZ DEFAULT now();
-
 -- Backfill first_seen_at from created_at where possible
 UPDATE public.influencer_profiles
   SET first_seen_at = COALESCE(created_at, now())
   WHERE first_seen_at IS NULL;
-
 -- Index on first_seen_at for new-creator queries
 CREATE INDEX IF NOT EXISTS idx_ip_first_seen_at
   ON public.influencer_profiles (first_seen_at DESC NULLS LAST);
-
 -- Channel URL unique index (allows null, unique where present)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ip_channel_url
   ON public.influencer_profiles (channel_url)
   WHERE channel_url IS NOT NULL;
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 3. trending_niches table
 --    Populated by the trending-niches-analyzer worker.
@@ -47,21 +42,16 @@ CREATE TABLE IF NOT EXISTS public.trending_niches (
   last_updated     TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (tag, platform)
 );
-
 CREATE INDEX IF NOT EXISTS idx_tn_trend_score
   ON public.trending_niches (trend_score DESC);
-
 CREATE INDEX IF NOT EXISTS idx_tn_platform_score
   ON public.trending_niches (platform, trend_score DESC);
-
 -- RLS: read-only for authenticated users, full access via service role
 ALTER TABLE public.trending_niches ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "Authenticated users can read trending niches" ON public.trending_niches;
 CREATE POLICY "Authenticated users can read trending niches"
   ON public.trending_niches FOR SELECT
   TO authenticated USING (true);
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 4. discovery_runs audit table
 --    Tracks each automated worker run for debugging and monitoring.
@@ -80,14 +70,11 @@ CREATE TABLE IF NOT EXISTS public.discovery_runs (
   status          TEXT        NOT NULL DEFAULT 'running', -- 'running' | 'success' | 'error'
   meta            JSONB
 );
-
 CREATE INDEX IF NOT EXISTS idx_dr_run_type_started
   ON public.discovery_runs (run_type, started_at DESC);
-
 -- Auto-cleanup: delete runs older than 30 days to keep table lean
 CREATE INDEX IF NOT EXISTS idx_dr_started_at
   ON public.discovery_runs (started_at DESC);
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 5. creator_refresh_schedule view — tiered refresh priority
 --    Exposes which profiles are due for a refresh based on growth tier.
@@ -130,7 +117,6 @@ CREATE OR REPLACE VIEW public.creator_refresh_queue AS
   ORDER BY
     refresh_due DESC,
     ip.follower_count DESC;
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 6. pg_cron schedules
 --    Note: pg_cron jobs call the edge functions via pg_net HTTP requests.
@@ -146,7 +132,6 @@ SELECT cron.unschedule(jobname)
     'trending-niches-analyzer',
     'discovery-run-cleanup'
   );
-
 -- Every 6 hours: discover new creators
 SELECT cron.schedule(
   'creator-discovery-worker',
@@ -162,7 +147,6 @@ SELECT cron.schedule(
   );
   $$
 );
-
 -- Every 4 hours: refresh stale profiles (tiered)
 SELECT cron.schedule(
   'creator-refresh-monitor',
@@ -178,7 +162,6 @@ SELECT cron.schedule(
   );
   $$
 );
-
 -- Every 12 hours: analyze trending niches
 SELECT cron.schedule(
   'trending-niches-analyzer',
@@ -194,7 +177,6 @@ SELECT cron.schedule(
   );
   $$
 );
-
 -- Daily cleanup: remove discovery_runs older than 30 days
 SELECT cron.schedule(
   'discovery-run-cleanup',

@@ -1,12 +1,12 @@
+import { getServiceRoleKey } from "../_shared/privileged_gateway.ts";
+import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Redis } from "https://esm.sh/@upstash/redis";
 import { checkRateLimit, corsHeaders } from "../_shared/rate_limit.ts";
 import { extractCityFromBio } from "../_shared/geo.ts";
 import { computeQuickBotScore } from "../_shared/bot_signals.ts";
-
 // ── Shared Utilities ───────────────────────────────────────────────────────────
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
-
 function extractLinkedHandles(bio: string, currentPlatform: string): Array<{ platform: string; username: string }> {
     const out: Array<{ platform: string; username: string }> = [];
     const ig = bio.match(/instagram\.com\/([a-zA-Z0-9_.]+)/i) || (currentPlatform !== "instagram" ? bio.match(/\big:\s*@?([a-zA-Z0-9_.]{3,30})/i) : null);
@@ -313,7 +313,11 @@ Deno.serve(async (req: Request) => {
         const { data: { user } } = await supabase.auth.getUser(token);
         if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-        const serviceClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { autoRefreshToken: false, persistSession: false } });
+        const serviceClient = await performPrivilegedWrite({
+        authHeader: req.headers.get("Authorization"),
+        action: "gateway:privileged-client-bootstrap",
+        execute: async (_ctx, client) => client,
+    });
 
         const { data: workspaceId } = await supabase.rpc("get_user_workspace_id");
         if (!workspaceId) return new Response(JSON.stringify({ error: "No workspace" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -525,7 +529,7 @@ Deno.serve(async (req: Request) => {
             fetch(tagUrl, {
                 method: "POST",
                 headers: {
-                    Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+                    Authorization: `Bearer ${getServiceRoleKey()}`,
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({ profile_id: profile.id }),

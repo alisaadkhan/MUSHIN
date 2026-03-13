@@ -1,6 +1,6 @@
+import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { generateText, extractJsonFromText } from "../_shared/huggingface.ts";
-
 const ALLOWED_ORIGIN = Deno.env.get("APP_URL") || "https://mushin.app";
 const corsHeaders = {
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
@@ -58,7 +58,6 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
@@ -81,7 +80,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+    const adminClient = await performPrivilegedWrite({
+        authHeader: req.headers.get("Authorization"),
+        action: "gateway:privileged-client-bootstrap",
+        execute: async (_ctx, client) => client,
+    });
 
     const { data: membership } = await adminClient
       .from("workspace_members")

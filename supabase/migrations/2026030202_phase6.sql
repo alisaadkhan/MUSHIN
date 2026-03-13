@@ -20,28 +20,23 @@ BEGIN
   END IF;
 END;
 $$;
-
 -- ─── 2. AI evaluation versioning & expiry ─────────────────────────────────────
 ALTER TABLE public.influencer_evaluations
   ADD COLUMN IF NOT EXISTS evaluation_version int NOT NULL DEFAULT 1,
   ADD COLUMN IF NOT EXISTS expires_at timestamptz;
-
 -- Set expiry on all existing rows (90-day rolling window)
 UPDATE public.influencer_evaluations
 SET expires_at = evaluated_at + INTERVAL '90 days'
 WHERE expires_at IS NULL;
-
 -- ─── 3. Enrichment TTL columns ────────────────────────────────────────────────
 -- enriched_at already exists. We add last_enriched_at as alias + TTL control.
 ALTER TABLE public.influencer_profiles
   ADD COLUMN IF NOT EXISTS last_enriched_at timestamptz,
   ADD COLUMN IF NOT EXISTS enrichment_ttl_days int NOT NULL DEFAULT 30;
-
 -- Backfill last_enriched_at from existing enriched_at
 UPDATE public.influencer_profiles
 SET last_enriched_at = enriched_at
 WHERE last_enriched_at IS NULL AND enriched_at IS NOT NULL;
-
 -- ─── 4. Engagement benchmark table (replaces hash-function estimates) ─────────
 CREATE TABLE IF NOT EXISTS public.engagement_benchmarks (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -57,7 +52,6 @@ CREATE TABLE IF NOT EXISTS public.engagement_benchmarks (
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE(platform, follower_bucket, primary_niche)
 );
-
 -- Seed with industry-researched benchmarks (2024/2025 data)
 -- Instagram benchmarks
 INSERT INTO public.engagement_benchmarks (platform, follower_bucket, min_followers, max_followers, median_er, p25_er, p75_er) VALUES
@@ -68,7 +62,6 @@ INSERT INTO public.engagement_benchmarks (platform, follower_bucket, min_followe
   ('instagram','mega',  500000, 999999999,1.10, 0.60, 2.00)
 ON CONFLICT (platform, follower_bucket, primary_niche) DO UPDATE
   SET median_er=EXCLUDED.median_er, p25_er=EXCLUDED.p25_er, p75_er=EXCLUDED.p75_er, updated_at=now();
-
 -- TikTok benchmarks
 INSERT INTO public.engagement_benchmarks (platform, follower_bucket, min_followers, max_followers, median_er, p25_er, p75_er) VALUES
   ('tiktok','nano',    1000,    10000, 7.80, 4.20,12.50),
@@ -78,7 +71,6 @@ INSERT INTO public.engagement_benchmarks (platform, follower_bucket, min_followe
   ('tiktok','mega',  500000, 999999999,2.10, 0.90, 4.10)
 ON CONFLICT (platform, follower_bucket, primary_niche) DO UPDATE
   SET median_er=EXCLUDED.median_er, p25_er=EXCLUDED.p25_er, p75_er=EXCLUDED.p75_er, updated_at=now();
-
 -- YouTube benchmarks
 INSERT INTO public.engagement_benchmarks (platform, follower_bucket, min_followers, max_followers, median_er, p25_er, p75_er) VALUES
   ('youtube','nano',    1000,    10000, 3.50, 1.90, 6.20),
@@ -88,13 +80,11 @@ INSERT INTO public.engagement_benchmarks (platform, follower_bucket, min_followe
   ('youtube','mega',  500000, 999999999,1.20, 0.50, 2.60)
 ON CONFLICT (platform, follower_bucket, primary_niche) DO UPDATE
   SET median_er=EXCLUDED.median_er, p25_er=EXCLUDED.p25_er, p75_er=EXCLUDED.p75_er, updated_at=now();
-
 ALTER TABLE public.engagement_benchmarks ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Authenticated users can read benchmarks" ON public.engagement_benchmarks
   FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "Service role manages benchmarks" ON public.engagement_benchmarks
   FOR ALL USING (auth.role() = 'service_role');
-
 -- ─── 5. Enrichment failure log ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.enrichment_failures (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -109,7 +99,6 @@ CREATE INDEX IF NOT EXISTS idx_enrichment_failures_created
   ON public.enrichment_failures(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_enrichment_failures_platform
   ON public.enrichment_failures(platform, created_at DESC);
-
 ALTER TABLE public.enrichment_failures ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admins can read failures" ON public.enrichment_failures
   FOR SELECT USING (
@@ -117,14 +106,12 @@ CREATE POLICY "Admins can read failures" ON public.enrichment_failures
   );
 CREATE POLICY "Service role manages failures" ON public.enrichment_failures
   FOR ALL USING (auth.role() = 'service_role');
-
 -- ─── 6. Niche correction storage ──────────────────────────────────────────────
 ALTER TABLE public.influencer_profiles
   ADD COLUMN IF NOT EXISTS niche_confidence int CHECK (niche_confidence BETWEEN 0 AND 100),
   ADD COLUMN IF NOT EXISTS niche_corrected_by uuid REFERENCES auth.users(id),
   ADD COLUMN IF NOT EXISTS niche_corrected_at timestamptz,
   ADD COLUMN IF NOT EXISTS niche_original text;
-
 CREATE OR REPLACE FUNCTION correct_influencer_niche(
   p_profile_id uuid,
   p_new_niche text,
@@ -142,7 +129,6 @@ BEGIN
   WHERE id = p_profile_id;
 END;
 $$;
-
 -- View for niche training dataset (export when 200+ corrections accumulated)
 DROP VIEW IF EXISTS public.niche_training_data;
 CREATE OR REPLACE VIEW public.niche_training_data AS
@@ -151,7 +137,6 @@ SELECT platform, username, bio, primary_niche AS corrected_niche,
 FROM public.influencer_profiles
 WHERE niche_corrected_by IS NOT NULL
 ORDER BY niche_corrected_at DESC;
-
 -- ─── 7. System integrity audit function ───────────────────────────────────────
 CREATE OR REPLACE FUNCTION system_integrity_audit()
 RETURNS jsonb
@@ -249,13 +234,12 @@ BEGIN
   );
 
   -- Log to audit table
-  INSERT INTO admin_audit_log(action, admin_user_id, details)
+  INSERT INTO admin_audit_log(action, user_id, details)
   VALUES ('system_integrity_audit', '00000000-0000-0000-0000-000000000001'::uuid, result);
 
   RETURN result;
 END;
 $$;
-
 -- ─── 8. pg_cron schedules (requires pg_cron extension enabled in Supabase dashboard) ──
 -- Enable in Supabase dashboard → Database → Extensions → pg_cron
 -- Then run this SQL:
@@ -291,7 +275,6 @@ BEGIN
   END IF;
 END;
 $$;
-
 -- ─── 10. Follower growth spike view (for bot detection signal 16) ─────────────
 DROP VIEW IF EXISTS public.follower_growth_signals;
 CREATE OR REPLACE VIEW public.follower_growth_signals AS
@@ -330,10 +313,8 @@ SELECT
     ELSE false
   END AS is_growth_spike
 FROM rolling_avg;
-
 -- ─── 11. claim_enrichment_jobs: atomic batch claim with FOR UPDATE SKIP LOCKED ────────
 ALTER TABLE public.enrichment_jobs ADD COLUMN IF NOT EXISTS started_at timestamptz;
-
 CREATE OR REPLACE FUNCTION claim_enrichment_jobs(batch_size int DEFAULT 5)
 RETURNS SETOF enrichment_jobs
 LANGUAGE sql

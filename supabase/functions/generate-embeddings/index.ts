@@ -1,5 +1,5 @@
+import { getServiceRoleKey } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
 // Batch generates text embeddings for all influencer_profiles that lack one.
 // Called by cron or manually. Processes 50 profiles per invocation to stay within memory limits.
 // Safe to call multiple times — skips profiles that already have embeddings.
@@ -17,7 +17,7 @@ Deno.serve(async (req: Request) => {
 
     // Internal-only: requires service role key
     const authHeader = req.headers.get("Authorization");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const serviceKey = getServiceRoleKey();
     if (!authHeader || authHeader !== `Bearer ${serviceKey}`) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }

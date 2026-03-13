@@ -1,6 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { checkRateLimit } from "../_shared/rate_limit.ts";
-
 /** Prevent XSS by escaping all HTML special characters before injecting into templates. */
 function escHtml(s: unknown): string {
   return String(s ?? "")
@@ -66,10 +65,7 @@ Deno.serve(async (req) => {
             );
         }
 
-        const serviceClient = createClient(
-            Deno.env.get("SUPABASE_URL")!,
-            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-        );
+        const serviceClient = createPrivilegedClient();
 
         const { data: profile, error } = await serviceClient
             .from("influencer_profiles")

@@ -3,11 +3,9 @@ ALTER TABLE public.influencer_profiles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Authenticated users can read profiles" ON public.influencer_profiles;
 CREATE POLICY "Authenticated users can read profiles" ON public.influencer_profiles
   FOR SELECT USING (auth.role() = 'authenticated');
-
 DROP POLICY IF EXISTS "Service role manages profiles" ON public.influencer_profiles;
 CREATE POLICY "Service role manages profiles" ON public.influencer_profiles
   FOR ALL USING (auth.role() = 'service_role');
-
 -- ── influencer_posts: public read for authenticated users ──
 ALTER TABLE public.influencer_posts ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Authenticated users can read posts" ON public.influencer_posts;
@@ -16,7 +14,6 @@ CREATE POLICY "Authenticated users can read posts" ON public.influencer_posts
 DROP POLICY IF EXISTS "Service role manages posts" ON public.influencer_posts;
 CREATE POLICY "Service role manages posts" ON public.influencer_posts
   FOR ALL USING (auth.role() = 'service_role');
-
 -- ── follower_history: workspace members only (contains enrichment timing intelligence) ──
 ALTER TABLE public.follower_history ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Workspace members can read follower history" ON public.follower_history;
@@ -25,7 +22,6 @@ CREATE POLICY "Workspace members can read follower history" ON public.follower_h
 DROP POLICY IF EXISTS "Service role manages follower history" ON public.follower_history;
 CREATE POLICY "Service role manages follower history" ON public.follower_history
   FOR ALL USING (auth.role() = 'service_role');
-
 -- ── linked_accounts ──
 ALTER TABLE public.linked_accounts ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Authenticated can read linked accounts" ON public.linked_accounts;
@@ -34,7 +30,6 @@ CREATE POLICY "Authenticated can read linked accounts" ON public.linked_accounts
 DROP POLICY IF EXISTS "Service role manages linked accounts" ON public.linked_accounts;
 CREATE POLICY "Service role manages linked accounts" ON public.linked_accounts
   FOR ALL USING (auth.role() = 'service_role');
-
 -- ── influencer_evaluations ──
 ALTER TABLE public.influencer_evaluations ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Workspace members can read evaluations" ON public.influencer_evaluations;
@@ -47,7 +42,6 @@ CREATE POLICY "Workspace members can read evaluations" ON public.influencer_eval
 DROP POLICY IF EXISTS "Service role manages evaluations" ON public.influencer_evaluations;
 CREATE POLICY "Service role manages evaluations" ON public.influencer_evaluations
   FOR ALL USING (auth.role() = 'service_role');
-
 -- ── audience_analysis ──
 ALTER TABLE public.audience_analysis ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Authenticated can read audience analysis" ON public.audience_analysis;
@@ -56,7 +50,6 @@ CREATE POLICY "Authenticated can read audience analysis" ON public.audience_anal
 DROP POLICY IF EXISTS "Service role manages audience analysis" ON public.audience_analysis;
 CREATE POLICY "Service role manages audience analysis" ON public.audience_analysis
   FOR ALL USING (auth.role() = 'service_role');
-
 -- ── API cost tracking table ──
 CREATE TABLE IF NOT EXISTS public.api_cost_log (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -71,7 +64,6 @@ CREATE INDEX IF NOT EXISTS idx_api_cost_log_workspace_date
   ON public.api_cost_log(workspace_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_api_cost_log_api_date
   ON public.api_cost_log(api_name, created_at DESC);
-
 ALTER TABLE public.api_cost_log ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Workspace members can read own costs" ON public.api_cost_log
   FOR SELECT USING (
@@ -79,14 +71,12 @@ CREATE POLICY "Workspace members can read own costs" ON public.api_cost_log
   );
 CREATE POLICY "Service role manages cost log" ON public.api_cost_log
   FOR ALL USING (auth.role() = 'service_role');
-
 -- Monthly budget caps per workspace
 ALTER TABLE public.workspaces
   ADD COLUMN IF NOT EXISTS monthly_api_budget_usd numeric(10,2) DEFAULT 50.00,
   ADD COLUMN IF NOT EXISTS current_month_spend_usd numeric(10,4) DEFAULT 0,
   ADD COLUMN IF NOT EXISTS budget_alert_sent_at timestamptz,
   ADD COLUMN IF NOT EXISTS enrichment_locked boolean NOT NULL DEFAULT false;
-
 -- Function: check and enforce budget cap before enrichment
 CREATE OR REPLACE FUNCTION check_workspace_budget(ws_id uuid)
 RETURNS void
@@ -113,7 +103,6 @@ BEGIN
   END IF;
 END;
 $$;
-
 -- Function: record API spend and update workspace monthly total
 CREATE OR REPLACE FUNCTION record_api_cost(
   ws_id uuid,
@@ -135,7 +124,6 @@ BEGIN
   WHERE id = ws_id;
 END;
 $$;
-
 -- Cursor-based pagination helper for influencer_profiles
 CREATE OR REPLACE FUNCTION get_profiles_page(
   p_platform text DEFAULT NULL,
@@ -165,7 +153,6 @@ AS $$
   ORDER BY p.id ASC
   LIMIT LEAST(p_limit, 100);  -- Hard cap: never return more than 100 rows
 $$;
-
 -- Behavioral anomaly detection: rapid search burst tracking per workspace
 CREATE TABLE IF NOT EXISTS public.behavioral_anomalies (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -179,7 +166,6 @@ CREATE TABLE IF NOT EXISTS public.behavioral_anomalies (
 );
 CREATE INDEX IF NOT EXISTS idx_behavioral_anomalies_workspace
   ON public.behavioral_anomalies(workspace_id, detected_at DESC);
-
 ALTER TABLE public.behavioral_anomalies ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admins can read anomalies" ON public.behavioral_anomalies
   FOR SELECT USING (
@@ -187,7 +173,6 @@ CREATE POLICY "Admins can read anomalies" ON public.behavioral_anomalies
   );
 CREATE POLICY "Service role manages anomalies" ON public.behavioral_anomalies
   FOR ALL USING (auth.role() = 'service_role');
-
 -- Consent log (GDPR)
 CREATE TABLE IF NOT EXISTS public.consent_log (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -203,14 +188,12 @@ CREATE POLICY "Users can read own consent" ON public.consent_log
   FOR SELECT USING (user_id = auth.uid());
 CREATE POLICY "Service role manages consent" ON public.consent_log
   FOR ALL USING (auth.role() = 'service_role');
-
 -- Data retention: auto-archive search_history older than 1 year
 CREATE OR REPLACE FUNCTION archive_old_search_history()
 RETURNS void LANGUAGE sql AS $$
   DELETE FROM public.search_history
   WHERE created_at < now() - INTERVAL '1 year';
 $$;
-
 -- Platform TOS legal risk scoring function
 CREATE OR REPLACE FUNCTION compute_platform_tos_risk(p_platform text)
 RETURNS jsonb
@@ -235,7 +218,6 @@ AS $$
     ELSE jsonb_build_object('risk_level', 'unknown', 'score', 50)
   END;
 $$;
-
 -- Atomic AI credit deduction (Phase 3 Critical #4)
 CREATE OR REPLACE FUNCTION consume_ai_credit(ws_id uuid)
 RETURNS void
@@ -252,22 +234,20 @@ BEGIN
   END IF;
 END;
 $$;
-
 -- Allow 'partial' status for fallback enrichments (Phase 4 High #4)
 ALTER TABLE public.influencer_profiles 
 DROP CONSTRAINT IF EXISTS influencer_profiles_enrichment_status_check;
-
 ALTER TABLE public.influencer_profiles 
 ADD CONSTRAINT influencer_profiles_enrichment_status_check 
 CHECK (enrichment_status IN ('pending','processing','success','failed','partial','queued'));
-
 -- Niche confidence and correction tracking (Phase 4 High #5)
 ALTER TABLE public.influencer_profiles
   ADD COLUMN IF NOT EXISTS niche_confidence int CHECK (niche_confidence >= 0 AND niche_confidence <= 100),
   ADD COLUMN IF NOT EXISTS niche_method text,
   ADD COLUMN IF NOT EXISTS niche_corrected_by uuid REFERENCES auth.users(id),
   ADD COLUMN IF NOT EXISTS niche_corrected_at timestamptz,
-  ADD COLUMN IF NOT EXISTS niche_original text;  -- stores AI-classified niche before human correction
+  ADD COLUMN IF NOT EXISTS niche_original text;
+-- stores AI-classified niche before human correction
 
 -- Function: record a human niche correction (builds training dataset)
 CREATE OR REPLACE FUNCTION correct_influencer_niche(
@@ -290,7 +270,6 @@ BEGIN
   WHERE id = p_profile_id;
 END;
 $$;
-
 -- View: training data for future ML niche model
 -- Export this to retrain the classifier when you have 500+ corrections
 CREATE OR REPLACE VIEW public.niche_training_data AS
@@ -306,7 +285,6 @@ SELECT
 FROM public.influencer_profiles
 WHERE niche_corrected_by IS NOT NULL
 ORDER BY niche_corrected_at DESC;
-
 -- Weekly follower growth summary (computed from follower_history) (Phase 4 High #6)
 CREATE OR REPLACE VIEW public.influencer_growth_signals AS
 SELECT 

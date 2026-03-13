@@ -17,7 +17,6 @@
 
 -- First, ensure the enrichment_jobs table has last_error column (idempotent)
 ALTER TABLE public.enrichment_jobs ADD COLUMN IF NOT EXISTS last_error text;
-
 -- Rebuild system_integrity_audit using last_error
 CREATE OR REPLACE FUNCTION system_integrity_audit()
 RETURNS jsonb
@@ -93,7 +92,6 @@ BEGIN
   RETURN result;
 END;
 $$;
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- FIX 2: follower_history RLS — tighten predicate to match policy name
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -115,7 +113,6 @@ CREATE POLICY "Authenticated workspace members can read follower history"
     )
     OR auth.role() = 'service_role'
   );
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- FIX 3: influencer_profiles RLS — block truly unauthenticated anonymous access
 -- ─────────────────────────────────────────────────────────────────────────────

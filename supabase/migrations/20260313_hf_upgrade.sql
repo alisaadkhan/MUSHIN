@@ -21,24 +21,18 @@ CREATE TABLE IF NOT EXISTS public.creator_tags (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (creator_id, tag)
 );
-
 -- RLS: read-only for authenticated users; write only via service role
 ALTER TABLE public.creator_tags ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "creator_tags_read" ON public.creator_tags
     FOR SELECT TO authenticated USING (true);
-
 -- Fast tag lookup
 CREATE INDEX IF NOT EXISTS idx_creator_tags_creator_id
     ON public.creator_tags (creator_id);
-
 CREATE INDEX IF NOT EXISTS idx_creator_tags_tag
     ON public.creator_tags (tag);
-
 -- GIN on (tag, weight) for "find all creators with tag X, sorted by weight"
 CREATE INDEX IF NOT EXISTS idx_creator_tags_tag_weight
     ON public.creator_tags (tag, weight DESC);
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2. Embedding dimension upgrade: vector(1536) → vector(1024)
 --    BGE-large-en-v1.5 outputs 1024 dimensions (vs OpenAI's 1536).
@@ -47,26 +41,21 @@ CREATE INDEX IF NOT EXISTS idx_creator_tags_tag_weight
 
 -- 2a. Drop the HNSW index that depends on the old column
 DROP INDEX IF EXISTS public.influencer_profiles_embedding_idx;
-
 -- 2b. Drop old 1536-dim column
 ALTER TABLE public.influencer_profiles
     DROP COLUMN IF EXISTS embedding;
-
 -- 2c. Add new 1024-dim column
 ALTER TABLE public.influencer_profiles
     ADD COLUMN IF NOT EXISTS embedding VECTOR(1024);
-
 -- 2d. Recreate HNSW index for fast cosine similarity search
 CREATE INDEX IF NOT EXISTS idx_ip_embedding_hnsw
     ON public.influencer_profiles
     USING hnsw (embedding vector_cosine_ops)
     WITH (m = 16, ef_construction = 64);
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 3. Update match_influencers() to use 1024-dim vectors
 -- ─────────────────────────────────────────────────────────────────────────────
 DROP FUNCTION IF EXISTS public.match_influencers(VECTOR, FLOAT, INT, TEXT);
-
 CREATE OR REPLACE FUNCTION public.match_influencers(
     query_embedding  VECTOR(1024),
     match_threshold  FLOAT    DEFAULT 0.5,
@@ -107,17 +96,14 @@ AS $$
     ORDER BY p.embedding <=> query_embedding
     LIMIT match_count;
 $$;
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 4. Ensure platform column exists on creator_tags for efficient cross-table
 --    queries (denormalized from influencer_profiles for join elimination)
 -- ─────────────────────────────────────────────────────────────────────────────
 ALTER TABLE public.creator_tags
     ADD COLUMN IF NOT EXISTS platform TEXT;
-
 CREATE INDEX IF NOT EXISTS idx_creator_tags_platform_tag
     ON public.creator_tags (platform, tag);
-
 -- Populate platform from influencer_profiles (for existing rows, if any)
 UPDATE public.creator_tags ct
 SET platform = p.platform

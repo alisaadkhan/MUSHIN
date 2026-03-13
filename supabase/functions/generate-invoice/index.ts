@@ -1,7 +1,7 @@
+import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 import { safeErrorResponse } from "../_shared/errors.ts";
-
 const APP_URL = Deno.env.get("APP_URL") || "https://mushin.app";
 const corsHeaders = {
     "Access-Control-Allow-Origin": APP_URL,
@@ -34,10 +34,11 @@ Deno.serve(async (req) => {
             });
         }
 
-        const serviceClient = createClient(
-            Deno.env.get("SUPABASE_URL")!,
-            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-        );
+        const serviceClient = await performPrivilegedWrite({
+        authHeader: req.headers.get("Authorization"),
+        action: "gateway:privileged-client-bootstrap",
+        execute: async (_ctx, client) => client,
+    });
 
         const { payment_id } = await req.json();
         if (!payment_id || typeof payment_id !== "string") {

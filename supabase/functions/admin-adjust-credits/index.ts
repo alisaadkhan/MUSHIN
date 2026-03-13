@@ -1,82 +1,114 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { safeErrorResponse } from "../_shared/errors.ts";
+import { adminAdjustCredits, requireJwt, requireSystemAdmin } from "../_shared/privileged_gateway.ts";
+import { logAdminAction, logSystemAction } from "../_shared/audit_logger.ts";
+import { safeErrorResponse, validationErrorResponse } from "../_shared/errors.ts";
+import { checkRateLimit, corsHeaders } from "../_shared/rate_limit.ts";
+import { extractClientIp } from "../_shared/security.ts";
 
-const corsHeaders = {
-    "Access-Control-Allow-Origin": Deno.env.get("APP_URL") || "https://mushin.app",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-async function getCallerRole(serviceClient: any, userId: string): Promise<string | null> {
-    const { data } = await serviceClient.from("user_roles").select("role").eq("user_id", userId).maybeSingle();
-    return data?.role ?? null;
-}
-
-async function logAction(serviceClient: any, adminId: string, action: string, targetId: string, details: object) {
-    await serviceClient.from("admin_audit_log").insert({ admin_user_id: adminId, action, target_user_id: targetId, details });
+function jsonResponse(body: unknown, status = 200) {
+    return new Response(JSON.stringify(body), {
+        status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
 }
 
 Deno.serve(async (req) => {
     if (req.method === "OPTIONS") {
         return new Response(null, { headers: corsHeaders });
     }
+    if (req.method !== "POST") {
+        return jsonResponse({ error: "Method not allowed" }, 405);
+    }
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    const serviceClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
-        auth: { autoRefreshToken: false, persistSession: false },
-    });
-    const anonClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-        global: { headers: { Authorization: authHeader } },
-    });
-
-    const { data: { user }, error: authErr } = await anonClient.auth.getUser();
-    if (authErr || !user) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    const callerRole = await getCallerRole(serviceClient, user.id);
-    if (!callerRole || !["super_admin", "admin"].includes(callerRole)) {
-        return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    const ipAddress = extractClientIp(req.headers.get("x-forwarded-for"));
+    const userAgent = req.headers.get("user-agent") ?? "unknown";
 
     try {
-        const { target_user_id, search_credits, ai_credits, email_sends, enrichment_credits } = await req.json();
-        if (!target_user_id) {
-            return new Response(JSON.stringify({ error: "target_user_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const rate = await checkRateLimit(ipAddress, "general", { perMin: 12, perHour: 120 });
+        if (!rate.allowed) {
+            await logSystemAction({
+                actionType: "security:rate_limit",
+                actionDescription: "Rate limit exceeded for admin-adjust-credits",
+                ipAddress,
+                userAgent,
+                metadata: { retry_after: rate.retryAfter },
+            });
+            return jsonResponse({ error: "Too many requests" }, 429);
         }
 
-        // Get user's workspace
-        const { data: workspace } = await serviceClient
-            .from("workspaces")
-            .select("id, search_credits_remaining, ai_credits_remaining, email_sends_remaining, enrichment_credits_remaining")
-            .eq("owner_id", target_user_id)
-            .single();
-
-        if (!workspace) {
-            return new Response(JSON.stringify({ error: "User workspace not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        if (!authHeader?.startsWith("Bearer ")) {
+            await logSystemAction({
+                actionType: "auth:login_attempt",
+                actionDescription: "Admin credit adjustment blocked due to missing token",
+                ipAddress,
+                userAgent,
+                metadata: { endpoint: "admin-adjust-credits", status: "failed" },
+            });
+            return jsonResponse({ error: "Unauthorized" }, 401);
         }
 
-        const updates: Record<string, number> = {};
-        // SEC-09: clamp to 0 — negative credit balances are never valid
-        if (search_credits != null) updates.search_credits_remaining = Math.max(0, workspace.search_credits_remaining + search_credits);
-        if (ai_credits != null) updates.ai_credits_remaining = Math.max(0, workspace.ai_credits_remaining + ai_credits);
-        if (email_sends != null) updates.email_sends_remaining = Math.max(0, workspace.email_sends_remaining + email_sends);
-        if (enrichment_credits != null) updates.enrichment_credits_remaining = Math.max(0, workspace.enrichment_credits_remaining + enrichment_credits);
+        const { userId } = await requireJwt(authHeader);
+        await requireSystemAdmin(authHeader);
 
-        if (Object.keys(updates).length === 0) {
-            return new Response(JSON.stringify({ error: "No credit adjustments specified" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const { workspace_id, credit_type, amount_delta, reason, target_user_id } = await req.json();
+        if (!workspace_id || !credit_type || !reason || amount_delta == null) {
+            return validationErrorResponse(
+                "workspace_id, credit_type, amount_delta, and reason are required",
+                corsHeaders,
+            );
         }
 
-        await serviceClient.from("workspaces").update(updates).eq("id", workspace.id);
-        await logAction(serviceClient, user.id, "adjust_credits", target_user_id, { adjustments: { search_credits, ai_credits, email_sends, enrichment_credits } });
-
-        return new Response(JSON.stringify({ success: true }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        const result = await adminAdjustCredits({
+            authHeader,
+            workspaceId: workspace_id,
+            creditType: credit_type,
+            amountDelta: Number(amount_delta),
+            reason,
+            targetUserId: target_user_id ?? null,
+            ipAddress,
+            userAgent,
         });
-    } catch (err: any) {
+
+        await logAdminAction({
+            actorUserId: userId,
+            targetUserId: target_user_id ?? null,
+            workspaceId: workspace_id,
+            actionType: "admin:credits:adjust:api",
+            actionDescription: "Admin credits adjustment request completed",
+            ipAddress,
+            userAgent,
+            metadata: { credit_type, amount_delta, reason },
+        });
+
+        return jsonResponse(result);
+    } catch (err) {
+        if (err instanceof Error && err.message === "Forbidden") {
+            try {
+                const { userId } = await requireJwt(authHeader);
+                await logAdminAction({
+                    actorUserId: userId,
+                    actionType: "security:admin_access_denied",
+                    actionDescription: "Non-system-admin attempted admin-adjust-credits",
+                    ipAddress,
+                    userAgent,
+                });
+            } catch {
+                // Ignore nested auth/logging failures.
+            }
+            return jsonResponse({ error: "Forbidden" }, 403);
+        }
+
+        if (err instanceof Error && err.message === "Unauthorized") {
+            await logSystemAction({
+                actionType: "auth:login_attempt",
+                actionDescription: "Admin credit adjustment blocked due to invalid token",
+                ipAddress,
+                userAgent,
+                metadata: { endpoint: "admin-adjust-credits", status: "failed" },
+            });
+            return jsonResponse({ error: "Unauthorized" }, 401);
+        }
+
         return safeErrorResponse(err, "[admin-adjust-credits]", corsHeaders);
     }
 });

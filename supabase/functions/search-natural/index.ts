@@ -1,10 +1,9 @@
+import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 // @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Redis } from "https://esm.sh/@upstash/redis";
 import { generateEmbedding } from "../_shared/huggingface.ts";
-
 const APP_URL = Deno.env.get("APP_URL") || "https://mushin.app";
-
 // CORS: lock to known app origin — do NOT use wildcard (security: CSRF/data-harvesting prevention)
 const corsHeaders = {
     "Access-Control-Allow-Origin": APP_URL,
@@ -66,10 +65,11 @@ Deno.serve(async (req) => {
             });
         }
 
-        const serviceClient = createClient(
-            Deno.env.get("SUPABASE_URL")!,
-            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-        );
+        const serviceClient = await performPrivilegedWrite({
+        authHeader: req.headers.get("Authorization"),
+        action: "gateway:privileged-client-bootstrap",
+        execute: async (_ctx, client) => client,
+    });
 
         const { data: ws } = await serviceClient
             .from("workspaces")

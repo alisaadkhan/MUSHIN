@@ -1,5 +1,5 @@
+import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
 const APP_URL = Deno.env.get("APP_URL") ?? "";
 const corsHeaders = {
   "Access-Control-Allow-Origin": APP_URL || "https://mushin.app", // Never fall back to *
@@ -23,7 +23,6 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
 
     if (!resendApiKey) {
@@ -49,7 +48,11 @@ Deno.serve(async (req) => {
     const userId = userData.user.id;
 
     // Service-role client for credit checks
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+    const adminClient = await performPrivilegedWrite({
+        authHeader: req.headers.get("Authorization"),
+        action: "gateway:privileged-client-bootstrap",
+        execute: async (_ctx, client) => client,
+    });
 
     // Get user's workspace
     const { data: membership } = await adminClient

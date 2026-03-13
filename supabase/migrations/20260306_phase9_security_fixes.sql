@@ -42,10 +42,8 @@ BEGIN
   END IF;
 END;
 $$;
-
 -- Index to speed up workspace lookups by owner (used in credit adjustments)
 CREATE INDEX IF NOT EXISTS idx_workspaces_owner_id ON workspaces(owner_id);
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- H-2: Lock down restore_email_credit and restore_ai_credit
 -- These functions should only be callable by edge functions running with
@@ -54,11 +52,9 @@ CREATE INDEX IF NOT EXISTS idx_workspaces_owner_id ON workspaces(owner_id);
 REVOKE EXECUTE ON FUNCTION restore_email_credit(uuid) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION restore_email_credit(uuid) FROM authenticated;
 GRANT  EXECUTE ON FUNCTION restore_email_credit(uuid) TO service_role;
-
 REVOKE EXECUTE ON FUNCTION restore_ai_credit(uuid) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION restore_ai_credit(uuid) FROM authenticated;
 GRANT  EXECUTE ON FUNCTION restore_ai_credit(uuid) TO service_role;
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- M-6: Fix admin_send_notification to exclude unverified and banned users
 -- Previously SELECT ARRAY_AGG(id) FROM auth.users returned ALL rows including

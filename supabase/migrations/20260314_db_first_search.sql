@@ -23,22 +23,17 @@ ALTER TABLE public.influencer_profiles
             coalesce(city, '')
         )
     ) STORED;
-
 CREATE INDEX IF NOT EXISTS idx_ip_search_vector
     ON public.influencer_profiles USING gin (search_vector);
-
 -- ── 2. GIN index on tags[] for fast array-contains queries ───────────────────
 CREATE INDEX IF NOT EXISTS idx_ip_tags_gin
     ON public.influencer_profiles USING gin (tags);
-
 -- ── 3. Composite index for DB-first platform + enrichment_status lookups ─────
 CREATE INDEX IF NOT EXISTS idx_ip_platform_status_followers
     ON public.influencer_profiles (platform, enrichment_status, follower_count DESC NULLS LAST);
-
 -- ── 4. GIN index on influencers_cache.tags for tag filter lookups ─────────────
 CREATE INDEX IF NOT EXISTS idx_ic_tags_gin
     ON public.influencers_cache USING gin (tags);
-
 -- ── 5. creator_tags: add platform column if somehow missing from previous migration ─
 DO $$
 BEGIN
@@ -49,10 +44,8 @@ BEGIN
         ALTER TABLE public.creator_tags ADD COLUMN platform TEXT;
     END IF;
 END$$;
-
 CREATE INDEX IF NOT EXISTS idx_creator_tags_platform_tag
     ON public.creator_tags (platform, tag, weight DESC);
-
 -- ── 6. tag_match_influencers() — set-returning function for DB-first search ────
 -- Returns profiles that contain any of the provided tags OR match the niche text.
 -- Used as the primary DB lookup before resorting to Serper.

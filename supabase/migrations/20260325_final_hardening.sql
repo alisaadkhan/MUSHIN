@@ -13,7 +13,6 @@
 -- Supabase enables this extension by default; the DO block is idempotent.
 -- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 CREATE EXTENSION IF NOT EXISTS "pgcrypto" SCHEMA extensions;
-
 -- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- MED-03: Server-side consumer email domain blocking
 --
@@ -41,16 +40,13 @@ CREATE TABLE IF NOT EXISTS public.blocked_email_domains (
   domain text PRIMARY KEY,
   added_at timestamptz NOT NULL DEFAULT now()
 );
-
 ALTER TABLE public.blocked_email_domains ENABLE ROW LEVEL SECURITY;
-
 -- No direct access by authenticated users â€” admin-only via service_role
 DROP POLICY IF EXISTS "bed_service_only" ON public.blocked_email_domains;
 CREATE POLICY "bed_service_only" ON public.blocked_email_domains
   FOR ALL
   USING  (auth.role() = 'service_role')
   WITH CHECK (auth.role() = 'service_role');
-
 -- Seed the initial blocked domain list (matches the client-side list)
 INSERT INTO public.blocked_email_domains (domain) VALUES
   ('gmail.com'),('yahoo.com'),('hotmail.com'),('outlook.com'),('live.com'),
@@ -60,7 +56,6 @@ INSERT INTO public.blocked_email_domains (domain) VALUES
   ('163.com'),('126.com'),('sina.com'),('rediffmail.com'),('web.de'),
   ('gmx.de'),('t-online.de')
 ON CONFLICT (domain) DO NOTHING;
-
 -- SECURITY DEFINER function: checks whether an email is from a consumer domain.
 -- Called from Auth Hooks or any SECURITY DEFINER trigger.
 CREATE OR REPLACE FUNCTION public.is_consumer_email(p_email text)
@@ -79,10 +74,8 @@ BEGIN
   );
 END;
 $$;
-
 REVOKE EXECUTE ON FUNCTION public.is_consumer_email(text) FROM PUBLIC;
 GRANT  EXECUTE ON FUNCTION public.is_consumer_email(text) TO service_role;
-
 -- Supabase Auth Hook function â€” called before user creation.
 -- Must be SECURITY DEFINER with search_path = extensions, public.
 -- Return value: jsonb  { "error": {...} } blocks signup; {} allows it.
@@ -116,10 +109,8 @@ BEGIN
   RETURN '{}';
 END;
 $$;
-
 -- Grant the Supabase Auth system (supabase_auth_admin role) permission to call this
 GRANT EXECUTE ON FUNCTION public.auth_hook_block_consumer_domains(jsonb) TO supabase_auth_admin;
-
 -- Expose a simple RPC for the client to pre-validate before calling signup
 -- (reduces failed signup attempts; does NOT replace the hook)
 CREATE OR REPLACE FUNCTION public.check_email_allowed(p_email text)
@@ -135,11 +126,8 @@ BEGIN
   RETURN jsonb_build_object('allowed', true);
 END;
 $$;
-
 REVOKE EXECUTE ON FUNCTION public.check_email_allowed(text) FROM PUBLIC;
 GRANT  EXECUTE ON FUNCTION public.check_email_allowed(text) TO authenticated, anon;
-
-
 -- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- MED-04: HubSpot API key encrypted at rest
 --
@@ -161,7 +149,6 @@ GRANT  EXECUTE ON FUNCTION public.check_email_allowed(text) TO authenticated, an
 -- Step 1: Add the encrypted column
 ALTER TABLE public.workspace_secrets
   ADD COLUMN IF NOT EXISTS hubspot_api_key_encrypted text;
-
 -- Step 2: SECURITY DEFINER functions for encrypt/decrypt that edge functions call.
 --   These access vault.decrypted_secrets to retrieve the master key.
 --   The authenticated user can never directly read vault secrets.
@@ -217,10 +204,8 @@ BEGIN
         updated_at                = now();
 END;
 $$;
-
 REVOKE EXECUTE ON FUNCTION public.set_hubspot_key(uuid, text) FROM PUBLIC;
 GRANT  EXECUTE ON FUNCTION public.set_hubspot_key(uuid, text) TO authenticated;
-
 -- Decrypt function â€” only callable by service_role (edge functions)
 CREATE OR REPLACE FUNCTION public.get_hubspot_key(p_workspace_id uuid)
 RETURNS text
@@ -257,11 +242,9 @@ BEGIN
   RETURN pgp_sym_decrypt(decode(v_encrypted, 'base64'), v_master_key);
 END;
 $$;
-
 REVOKE EXECUTE ON FUNCTION public.get_hubspot_key(uuid) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.get_hubspot_key(uuid) FROM authenticated;
 GRANT  EXECUTE ON FUNCTION public.get_hubspot_key(uuid) TO service_role;
-
 -- "Is configured" helper â€” callable by owner without exposing the key value
 CREATE OR REPLACE FUNCTION public.get_hubspot_configured(
   _workspace_id uuid
@@ -282,10 +265,8 @@ AS $$
       )
   );
 $$;
-
 REVOKE EXECUTE ON FUNCTION public.get_hubspot_configured(uuid) FROM PUBLIC;
 GRANT  EXECUTE ON FUNCTION public.get_hubspot_configured(uuid) TO authenticated;
-
 -- Migrate any existing plaintext keys to encrypted form during next deploy.
 -- This DO block re-encrypts existing rows if the vault key is available.
 DO $$
@@ -324,8 +305,6 @@ BEGIN
   END LOOP;
 END;
 $$;
-
-
 -- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- ADDITIONAL HARDENING: Schema introspection lockdown
 --
@@ -340,13 +319,10 @@ $$;
 REVOKE SELECT ON ALL TABLES IN SCHEMA information_schema FROM anon;
 -- Prevent anon from listing pg_catalog objects
 REVOKE SELECT ON ALL TABLES IN SCHEMA pg_catalog FROM anon;
-
 -- Authenticated users: remove usage on internal schemata
 -- (They still reach public.* via RLS)
 REVOKE USAGE ON SCHEMA information_schema FROM authenticated;
 REVOKE USAGE ON SCHEMA pg_catalog        FROM authenticated;
-
-
 -- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- ADDITIONAL HARDENING: Webhook URLs validation trigger
 --
@@ -414,14 +390,11 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 DROP TRIGGER IF EXISTS trg_validate_webhook_urls ON public.workspaces;
 CREATE TRIGGER trg_validate_webhook_urls
   BEFORE INSERT OR UPDATE OF settings ON public.workspaces
   FOR EACH ROW
   EXECUTE FUNCTION public.validate_webhook_urls();
-
-
 -- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- ADDITIONAL HARDENING: Profiles table â€” prevent email column injection
 --
@@ -451,14 +424,11 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 DROP TRIGGER IF EXISTS trg_profile_email_immutability ON public.profiles;
 CREATE TRIGGER trg_profile_email_immutability
   BEFORE UPDATE ON public.profiles
   FOR EACH ROW
   EXECUTE FUNCTION public.enforce_profile_email_immutability();
-
-
 -- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- ADDITIONAL HARDENING: Profiles RLS â€” add explicit WITH CHECK
 --
@@ -473,7 +443,6 @@ DROP POLICY IF EXISTS "Users can manage own profile" ON public.profiles;
 CREATE POLICY "Users can manage own profile" ON public.profiles
   USING     (auth.uid() = id)
   WITH CHECK (auth.uid() = id);
-
 -- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- ADDITIONAL HARDENING: campaign_activity â€” prevent impersonation
 --

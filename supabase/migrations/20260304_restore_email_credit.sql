@@ -14,6 +14,5 @@ BEGIN
   WHERE id = ws_id;
 END;
 $$;
-
 -- Grant execute only to authenticated users (edge functions run as the calling user)
 GRANT EXECUTE ON FUNCTION restore_email_credit(uuid) TO authenticated;

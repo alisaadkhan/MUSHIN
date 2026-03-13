@@ -1,3 +1,4 @@
+import { getServiceRoleKey } from "../_shared/privileged_gateway.ts";
 /**
  * creator-discovery-worker/index.ts
  *
@@ -10,7 +11,7 @@
  * This gradually grows the Mushin creator database so future searches
  * return results from the local index instead of hitting Serper every time.
  *
- * Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>
+ * Authorization: Bearer <INTERNAL_GATEWAY_SECRET>
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -20,7 +21,6 @@ import { inferNiche } from "../_shared/niche.ts";
 import { extractCity } from "../_shared/geo.ts";
 import { extractFollowers } from "../_shared/followers.ts";
 import { extractUsername, DOMAIN_MAP } from "../_shared/platform.ts";
-
 const CORS = {
   "Access-Control-Allow-Origin": Deno.env.get("APP_URL") || "https://mushin.app",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -71,7 +71,7 @@ Deno.serve(async (req: Request) => {
 
   // Internal-only endpoint — requires service role key OR worker secret
   const authHeader = req.headers.get("Authorization") ?? "";
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const serviceKey = getServiceRoleKey();
   const workerSecret = Deno.env.get("WORKER_SECRET") ?? "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
   const isAuthorized = (serviceKey && token === serviceKey) || (workerSecret && token === workerSecret);

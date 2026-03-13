@@ -1,6 +1,6 @@
+import { getServiceRoleKey } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { safeErrorResponse } from "../_shared/errors.ts";
-
 // Internal cron worker — never called from browser. No CORS headers needed.
 const internalHeaders = { "Content-Type": "application/json" };
 
@@ -10,7 +10,7 @@ const internalHeaders = { "Content-Type": "application/json" };
 Deno.serve(async (req: Request) => {
     // Internal cron worker — no CORS preflight handled
     const authHeader = req.headers.get("Authorization");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const serviceKey = getServiceRoleKey();
     if (!authHeader || authHeader !== `Bearer ${serviceKey}`) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401, headers: internalHeaders

@@ -1,5 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
 // No auth required — public health endpoint for monitoring tools (UptimeRobot, BetterUptime).
 // Returns: database connectivity, Redis connectivity, function status.
 
@@ -13,11 +12,7 @@ Deno.serve(async (req: Request) => {
 
     // 1. Database check
     try {
-        const serviceClient = createClient(
-            Deno.env.get("SUPABASE_URL")!,
-            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-            { auth: { autoRefreshToken: false, persistSession: false } }
-        );
+        const serviceClient = createPrivilegedClient();
         const t = Date.now();
         const { error } = await serviceClient.from("workspaces").select("id").limit(1);
         checks.database = error

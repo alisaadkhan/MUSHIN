@@ -1,3 +1,4 @@
+import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Redis } from "https://esm.sh/@upstash/redis";
 import { checkRateLimit, corsHeaders } from "../_shared/rate_limit.ts";
@@ -10,7 +11,6 @@ import { computeSearchScore, computeSearchScoreV2, snippetRelevanceScore, detect
 import { normalizeQuery, detectLanguage } from "../_shared/language.ts";
 import { getTagScore, normalizeTags } from "../_shared/tag_intelligence.ts";
 import { expandSerperQueries, extractContactEmail, detectSocialLinks } from "../_shared/query_expander.ts";
-
 let redis: Redis | null = null;
 if (Deno.env.get("UPSTASH_REDIS_REST_URL") && Deno.env.get("UPSTASH_REDIS_REST_TOKEN")) {
   redis = new Redis({
@@ -88,10 +88,11 @@ Deno.serve(async (req) => {
         { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const serviceClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const serviceClient = await performPrivilegedWrite({
+        authHeader: req.headers.get("Authorization"),
+        action: "gateway:privileged-client-bootstrap",
+        execute: async (_ctx, client) => client,
+    });
 
     const { data: workspace } = await serviceClient
       .from("workspaces")

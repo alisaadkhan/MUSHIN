@@ -14,7 +14,6 @@ BEGIN
   END IF;
 END;
 $$;
-
 -- Fix consume_email_credit (needed by send-outreach-email)
 CREATE OR REPLACE FUNCTION consume_email_credit(ws_id uuid)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
@@ -27,7 +26,6 @@ BEGIN
   END IF;
 END;
 $$;
-
 -- Fix consume_enrichment_credit (already exists but verify correctness)
 CREATE OR REPLACE FUNCTION consume_enrichment_credit(ws_id uuid)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
@@ -40,7 +38,6 @@ BEGIN
   END IF;
 END;
 $$;
-
 -- Fix consume_search_credit (already fixed in Phase 6 but ensure it's correct)
 CREATE OR REPLACE FUNCTION consume_search_credit(ws_id uuid)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
@@ -53,7 +50,6 @@ BEGIN
   END IF;
 END;
 $$;
-
 -- Bot detection feedback tables (from Part 3)
 CREATE TABLE IF NOT EXISTS public.bot_detection_feedback (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -66,14 +62,12 @@ CREATE TABLE IF NOT EXISTS public.bot_detection_feedback (
   user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_bot_feedback_platform ON public.bot_detection_feedback(platform, username);
 ALTER TABLE public.bot_detection_feedback ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Authenticated can submit bot feedback" ON public.bot_detection_feedback
   FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 CREATE POLICY "Admins read bot feedback" ON public.bot_detection_feedback
   FOR SELECT USING (EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role IN ('admin','super_admin')));
-
 CREATE TABLE IF NOT EXISTS public.bot_signal_weights (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   signal_name text UNIQUE NOT NULL,
@@ -86,7 +80,6 @@ CREATE TABLE IF NOT EXISTS public.bot_signal_weights (
   ) STORED,
   last_updated_at timestamptz DEFAULT now()
 );
-
 INSERT INTO public.bot_signal_weights (signal_name, weight_current, weight_original) VALUES
   ('suspicious_ratio',20,20),('ghost_audience',25,25),('high_engagement_rate',18,18),
   ('dead_audience_low_er',20,20),('no_bio',8,8),('low_posts_high_followers',15,15),
@@ -95,7 +88,6 @@ INSERT INTO public.bot_signal_weights (signal_name, weight_current, weight_origi
   ('suspicious_username',8,8),('very_low_post_rate',12,12),('abnormal_followers_per_post',10,10),
   ('growth_spike_anomaly',22,22)
 ON CONFLICT (signal_name) DO NOTHING;
-
 CREATE OR REPLACE FUNCTION process_bot_feedback(
   p_username text, p_platform text, p_predicted_score int,
   p_verdict text, p_signals_triggered jsonb

@@ -1,6 +1,6 @@
+import { getServiceRoleKey } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { safeErrorResponse } from "../_shared/errors.ts";
-
 const APP_URL = Deno.env.get("APP_URL") || "https://mushin.app";
 const corsHeaders = {
   "Access-Control-Allow-Origin": APP_URL,
@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
   try {
     // Validate authorization (anon key from cron or service role)
     const authHeader = req.headers.get("Authorization");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const serviceKey = getServiceRoleKey();
     // Only callable by cron jobs or internal services using the service role key
     if (!authHeader || authHeader !== `Bearer ${serviceKey}`) {
       return new Response(JSON.stringify({ error: "Unauthorized — internal endpoint" }), {

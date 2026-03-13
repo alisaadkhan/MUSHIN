@@ -1,3 +1,4 @@
+import { getServiceRoleKey } from "../_shared/privileged_gateway.ts";
 /**
  * trending-niches-analyzer/index.ts
  *
@@ -13,12 +14,11 @@
  * Results are written to the trending_niches table for use by the UI
  * (niche suggestion chips, search autocomplete, campaign targeting).
  *
- * Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>
+ * Authorization: Bearer <INTERNAL_GATEWAY_SECRET>
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { safeErrorResponse } from "../_shared/errors.ts";
-
 const CORS = {
   "Access-Control-Allow-Origin": Deno.env.get("APP_URL") || "https://mushin.app",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -30,7 +30,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
 
   const authHeader = req.headers.get("Authorization") ?? "";
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const serviceKey = getServiceRoleKey();
   const workerSecret = Deno.env.get("WORKER_SECRET") ?? "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
   const isAuthorized = (serviceKey && token === serviceKey) || (workerSecret && token === workerSecret);

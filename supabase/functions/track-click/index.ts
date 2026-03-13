@@ -1,12 +1,18 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { safeErrorResponse } from "../_shared/errors.ts";
-
+import { checkRateLimit, extractClientIp, isDuplicateWithinWindow, isValidTrackingCode } from "../_shared/security.ts";
 // track-click is embedded in outbound emails and clicked by external recipients.
 // Wildcard CORS is intentional — restricting to APP_URL would break email client requests.
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const RATE_LIMIT_STORE = new Map<string, number[]>();
+const DEDUPE_STORE = new Map<string, number>();
+const MAX_EVENTS_PER_MINUTE = 60;
+const RATE_WINDOW_MS = 60_000;
+const DEDUPE_WINDOW_MS = 30_000;
 
 Deno.serve(async (req) => {
     if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -15,15 +21,24 @@ Deno.serve(async (req) => {
         // This is typically called via a GET request to a short url route like /api/t/{code}
         const url = new URL(req.url);
         const code = url.searchParams.get("code");
+        const clientIp = extractClientIp(req.headers.get("x-forwarded-for"));
 
         if (!code) {
             return new Response("Missing tracking code", { status: 400 });
         }
+        if (!isValidTrackingCode(code)) {
+            return new Response("Invalid tracking code", { status: 400 });
+        }
 
-        const serviceClient = createClient(
-            Deno.env.get("SUPABASE_URL")!,
-            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-        );
+        const rl = checkRateLimit(RATE_LIMIT_STORE, `track:${clientIp}`, MAX_EVENTS_PER_MINUTE, RATE_WINDOW_MS);
+        if (!rl.allowed) {
+            return new Response("Too many requests", {
+                status: 429,
+                headers: { "Retry-After": String(rl.retryAfterSeconds ?? 60) }
+            });
+        }
+
+        const serviceClient = createPrivilegedClient();
 
         // 1. Find the link
         const { data: link, error: linkErr } = await serviceClient
@@ -34,6 +49,21 @@ Deno.serve(async (req) => {
 
         if (linkErr || !link) {
             return new Response("Tracking link not found", { status: 404 });
+        }
+
+        const dedupeKey = `${clientIp}:${code}`;
+        const isDuplicate = isDuplicateWithinWindow(DEDUPE_STORE, dedupeKey, DEDUPE_WINDOW_MS);
+        if (isDuplicate) {
+            let parsedUrl: URL;
+            try {
+                parsedUrl = new URL(link.original_url);
+            } catch {
+                return new Response("Invalid redirect target", { status: 400 });
+            }
+            if (parsedUrl.protocol !== "https:" && parsedUrl.protocol !== "http:") {
+                return new Response("Invalid redirect target", { status: 400 });
+            }
+            return Response.redirect(link.original_url, 302);
         }
 
         // 2. Log the click natively using RPC to handle UPSERT cleanly

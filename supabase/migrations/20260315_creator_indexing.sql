@@ -10,36 +10,28 @@
 --    Updated every time a creator appears in Serper search results.
 ALTER TABLE public.influencers_cache
   ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ DEFAULT now();
-
 -- 2. Add last_seen_at to influencer_profiles
 --    Updated when a profile is created as a stub or re-discovered.
 ALTER TABLE public.influencer_profiles
   ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ DEFAULT now();
-
 -- 3. Indexes for staleness queries (find creators not seen in > 30 days)
 CREATE INDEX IF NOT EXISTS idx_ic_last_seen_at
   ON public.influencers_cache (last_seen_at DESC NULLS LAST);
-
 CREATE INDEX IF NOT EXISTS idx_ip_last_seen_at
   ON public.influencer_profiles (last_seen_at DESC NULLS LAST);
-
 -- 4. Composite index: platform + last_seen_at for platform-scoped staleness
 CREATE INDEX IF NOT EXISTS idx_ic_platform_last_seen
   ON public.influencers_cache (platform, last_seen_at DESC NULLS LAST);
-
 CREATE INDEX IF NOT EXISTS idx_ip_platform_last_seen
   ON public.influencer_profiles (platform, last_seen_at DESC NULLS LAST);
-
 -- 5. Backfill: set last_seen_at = updated_at (or now) for existing rows
 --    so they don't all appear as NULL/epoch-0.
 UPDATE public.influencers_cache
   SET last_seen_at = COALESCE(updated_at, now())
   WHERE last_seen_at IS NULL;
-
 UPDATE public.influencer_profiles
   SET last_seen_at = COALESCE(last_enriched_at, now())
   WHERE last_seen_at IS NULL;
-
 -- 6. Update tag_match_influencers() to also return last_seen_at so the
 --    DB-first search path can surface freshness info in results.
 -- Must DROP first because return type changes (added last_seen_at column)
@@ -126,7 +118,6 @@ AS $$
     ip.follower_count DESC
   LIMIT p_limit;
 $$;
-
 COMMENT ON FUNCTION public.tag_match_influencers IS
   'DB-first search: returns creators matching tags/niche/city from the local index. '
   'Used before calling Serper to reduce external API usage. last_seen_at added 2026-03-15.';

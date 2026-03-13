@@ -1,8 +1,8 @@
+import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@14?target=deno";
 import { checkRateLimit } from "../_shared/rate_limit.ts";
 import { safeErrorResponse } from "../_shared/errors.ts";
-
 const ALLOWED_ORIGIN = Deno.env.get("APP_URL") || "https://mushin.app";
 const corsHeaders = {
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
@@ -45,10 +45,11 @@ Deno.serve(async (req) => {
     const userId = userData.user.id;
 
     // Use service role for cascading deletions
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabaseAdmin = await performPrivilegedWrite({
+        authHeader: req.headers.get("Authorization"),
+        action: "gateway:privileged-client-bootstrap",
+        execute: async (_ctx, client) => client,
+    });
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     const stripe = stripeKey ? new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" as const }) : null;

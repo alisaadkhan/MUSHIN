@@ -1,7 +1,7 @@
-﻿import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { safeErrorResponse } from "../_shared/errors.ts";
 import { analyzeFullBotSignals, type BotAnalysisInput } from "../_shared/bot_signals.ts";
-
 const APP_URL = Deno.env.get("APP_URL") || "https://mushin.app";
 const corsHeaders = {
     "Access-Control-Allow-Origin": APP_URL,
@@ -11,7 +11,7 @@ const corsHeaders = {
 Deno.serve(async (req: Request) => {
     if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-    // All paths — analysis and feedback — require a valid JWT.
+    // All paths � analysis and feedback � require a valid JWT.
     // Previously the main analysis path had no auth check, allowing unauthenticated
     // callers to write bot_probability scores to influencer_profiles (fixed 2026-03-11).
     const authHeader = req.headers.get("Authorization");
@@ -53,11 +53,11 @@ Deno.serve(async (req: Request) => {
             }
 
             const authHeader = req.headers.get("Authorization");
-            const serviceClientForAuth = createClient(
-                Deno.env.get("SUPABASE_URL")!,
-                Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-                { auth: { autoRefreshToken: false, persistSession: false } }
-            );
+            const serviceClientForAuth = await performPrivilegedWrite({
+        authHeader: req.headers.get("Authorization"),
+        action: "gateway:privileged-client-bootstrap",
+        execute: async (_ctx, client) => client,
+    });
             const { data: userData } = await serviceClientForAuth.auth.getUser(authHeader?.replace("Bearer ", "") || "");
 
             await serviceClientForAuth.from("bot_detection_feedback").insert({
@@ -86,11 +86,11 @@ Deno.serve(async (req: Request) => {
         }
 
         // Init service client early to fetch history
-        const serviceClient = createClient(
-            Deno.env.get("SUPABASE_URL")!,
-            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-            { auth: { autoRefreshToken: false, persistSession: false } }
-        );
+        const serviceClient = await performPrivilegedWrite({
+        authHeader: req.headers.get("Authorization"),
+        action: "gateway:privileged-client-bootstrap",
+        execute: async (_ctx, client) => client,
+    });
 
         const { data: profile } = await serviceClient
             .from("influencer_profiles")
@@ -173,11 +173,11 @@ Deno.serve(async (req: Request) => {
             confidence,
             signals: triggeredSignals,
             all_signals: signals,
-            interpretation: score < 20 ? "Likely authentic ΓÇö no significant red flags detected"
-                : score < 40 ? "Minor concerns ΓÇö worth monitoring but low risk for campaigns under $5K"
-                    : score < 60 ? "Moderate risk ΓÇö request media kit and last 3 months analytics before committing budget"
-                        : score < 80 ? "High risk ΓÇö strong indicators of inflated following. Require third-party audit."
-                            : "Very high risk ΓÇö do not proceed without independent verification",
+            interpretation: score < 20 ? "Likely authentic G�� no significant red flags detected"
+                : score < 40 ? "Minor concerns G�� worth monitoring but low risk for campaigns under $5K"
+                    : score < 60 ? "Moderate risk G�� request media kit and last 3 months analytics before committing budget"
+                        : score < 80 ? "High risk G�� strong indicators of inflated following. Require third-party audit."
+                            : "Very high risk G�� do not proceed without independent verification",
             meta_api_note: "For enterprise campaigns, exact audience quality requires Meta Creator Marketplace API access (apply at business.facebook.com/creator-marketplace) or TikTok Creator Marketplace API. Current scores use 15 heuristic signals which detect ~65-70% of obvious fraud.",
         }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" }

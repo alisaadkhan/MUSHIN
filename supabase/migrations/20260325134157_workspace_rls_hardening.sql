@@ -19,8 +19,6 @@
 -- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
-
 -- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- Phase 5a: follower_history â€” true workspace isolation
 --
@@ -30,12 +28,10 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 ALTER TABLE public.follower_history ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "fh_member_select"                          ON public.follower_history;
 DROP POLICY IF EXISTS "fh_service_write"                          ON public.follower_history;
 DROP POLICY IF EXISTS "Workspace members can read follower history" ON public.follower_history;
 DROP POLICY IF EXISTS "Service role manages follower history"       ON public.follower_history;
-
 -- SELECT: restrict to callers who are in a workspace
 DROP POLICY IF EXISTS "fh_workspace_select" ON public.follower_history;
 CREATE POLICY "fh_workspace_select" ON public.follower_history
@@ -46,15 +42,12 @@ CREATE POLICY "fh_workspace_select" ON public.follower_history
       WHERE wm.user_id = auth.uid()
     )
   );
-
 -- ALL writes go through service_role only (enrich-influencer edge function)
 DROP POLICY IF EXISTS "fh_service_write" ON public.follower_history;
 CREATE POLICY "fh_service_write" ON public.follower_history
   FOR ALL
   USING  (auth.role() = 'service_role')
   WITH CHECK (auth.role() = 'service_role');
-
-
 -- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- Phase 5b: audience_analysis â€” workspace-scoped SELECT
 --
@@ -62,13 +55,11 @@ CREATE POLICY "fh_service_write" ON public.follower_history
 -- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 ALTER TABLE public.audience_analysis ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "aa_member_select"                          ON public.audience_analysis;
 DROP POLICY IF EXISTS "aa_service_write"                          ON public.audience_analysis;
 DROP POLICY IF EXISTS "Authenticated can read audience analysis"  ON public.audience_analysis;
 DROP POLICY IF EXISTS "Service role manages audience analysis"    ON public.audience_analysis;
 DROP POLICY IF EXISTS "Users can read audience analysis"          ON public.audience_analysis;
-
 -- SELECT: restrict to callers who are in a workspace
 DROP POLICY IF EXISTS "aa_workspace_select" ON public.audience_analysis;
 CREATE POLICY "aa_workspace_select" ON public.audience_analysis
@@ -79,14 +70,11 @@ CREATE POLICY "aa_workspace_select" ON public.audience_analysis
       WHERE wm.user_id = auth.uid()
     )
   );
-
 DROP POLICY IF EXISTS "aa_service_write" ON public.audience_analysis;
 CREATE POLICY "aa_service_write" ON public.audience_analysis
   FOR ALL
   USING  (auth.role() = 'service_role')
   WITH CHECK (auth.role() = 'service_role');
-
-
 -- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- Phase 5c: linked_accounts â€” workspace-scoped SELECT
 --
@@ -94,12 +82,10 @@ CREATE POLICY "aa_service_write" ON public.audience_analysis
 -- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 ALTER TABLE public.linked_accounts ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "la_member_select"                        ON public.linked_accounts;
 DROP POLICY IF EXISTS "la_service_write"                        ON public.linked_accounts;
 DROP POLICY IF EXISTS "Authenticated can read linked accounts"  ON public.linked_accounts;
 DROP POLICY IF EXISTS "Service role manages linked accounts"    ON public.linked_accounts;
-
 -- SELECT: restrict to callers who are in a workspace
 DROP POLICY IF EXISTS "la_workspace_select" ON public.linked_accounts;
 CREATE POLICY "la_workspace_select" ON public.linked_accounts
@@ -110,14 +96,11 @@ CREATE POLICY "la_workspace_select" ON public.linked_accounts
       WHERE wm.user_id = auth.uid()
     )
   );
-
 DROP POLICY IF EXISTS "la_service_write" ON public.linked_accounts;
 CREATE POLICY "la_service_write" ON public.linked_accounts
   FOR ALL
   USING  (auth.role() = 'service_role')
   WITH CHECK (auth.role() = 'service_role');
-
-
 -- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- Phase 5d: Explicit UPDATE policies enforcing workspace isolation
 --
@@ -131,8 +114,6 @@ CREATE POLICY "la_service_write" ON public.linked_accounts
 DROP POLICY IF EXISTS "Allow update follower history"   ON public.follower_history;
 DROP POLICY IF EXISTS "Allow update audience analysis"  ON public.audience_analysis;
 DROP POLICY IF EXISTS "Allow update linked accounts"    ON public.linked_accounts;
-
-
 -- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- Phase 6 (reinforcement): tracking_events â€” service_role INSERT only
 --
@@ -142,9 +123,7 @@ DROP POLICY IF EXISTS "Allow update linked accounts"    ON public.linked_account
 -- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 ALTER TABLE public.tracking_events ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "te_public_insert" ON public.tracking_events;
-
 -- Only the track-click edge function (service_role) may insert
 DO $$
 BEGIN

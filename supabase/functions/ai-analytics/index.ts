@@ -1,3 +1,4 @@
+import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 /**
  * supabase/functions/ai-analytics/index.ts
  *
@@ -15,10 +16,9 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/rate_limit.ts";
-
+import { resolveAuthorizedWorkspace } from "../_shared/security.ts";
 const ANALYTICS_CREDIT_COST = 3;
 const CACHE_TTL_HOURS = 24 * 7; // 7 days
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -34,12 +34,16 @@ Deno.serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey, {
+    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
+    const serviceClient = await performPrivilegedWrite({
+        authHeader: req.headers.get("Authorization"),
+        action: "gateway:privileged-client-bootstrap",
+        execute: async (_ctx, client) => client,
+    });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(
+    const { data: { user }, error: authError } = await userClient.auth.getUser(
       authHeader.replace("Bearer ", "")
     );
     if (authError || !user) {
@@ -50,7 +54,25 @@ Deno.serve(async (req) => {
 
     // ── Parse body ────────────────────────────────────────────────────────────
     const body = await req.json();
-    const { platform, username, metrics = {}, workspace_id, force_refresh = false } = body;
+    const { platform, username, metrics = {}, workspace_id: requestedWorkspaceId, force_refresh = false } = body;
+    const { data: memberships, error: membershipError } = await serviceClient
+      .from("workspace_members")
+      .select("workspace_id")
+      .eq("user_id", user.id);
+
+    if (membershipError) {
+      return new Response(JSON.stringify({ error: "Failed to resolve workspace membership" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const targetWorkspace = resolveAuthorizedWorkspace(requestedWorkspaceId, memberships ?? []);
+    if (!targetWorkspace) {
+      return new Response(JSON.stringify({ error: "Workspace access denied" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
 
     if (!platform || !username) {
       return new Response(JSON.stringify({ error: "platform and username are required" }), {
@@ -152,12 +174,12 @@ Deno.serve(async (req) => {
     // ── Cache lookup (7-day) ──────────────────────────────────────────────────
     const cacheExpiry = new Date(Date.now() - CACHE_TTL_HOURS * 60 * 60 * 1000).toISOString();
     if (!force_refresh) {
-      const { data: cached } = await supabase
+      const { data: cached } = await serviceClient
         .from("influencer_evaluations")
         .select("python_analytics, python_analytics_at")
         .eq("platform", platform)
         .eq("username", username)
-        .eq("workspace_id", workspace_id ?? user.id)
+        .eq("workspace_id", targetWorkspace)
         .not("python_analytics", "is", null)
         .gt("python_analytics_at", cacheExpiry)
         .maybeSingle();
@@ -200,8 +222,7 @@ Deno.serve(async (req) => {
     }
 
     // ── Persist to cache ──────────────────────────────────────────────────────
-    const targetWorkspace = workspace_id ?? user.id;
-    const { error: persistErr } = await supabase
+    const { error: persistErr } = await serviceClient
       .from("influencer_evaluations")
       .upsert(
         {

@@ -11,18 +11,15 @@
 
 -- â”€â”€ bot_signal_weights â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 ALTER TABLE public.bot_signal_weights ENABLE ROW LEVEL SECURITY;
-
 -- Any authenticated user may read signal weights (needed for bot score breakdown UI)
 DROP POLICY IF EXISTS "bot_signal_weights_read" ON public.bot_signal_weights;
 CREATE POLICY "bot_signal_weights_read" ON public.bot_signal_weights
   FOR SELECT TO authenticated USING (true);
-
 -- Only service_role (edge functions, pg_cron) may insert or update weights.
 -- No explicit INSERT/UPDATE policy = denied for all authenticated roles.
 
 -- â”€â”€ discovery_runs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 ALTER TABLE public.discovery_runs ENABLE ROW LEVEL SECURITY;
-
 -- Only admins (role = 'admin' in user_roles) may read the audit log.
 DROP POLICY IF EXISTS "discovery_runs_admin_read" ON public.discovery_runs;
 CREATE POLICY "discovery_runs_admin_read" ON public.discovery_runs
@@ -34,6 +31,5 @@ CREATE POLICY "discovery_runs_admin_read" ON public.discovery_runs
         AND ur.role IN ('admin', 'super_admin')
     )
   );
-
 -- Service_role (cron workers) may insert run records â€” no RLS restriction applies
--- to service_role (it bypasses RLS by design).
+-- to service_role (it bypasses RLS by design).;

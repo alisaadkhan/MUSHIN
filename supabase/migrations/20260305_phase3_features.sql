@@ -20,7 +20,6 @@ CREATE TABLE IF NOT EXISTS support_tickets (
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
 CREATE TABLE IF NOT EXISTS support_ticket_replies (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ticket_id  UUID NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
@@ -29,23 +28,19 @@ CREATE TABLE IF NOT EXISTS support_ticket_replies (
   body       TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_support_tickets_user_id ON support_tickets(user_id);
 CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status);
 CREATE INDEX IF NOT EXISTS idx_support_tickets_created_at ON support_tickets(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_support_replies_ticket_id ON support_ticket_replies(ticket_id);
-
 -- RLS
 ALTER TABLE support_tickets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE support_ticket_replies ENABLE ROW LEVEL SECURITY;
-
 -- Users can see and manage their own tickets
 CREATE POLICY "Users manage own tickets"
   ON support_tickets FOR ALL
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
-
 -- Admins can see and update all tickets
 CREATE POLICY "Admins manage all tickets"
   ON support_tickets FOR ALL
@@ -56,7 +51,6 @@ CREATE POLICY "Admins manage all tickets"
         AND ur.role IN ('admin', 'super_admin')
     )
   );
-
 -- Users can see replies on their tickets
 CREATE POLICY "Users see replies on own tickets"
   ON support_ticket_replies FOR SELECT
@@ -66,7 +60,6 @@ CREATE POLICY "Users see replies on own tickets"
       WHERE st.id = ticket_id AND st.user_id = auth.uid()
     )
   );
-
 -- Users can add replies to own tickets
 CREATE POLICY "Users reply to own tickets"
   ON support_ticket_replies FOR INSERT
@@ -77,7 +70,6 @@ CREATE POLICY "Users reply to own tickets"
       WHERE st.id = ticket_id AND st.user_id = auth.uid()
     )
   );
-
 -- Admins can see and add replies for all tickets
 CREATE POLICY "Admins manage all replies"
   ON support_ticket_replies FOR ALL
@@ -88,7 +80,6 @@ CREATE POLICY "Admins manage all replies"
         AND ur.role IN ('admin', 'super_admin')
     )
   );
-
 -- Updated_at trigger
 CREATE OR REPLACE FUNCTION update_support_ticket_updated_at()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
@@ -97,11 +88,9 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 CREATE TRIGGER trg_support_tickets_updated_at
   BEFORE UPDATE ON support_tickets
   FOR EACH ROW EXECUTE FUNCTION update_support_ticket_updated_at();
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2. NOTIFICATIONS TABLE
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -116,25 +105,21 @@ CREATE TABLE IF NOT EXISTS notifications (
   is_archived BOOLEAN NOT NULL DEFAULT FALSE,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
-
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Users see own notifications"
   ON notifications FOR SELECT
   USING (auth.uid() = user_id);
-
 CREATE POLICY "Users update own notifications"
   ON notifications FOR UPDATE
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
-
 CREATE POLICY "Service role inserts notifications"
   ON notifications FOR INSERT
-  WITH CHECK (TRUE); -- Service role inserts, no user restriction
+  WITH CHECK (TRUE);
+-- Service role inserts, no user restriction
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 3. ANNOUNCEMENTS TABLE (persist AdminAnnouncements to DB)
@@ -150,17 +135,13 @@ CREATE TABLE IF NOT EXISTS announcements (
   is_active       BOOLEAN NOT NULL DEFAULT TRUE,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
 CREATE INDEX IF NOT EXISTS idx_announcements_is_active ON announcements(is_active);
 CREATE INDEX IF NOT EXISTS idx_announcements_created_at ON announcements(created_at DESC);
-
 ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
-
 -- All authenticated users can read active announcements
 CREATE POLICY "Users read active announcements"
   ON announcements FOR SELECT
   USING (is_active = TRUE);
-
 -- Only admins can manage announcements
 CREATE POLICY "Admins manage announcements"
   ON announcements FOR ALL
@@ -171,7 +152,6 @@ CREATE POLICY "Admins manage announcements"
         AND ur.role IN ('admin', 'super_admin')
     )
   );
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 4a. CAMPAIGN METRICS TABLE (idempotent — table may already exist on remote)
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -186,14 +166,11 @@ CREATE TABLE IF NOT EXISTS campaign_metrics (
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
 CREATE INDEX IF NOT EXISTS idx_campaign_metrics_tracking_link_id
   ON campaign_metrics(tracking_link_id);
 CREATE INDEX IF NOT EXISTS idx_campaign_metrics_date
   ON campaign_metrics(date DESC);
-
 ALTER TABLE campaign_metrics ENABLE ROW LEVEL SECURITY;
-
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -205,7 +182,6 @@ BEGIN
         UNIQUE (tracking_link_id, date);
   END IF;
 END $$;
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 4. MISSING RPC: increment_click_metric
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -224,7 +200,6 @@ BEGIN
         updated_at = NOW();
 END;
 $$;
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 5. ADMIN SEND NOTIFICATION to target audience RPC
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -274,7 +249,6 @@ BEGIN
   RETURN v_count;
 END;
 $$;
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 6. MARK NOTIFICATIONS READ/ARCHIVED RPCs
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -285,7 +259,6 @@ BEGIN
   WHERE id = p_notification_id AND user_id = auth.uid();
 END;
 $$;
-
 CREATE OR REPLACE FUNCTION mark_all_notifications_read()
 RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
@@ -293,7 +266,6 @@ BEGIN
   WHERE user_id = auth.uid() AND is_read = FALSE;
 END;
 $$;
-
 CREATE OR REPLACE FUNCTION archive_notification(p_notification_id UUID)
 RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
@@ -301,7 +273,6 @@ BEGIN
   WHERE id = p_notification_id AND user_id = auth.uid();
 END;
 $$;
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 7. NOTIFICATION LOG
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -315,9 +286,7 @@ CREATE TABLE IF NOT EXISTS notification_log (
   recipient_count INTEGER,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
 ALTER TABLE notification_log ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Admins see notification log"
   ON notification_log FOR SELECT
   USING (
@@ -327,11 +296,9 @@ CREATE POLICY "Admins see notification log"
         AND ur.role IN ('admin', 'super_admin')
     )
   );
-
 CREATE POLICY "Service insert notification log"
   ON notification_log FOR INSERT
   WITH CHECK (TRUE);
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 8. WORKSPACE MEMBER INVITE RPC
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -381,7 +348,6 @@ BEGIN
   RETURN jsonb_build_object('success', true, 'user_id', v_target_user_id);
 END;
 $$;
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 9. REMOVE WORKSPACE MEMBER RPC
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -420,7 +386,6 @@ BEGIN
   RETURN jsonb_build_object('success', true);
 END;
 $$;
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 12. RESTORE AI CREDIT (for rollback on failed AI call)
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -432,7 +397,6 @@ BEGIN
   WHERE id = ws_id;
 END;
 $$;
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- NOTE: campaign_metrics UNIQUE constraint (tracking_link_id, date) is now
 --       added in section 4a above. The old single-column constraint is omitted.
@@ -449,9 +413,7 @@ CREATE TABLE IF NOT EXISTS anomaly_logs (
   details      JSONB,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
 ALTER TABLE anomaly_logs ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Admins see anomaly logs"
   ON anomaly_logs FOR ALL
   USING (

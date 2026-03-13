@@ -1,3 +1,4 @@
+import { getServiceRoleKey } from "../_shared/privileged_gateway.ts";
 // supabase/functions/extract-creator-tags/index.ts
 // ─────────────────────────────────────────────────────────────────────────────
 // AI Tag Generation Pipeline
@@ -13,6 +14,7 @@
 // Failsafe: if HuggingFace is unavailable, falls back to pure keyword extraction.
 // ─────────────────────────────────────────────────────────────────────────────
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { safeErrorResponse } from "../_shared/errors.ts";
 import {
   generateText,
   extractJsonFromText,
@@ -84,7 +86,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const serviceKey = getServiceRoleKey();
     const isInternal = authHeader === `Bearer ${serviceKey}`;
 
     if (!isInternal) {

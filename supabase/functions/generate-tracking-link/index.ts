@@ -1,6 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { safeErrorResponse } from "../_shared/errors.ts";
-
 const APP_URL = Deno.env.get("APP_URL") || "https://mushin.app";
 const corsHeaders = {
     "Access-Control-Allow-Origin": APP_URL,
@@ -39,11 +38,6 @@ Deno.serve(async (req) => {
             return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400, headers: corsHeaders });
         }
 
-        const serviceClient = createClient(
-            Deno.env.get("SUPABASE_URL")!,
-            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-        );
-
         // Verify user has access to this campaign
         const { data: campaign, error: campaignErr } = await supabase
             .from("campaigns")
@@ -59,7 +53,8 @@ Deno.serve(async (req) => {
         // In production, you would map this to a custom domain (e.g., trk.mushin.com/{code})
         const shortUrl = `${req.headers.get("origin") || "https://app.mushin.com"}/api/t/${trackingCode}`;
 
-        const { data: trackingLink, error: insertErr } = await serviceClient
+        // RLS already scopes tracking_links writes to workspace members.
+        const { data: trackingLink, error: insertErr } = await supabase
             .from("tracking_links")
             .insert({
                 campaign_id,

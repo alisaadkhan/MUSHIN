@@ -1,6 +1,6 @@
+import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { crypto } from "https://deno.land/std@0.177.0/crypto/mod.ts";
-
 // email-webhook receives server-to-server calls from Resend. CORS headers are
 // not meaningful for S2S webhooks but must be present for Supabase edge runtime.
 const corsHeaders = {
@@ -81,9 +81,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+    const adminClient = await performPrivilegedWrite({
+        authHeader: req.headers.get("Authorization"),
+        action: "gateway:privileged-client-bootstrap",
+        execute: async (_ctx, client) => client,
+    });
 
     const payload = JSON.parse(rawBody);
     const eventType = payload?.type;

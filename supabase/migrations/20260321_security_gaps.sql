@@ -21,7 +21,6 @@
 
 -- Drop the overly broad read policy that allowed anon enumeration
 DROP POLICY IF EXISTS "avatars_public_read" ON storage.objects;
-
 -- Authenticated users may only list/download their own avatar folder.
 -- Public CDN URLs (used by the app for displaying any user's avatar) bypass
 -- this policy entirely because the bucket is public=true.
@@ -33,7 +32,6 @@ CREATE POLICY "avatars_own_select"
     bucket_id = 'avatars'
     AND (storage.foldername(name))[1] = auth.uid()::text
   );
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- SECTION 2: support_ticket_replies.is_admin injection fix
 -- The INSERT RLS policy "Users reply to own tickets" correctly validates author_id
@@ -72,13 +70,11 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 DROP TRIGGER IF EXISTS trg_reply_is_admin_check ON public.support_ticket_replies;
 CREATE TRIGGER trg_reply_is_admin_check
   BEFORE INSERT OR UPDATE ON public.support_ticket_replies
   FOR EACH ROW
   EXECUTE FUNCTION public.enforce_reply_is_admin();
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- SECTION 3: Harden the handle_new_user trigger against metadata injection
 -- When a new user signs up, Supabase fires handle_new_user() which creates

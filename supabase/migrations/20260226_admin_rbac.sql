@@ -23,7 +23,6 @@ BEGIN
     END IF;
   END IF;
 END $$;
-
 -- 1.2 Create workspace_role enum if missing (needed by workspace_members)
 DO $$
 BEGIN
@@ -31,7 +30,6 @@ BEGIN
     CREATE TYPE public.workspace_role AS ENUM ('owner', 'admin', 'member');
   END IF;
 END $$;
-
 -- 1.3 Create campaign_status enum if missing
 DO $$
 BEGIN
@@ -39,7 +37,6 @@ BEGIN
     CREATE TYPE public.campaign_status AS ENUM ('draft', 'active', 'completed', 'archived');
   END IF;
 END $$;
-
 -- 1.4 Create enrichment_status enum if missing
 DO $$
 BEGIN
@@ -47,7 +44,6 @@ BEGIN
     CREATE TYPE public.enrichment_status AS ENUM ('pending', 'processing', 'completed', 'failed', 'dead_letter');
   END IF;
 END $$;
-
 -- ── Core tables (safe to run on empty DB) ─────────────────────────────────────
 
 -- profiles
@@ -64,7 +60,6 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can manage own profile" ON public.profiles;
 CREATE POLICY "Users can manage own profile" ON public.profiles
   USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
-
 -- workspaces
 CREATE TABLE IF NOT EXISTS public.workspaces (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -83,7 +78,6 @@ ALTER TABLE public.workspaces ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Workspace owner access" ON public.workspaces;
 CREATE POLICY "Workspace owner access" ON public.workspaces
   USING (auth.uid() = owner_id);
-
 -- workspace_members
 CREATE TABLE IF NOT EXISTS public.workspace_members (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -97,7 +91,6 @@ ALTER TABLE public.workspace_members ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Members can view own membership" ON public.workspace_members;
 CREATE POLICY "Members can view own membership" ON public.workspace_members
   USING (auth.uid() = user_id);
-
 -- user_roles
 CREATE TABLE IF NOT EXISTS public.user_roles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -109,7 +102,6 @@ ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can read own role" ON public.user_roles;
 CREATE POLICY "Users can read own role" ON public.user_roles
   FOR SELECT USING (auth.uid() = user_id);
-
 -- subscriptions
 CREATE TABLE IF NOT EXISTS public.subscriptions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -130,7 +122,6 @@ CREATE POLICY "Owner can read subscription" ON public.subscriptions
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM public.workspaces w WHERE w.id = workspace_id AND w.owner_id = auth.uid())
   );
-
 -- influencers_cache
 CREATE TABLE IF NOT EXISTS public.influencers_cache (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -144,7 +135,6 @@ CREATE TABLE IF NOT EXISTS public.influencers_cache (
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE(platform, username)
 );
-
 -- influencer_lists
 CREATE TABLE IF NOT EXISTS public.influencer_lists (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -157,7 +147,6 @@ ALTER TABLE public.influencer_lists ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Workspace members can manage lists" ON public.influencer_lists;
 CREATE POLICY "Workspace members can manage lists" ON public.influencer_lists
   USING (EXISTS (SELECT 1 FROM public.workspace_members wm WHERE wm.workspace_id = influencer_lists.workspace_id AND wm.user_id = auth.uid()));
-
 -- list_items
 CREATE TABLE IF NOT EXISTS public.list_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -177,7 +166,6 @@ CREATE POLICY "List members can manage items" ON public.list_items
     JOIN public.workspace_members wm ON wm.workspace_id = il.workspace_id
     WHERE il.id = list_id AND wm.user_id = auth.uid()
   ));
-
 -- campaigns
 CREATE TABLE IF NOT EXISTS public.campaigns (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -195,7 +183,6 @@ ALTER TABLE public.campaigns ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Workspace members can manage campaigns" ON public.campaigns;
 CREATE POLICY "Workspace members can manage campaigns" ON public.campaigns
   USING (EXISTS (SELECT 1 FROM public.workspace_members wm WHERE wm.workspace_id = campaigns.workspace_id AND wm.user_id = auth.uid()));
-
 -- pipeline_stages
 CREATE TABLE IF NOT EXISTS public.pipeline_stages (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -213,7 +200,6 @@ CREATE POLICY "Workspace members can manage pipeline stages" ON public.pipeline_
     JOIN public.workspace_members wm ON wm.workspace_id = c.workspace_id
     WHERE c.id = campaign_id AND wm.user_id = auth.uid()
   ));
-
 -- pipeline_cards
 CREATE TABLE IF NOT EXISTS public.pipeline_cards (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -236,7 +222,6 @@ CREATE POLICY "Workspace members can manage pipeline cards" ON public.pipeline_c
     JOIN public.workspace_members wm ON wm.workspace_id = c.workspace_id
     WHERE c.id = campaign_id AND wm.user_id = auth.uid()
   ));
-
 -- campaign_activity
 CREATE TABLE IF NOT EXISTS public.campaign_activity (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -256,7 +241,6 @@ CREATE POLICY "Workspace members can view activity" ON public.campaign_activity
       WHERE c.id = campaign_id AND wm.user_id = auth.uid()
     )
   );
-
 -- outreach_log
 CREATE TABLE IF NOT EXISTS public.outreach_log (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -284,7 +268,6 @@ CREATE POLICY "Workspace members can view outreach" ON public.outreach_log
       WHERE c.id = campaign_id AND wm.user_id = auth.uid()
     )
   );
-
 -- email_templates
 CREATE TABLE IF NOT EXISTS public.email_templates (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -299,7 +282,6 @@ ALTER TABLE public.email_templates ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Workspace members can manage templates" ON public.email_templates;
 CREATE POLICY "Workspace members can manage templates" ON public.email_templates
   USING (EXISTS (SELECT 1 FROM public.workspace_members wm WHERE wm.workspace_id = email_templates.workspace_id AND wm.user_id = auth.uid()));
-
 -- search_history
 CREATE TABLE IF NOT EXISTS public.search_history (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -315,7 +297,6 @@ ALTER TABLE public.search_history ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Workspace members can view history" ON public.search_history;
 CREATE POLICY "Workspace members can view history" ON public.search_history
   FOR SELECT USING (EXISTS (SELECT 1 FROM public.workspace_members wm WHERE wm.workspace_id = search_history.workspace_id AND wm.user_id = auth.uid()));
-
 -- saved_searches
 CREATE TABLE IF NOT EXISTS public.saved_searches (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -328,7 +309,6 @@ ALTER TABLE public.saved_searches ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Workspace members can manage saved searches" ON public.saved_searches;
 CREATE POLICY "Workspace members can manage saved searches" ON public.saved_searches
   USING (EXISTS (SELECT 1 FROM public.workspace_members wm WHERE wm.workspace_id = saved_searches.workspace_id AND wm.user_id = auth.uid()));
-
 -- credits_usage
 CREATE TABLE IF NOT EXISTS public.credits_usage (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -342,7 +322,6 @@ ALTER TABLE public.credits_usage ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Workspace members can view credits" ON public.credits_usage;
 CREATE POLICY "Workspace members can view credits" ON public.credits_usage
   FOR SELECT USING (EXISTS (SELECT 1 FROM public.workspace_members wm WHERE wm.workspace_id = credits_usage.workspace_id AND wm.user_id = auth.uid()));
-
 -- influencer_evaluations
 CREATE TABLE IF NOT EXISTS public.influencer_evaluations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -357,7 +336,6 @@ ALTER TABLE public.influencer_evaluations ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Workspace members can view evaluations" ON public.influencer_evaluations;
 CREATE POLICY "Workspace members can view evaluations" ON public.influencer_evaluations
   USING (EXISTS (SELECT 1 FROM public.workspace_members wm WHERE wm.workspace_id = influencer_evaluations.workspace_id AND wm.user_id = auth.uid()));
-
 -- enrichment_jobs
 CREATE TABLE IF NOT EXISTS public.enrichment_jobs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -375,7 +353,6 @@ ALTER TABLE public.enrichment_jobs ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Workspace owners can manage jobs" ON public.enrichment_jobs;
 CREATE POLICY "Workspace owners can manage jobs" ON public.enrichment_jobs
   USING (EXISTS (SELECT 1 FROM public.workspaces w WHERE w.id = workspace_id AND w.owner_id = auth.uid()));
-
 -- workspace_secrets
 CREATE TABLE IF NOT EXISTS public.workspace_secrets (
   workspace_id uuid PRIMARY KEY REFERENCES public.workspaces(id) ON DELETE CASCADE,
@@ -387,7 +364,6 @@ ALTER TABLE public.workspace_secrets ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Workspace owners can manage secrets" ON public.workspace_secrets;
 CREATE POLICY "Workspace owners can manage secrets" ON public.workspace_secrets
   USING (EXISTS (SELECT 1 FROM public.workspaces w WHERE w.id = workspace_id AND w.owner_id = auth.uid()));
-
 -- tracking_links (if used by generate-tracking-link fn)
 CREATE TABLE IF NOT EXISTS public.tracking_links (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -402,7 +378,6 @@ ALTER TABLE public.tracking_links ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Workspace members can manage tracking links" ON public.tracking_links;
 CREATE POLICY "Workspace members can manage tracking links" ON public.tracking_links
   USING (EXISTS (SELECT 1 FROM public.workspace_members wm WHERE wm.workspace_id = tracking_links.workspace_id AND wm.user_id = auth.uid()));
-
 -- tracking_events
 CREATE TABLE IF NOT EXISTS public.tracking_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -412,7 +387,6 @@ CREATE TABLE IF NOT EXISTS public.tracking_events (
   referrer text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
-
 -- invoices
 CREATE TABLE IF NOT EXISTS public.invoices (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -428,7 +402,6 @@ ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Workspace owners can view invoices" ON public.invoices;
 CREATE POLICY "Workspace owners can view invoices" ON public.invoices
   FOR SELECT USING (EXISTS (SELECT 1 FROM public.workspaces w WHERE w.id = workspace_id AND w.owner_id = auth.uid()));
-
 -- ── Helper functions ──────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION public.has_role(_user_id uuid, _role public.app_role)
@@ -440,7 +413,6 @@ AS $$
     WHERE user_id = _user_id AND role = _role
   );
 $$;
-
 CREATE OR REPLACE FUNCTION public.get_user_workspace_id()
 RETURNS uuid
 LANGUAGE sql STABLE SECURITY DEFINER
@@ -449,7 +421,6 @@ AS $$
   WHERE wm.user_id = auth.uid()
   LIMIT 1;
 $$;
-
 CREATE OR REPLACE FUNCTION public.get_user_workspace()
 RETURNS TABLE(workspace_id uuid, role text)
 LANGUAGE sql STABLE SECURITY DEFINER
@@ -458,7 +429,6 @@ AS $$
   WHERE wm.user_id = auth.uid()
   LIMIT 1;
 $$;
-
 CREATE OR REPLACE FUNCTION public.is_workspace_member(_workspace_id uuid)
 RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER
@@ -468,7 +438,6 @@ AS $$
     WHERE workspace_id = _workspace_id AND user_id = auth.uid()
   );
 $$;
-
 CREATE OR REPLACE FUNCTION public.is_workspace_owner(_workspace_id uuid)
 RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER
@@ -478,7 +447,6 @@ AS $$
     WHERE id = _workspace_id AND owner_id = auth.uid()
   );
 $$;
-
 -- ── Trigger: auto-create profile + workspace + membership + role on sign-up ──
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -510,12 +478,10 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
 -- ── Admin audit log ───────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS public.admin_audit_log (
@@ -533,7 +499,6 @@ CREATE POLICY "super_admin can view audit log" ON public.admin_audit_log
 DROP POLICY IF EXISTS "service role can insert audit log" ON public.admin_audit_log;
 CREATE POLICY "service role can insert audit log" ON public.admin_audit_log
   FOR INSERT WITH CHECK (true);
-
 -- ── Indexes ───────────────────────────────────────────────────────────────────
 
 CREATE INDEX IF NOT EXISTS idx_user_roles_role    ON public.user_roles(role);

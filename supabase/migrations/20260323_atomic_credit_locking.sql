@@ -45,10 +45,8 @@ BEGIN
   WHERE  id = ws_id;
 END;
 $$;
-
 REVOKE EXECUTE ON FUNCTION public.consume_search_credit(uuid) FROM anon;
 GRANT  EXECUTE ON FUNCTION public.consume_search_credit(uuid) TO authenticated, service_role;
-
 -- ─── consume_ai_credit — atomic with row lock ─────────────────────────────
 CREATE OR REPLACE FUNCTION public.consume_ai_credit(ws_id uuid)
 RETURNS void
@@ -78,10 +76,8 @@ BEGIN
   WHERE  id = ws_id;
 END;
 $$;
-
 REVOKE EXECUTE ON FUNCTION public.consume_ai_credit(uuid) FROM anon;
 GRANT  EXECUTE ON FUNCTION public.consume_ai_credit(uuid) TO authenticated, service_role;
-
 -- ─── consume_enrichment_credit — atomic with row lock ─────────────────────
 CREATE OR REPLACE FUNCTION public.consume_enrichment_credit(ws_id uuid)
 RETURNS void
@@ -111,10 +107,8 @@ BEGIN
   WHERE  id = ws_id;
 END;
 $$;
-
 REVOKE EXECUTE ON FUNCTION public.consume_enrichment_credit(uuid) FROM anon;
 GRANT  EXECUTE ON FUNCTION public.consume_enrichment_credit(uuid) TO authenticated, service_role;
-
 -- ─── consume_email_credit — atomic with row lock ──────────────────────────
 CREATE OR REPLACE FUNCTION public.consume_email_credit(ws_id uuid)
 RETURNS void
@@ -144,10 +138,8 @@ BEGIN
   WHERE  id = ws_id;
 END;
 $$;
-
 REVOKE EXECUTE ON FUNCTION public.consume_email_credit(uuid) FROM anon;
 GRANT  EXECUTE ON FUNCTION public.consume_email_credit(uuid) TO authenticated, service_role;
-
 -- ─── restore_ai_credit — atomic refund on AI failure ─────────────────────
 -- Called by ai-insights when HuggingFace fails after credit was deducted.
 -- Capped at the plan maximum to prevent credit farming via deliberate failures.
@@ -165,7 +157,6 @@ BEGIN
   WHERE  id = ws_id;
 END;
 $$;
-
 REVOKE EXECUTE ON FUNCTION public.restore_ai_credit(uuid) FROM anon;
 GRANT  EXECUTE ON FUNCTION public.restore_ai_credit(uuid) TO service_role;
--- Note: authenticated role does NOT get restore — only service_role (edge functions) may invoke this.
+-- Note: authenticated role does NOT get restore — only service_role (edge functions) may invoke this.;

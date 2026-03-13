@@ -13,7 +13,6 @@
 -- This migration re-instates the correct version.
 -- ─────────────────────────────────────────────────────────────────────────────
 ALTER TABLE public.enrichment_jobs ADD COLUMN IF NOT EXISTS last_error text;
-
 CREATE OR REPLACE FUNCTION system_integrity_audit()
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -87,7 +86,6 @@ BEGIN
   RETURN result;
 END;
 $$;
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- C-2: Add bot_signals cache columns to influencer_profiles
 -- Prevents detect-bot-entendre from being called on every profile load.
@@ -96,7 +94,6 @@ $$;
 ALTER TABLE public.influencer_profiles
   ADD COLUMN IF NOT EXISTS bot_signals jsonb,
   ADD COLUMN IF NOT EXISTS bot_signals_computed_at timestamptz;
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- L-1 + M-4: Drop and recreate match_influencers with correct arg types and
 -- NULL embedding guard
@@ -104,7 +101,6 @@ ALTER TABLE public.influencer_profiles
 -- M-4: Cosine distance on NULL embedding crashes or drops rows silently.
 -- ─────────────────────────────────────────────────────────────────────────────
 DROP FUNCTION IF EXISTS public.match_influencers(vector(1536), float, int, text);
-
 CREATE OR REPLACE FUNCTION public.match_influencers(
   query_embedding vector(1536),
   match_threshold float,
@@ -146,7 +142,6 @@ BEGIN
   LIMIT match_count;
 END;
 $$;
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- L-4: Fix cron.unschedule() calls — must use PERFORM inside PL/pgSQL DO blocks
 -- Also isolate each unschedule in its own BEGIN/EXCEPTION so one missing
@@ -166,7 +161,6 @@ BEGIN
     PERFORM cron.unschedule('monthly-credit-reset');
   EXCEPTION WHEN OTHERS THEN NULL; END;
 END $$;
-
 -- Recreate the schedules (idempotent — unscheduled above)
 DO $$
 BEGIN

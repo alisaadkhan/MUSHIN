@@ -2,14 +2,11 @@
 
 -- 1. Add vector extension if not present, embedding column, and HNSW index
 CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
-
 ALTER TABLE public.influencer_profiles ADD COLUMN IF NOT EXISTS embedding vector(1536);
-
 -- Create HNSW index for efficient similarity search
 CREATE INDEX IF NOT EXISTS influencer_profiles_embedding_idx 
 ON public.influencer_profiles USING hnsw (embedding vector_cosine_ops)
 WITH (m = 16, ef_construction = 64);
-
 -- 2. Create/update match_influencers RPC
 DROP FUNCTION IF EXISTS public.match_influencers;
 CREATE OR REPLACE FUNCTION public.match_influencers(
@@ -52,10 +49,8 @@ BEGIN
   LIMIT match_count;
 END;
 $$;
-
 -- 3. Normalized Engagement Score for cross-platform comparison
 ALTER TABLE public.influencer_profiles ADD COLUMN IF NOT EXISTS normalized_engagement_score numeric(5,2);
-
 CREATE OR REPLACE FUNCTION public.compute_normalized_engagement(
   platform_name text,
   eng_rate numeric
@@ -83,7 +78,6 @@ BEGIN
   RETURN LEAST(ROUND(norm * 50, 2), 100.00);
 END;
 $$;
-
 -- Update trigger to auto-calculate normalized engagement on insert/update
 CREATE OR REPLACE FUNCTION public.trg_update_normalized_engagement()
 RETURNS TRIGGER
@@ -96,23 +90,19 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 DROP TRIGGER IF EXISTS trg_calc_norm_eng ON public.influencer_profiles;
 CREATE TRIGGER trg_calc_norm_eng
   BEFORE INSERT OR UPDATE OF engagement_rate
   ON public.influencer_profiles
   FOR EACH ROW
   EXECUTE FUNCTION public.trg_update_normalized_engagement();
-
 -- Retroactively compute for existing profiles
 UPDATE public.influencer_profiles 
 SET normalized_engagement_score = public.compute_normalized_engagement(platform, engagement_rate)
 WHERE engagement_rate IS NOT NULL AND normalized_engagement_score IS NULL;
-
 -- 4. Enable pg_cron and schedule the maintenance jobs
 CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA pg_catalog;
 CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA public;
-
 -- Ensure required configurations exist, falling back to dummy values if not set to prevent errors
 DO $$
 BEGIN
@@ -123,7 +113,6 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
   -- Ignore if cron isn't setup properly yet
 END $$;
-
 -- Notice: the user must manually set app.supabase_functions_url and app.service_role_key in Supabase Dashboard
 -- Example cron definition, though running edge functions requires pg_net
 DO $$

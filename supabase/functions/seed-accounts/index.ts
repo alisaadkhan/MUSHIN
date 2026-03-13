@@ -1,5 +1,5 @@
+import { getServiceRoleKey } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
 // SECURITY: Restrict CORS to the application domain — never use wildcard on
 // privileged endpoints even if other guards (service role key check) exist.
 const corsHeaders = {
@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
     // SECURITY: This endpoint wipes the entire user database.
     // Must only be callable with the service role key.
     const authHeader = req.headers.get("Authorization");
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const serviceRoleKey = getServiceRoleKey();
     if (!authHeader || authHeader !== `Bearer ${serviceRoleKey}`) {
         return new Response(JSON.stringify({ error: "Unauthorized — service role key required" }), {
             status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }

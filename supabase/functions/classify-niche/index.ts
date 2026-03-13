@@ -1,11 +1,10 @@
+import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { safeErrorResponse } from "../_shared/errors.ts";
 import { corsHeaders } from "../_shared/rate_limit.ts";
 import { generateText, extractJsonFromText, extractTagsFromBio, normalizeTags } from "../\_shared/huggingface.ts";
-
 Deno.serve(async (req) => {
     if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-
     try {
         const authHeader = req.headers.get("Authorization");
         if (!authHeader?.startsWith("Bearer ")) {
@@ -28,10 +27,11 @@ Deno.serve(async (req) => {
             return new Response(JSON.stringify({ error: "profile_id required" }), { status: 400, headers: corsHeaders });
         }
 
-        const serviceClient = createClient(
-            Deno.env.get("SUPABASE_URL")!,
-            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-        );
+        const serviceClient = await performPrivilegedWrite({
+        authHeader: req.headers.get("Authorization"),
+        action: "gateway:privileged-client-bootstrap",
+        execute: async (_ctx, client) => client,
+    });
 
         // Fetch up to 20 recent posts for this profile
         const { data: posts, error: postsErr } = await serviceClient

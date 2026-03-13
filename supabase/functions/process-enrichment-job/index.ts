@@ -1,12 +1,16 @@
+import { getServiceRoleKey } from "../_shared/privileged_gateway.ts";
+import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { recordCircuitResult } from "../_shared/rate_limit.ts";
 import { safeErrorResponse } from "../_shared/errors.ts";
-
+import { consumeNonceOnce, isRecentTimestamp } from "../_shared/security.ts";
 const APP_URL = Deno.env.get("APP_URL") || "https://mushin.app";
 const corsHeaders = {
     "Access-Control-Allow-Origin": APP_URL,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-webhook-signature",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-webhook-signature, x-webhook-timestamp, x-webhook-nonce",
 };
+
+const NONCE_STORE = new Map<string, number>();
 
 // This function is called by a pg_cron job or Supabase scheduled webhook.
 // It picks up to 3 queued enrichment jobs, processes them, and marks completion.
@@ -16,20 +20,41 @@ Deno.serve(async (req: Request) => {
     if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
     try {
-        // Verify the call is internal (via webhook secret)
+        // Fail closed: this endpoint must always be protected by WEBHOOK_SECRET.
         const secret = Deno.env.get("WEBHOOK_SECRET");
+        if (!secret) {
+            return new Response(JSON.stringify({ error: "Server misconfigured" }), {
+                status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+        }
+
         const authHeader = req.headers.get("x-webhook-signature") || req.headers.get("Authorization");
-        if (secret && authHeader !== `Bearer ${secret}`) {
+        if (authHeader !== `Bearer ${secret}`) {
             return new Response(JSON.stringify({ error: "Unauthorized" }), {
                 status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
             });
         }
 
-        const serviceClient = createClient(
-            Deno.env.get("SUPABASE_URL")!,
-            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-            { auth: { autoRefreshToken: false, persistSession: false } }
-        );
+        // Replay protection: require a short-lived timestamp and one-time nonce.
+        const timestampHeader = req.headers.get("x-webhook-timestamp");
+        if (!isRecentTimestamp(timestampHeader)) {
+            return new Response(JSON.stringify({ error: "Stale or missing timestamp" }), {
+                status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+        }
+
+        const nonceHeader = req.headers.get("x-webhook-nonce");
+        if (!nonceHeader || !consumeNonceOnce(NONCE_STORE, nonceHeader)) {
+            return new Response(JSON.stringify({ error: "Replay detected" }), {
+                status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+        }
+
+        const serviceClient = await performPrivilegedWrite({
+        authHeader: req.headers.get("Authorization"),
+        action: "gateway:privileged-client-bootstrap",
+        execute: async (_ctx, client) => client,
+    });
 
         // Claim up to 3 jobs atomically using raw SQL (FOR UPDATE SKIP LOCKED)
         const { data: jobs, error: claimError } = await serviceClient.rpc("claim_enrichment_jobs", { batch_size: 3 });
@@ -60,7 +85,7 @@ async function processJob(job: any, serviceClient: any): Promise<void> {
     try {
         // Call enrich-influencer synchronously (the actual enrichment logic lives there)
         const enrichUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/enrich-influencer`;
-        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const serviceKey = getServiceRoleKey();
 
         // 110-second hard timeout — prevents runaway jobs blocking the queue
         const controller = new AbortController();
