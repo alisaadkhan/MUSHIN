@@ -1,4 +1,4 @@
-import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
+import { isSuperAdmin, performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const APP_URL = Deno.env.get("APP_URL") ?? "";
 const corsHeaders = {
@@ -46,11 +46,14 @@ Deno.serve(async (req) => {
     }
 
     const userId = userData.user.id;
+    const callerIsSuperAdmin = await isSuperAdmin(userId);
 
     // Service-role client for credit checks
     const adminClient = await performPrivilegedWrite({
         authHeader: req.headers.get("Authorization"),
         action: "gateway:privileged-client-bootstrap",
+      endpoint: "send-outreach-email",
+      ipAddress: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
         execute: async (_ctx, client) => client,
     });
 
@@ -76,7 +79,7 @@ Deno.serve(async (req) => {
       .eq("id", membership.workspace_id)
       .single();
 
-    if (!ws || ws.email_sends_remaining <= 0) {
+    if (!callerIsSuperAdmin && (!ws || ws.email_sends_remaining <= 0)) {
       return new Response(JSON.stringify({ error: "Email credits exhausted. Upgrade your plan to send more emails." }), {
         status: 402,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -98,13 +101,15 @@ Deno.serve(async (req) => {
 
     // SEC-04: Deduct credit BEFORE sending — prevents double-send race condition.
     // If email send fails we restore the credit.
-    const { error: creditErr } = await adminClient.rpc("consume_email_credit", { ws_id: membership.workspace_id });
-    if (creditErr) {
-      console.error("[send-outreach-email] Credit deduction failed:", creditErr.message);
-      return new Response(
-        JSON.stringify({ error: "Failed to reserve email credit. Please try again." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!callerIsSuperAdmin) {
+      const { error: creditErr } = await adminClient.rpc("consume_email_credit", { ws_id: membership.workspace_id });
+      if (creditErr) {
+        console.error("[send-outreach-email] Credit deduction failed:", creditErr.message);
+        return new Response(
+          JSON.stringify({ error: "Failed to reserve email credit. Please try again." }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Send email via Resend
@@ -128,8 +133,10 @@ Deno.serve(async (req) => {
     if (!resendRes.ok) {
       console.error("Resend API error:", resendData);
       // Restore the credit since email failed to send
-      const { error: restoreEmailErr } = await adminClient.rpc("restore_email_credit", { ws_id: membership.workspace_id });
-      if (restoreEmailErr) console.error("[send-outreach-email] Credit restore failed:", restoreEmailErr.message);
+      if (!callerIsSuperAdmin) {
+        const { error: restoreEmailErr } = await adminClient.rpc("restore_email_credit", { ws_id: membership.workspace_id });
+        if (restoreEmailErr) console.error("[send-outreach-email] Credit restore failed:", restoreEmailErr.message);
+      }
       return new Response(
         JSON.stringify({ error: "Failed to send email", details: resendData }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }

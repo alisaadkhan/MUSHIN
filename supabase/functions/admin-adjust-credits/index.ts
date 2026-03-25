@@ -1,4 +1,4 @@
-import { adminAdjustCredits, requireJwt, requireSystemAdmin } from "../_shared/privileged_gateway.ts";
+import { adminAdjustCredits, isSuperAdmin, requireJwt, requireSystemAdmin } from "../_shared/privileged_gateway.ts";
 import { logAdminAction, logSystemAction } from "../_shared/audit_logger.ts";
 import { safeErrorResponse, validationErrorResponse } from "../_shared/errors.ts";
 import { checkRateLimit, corsHeaders } from "../_shared/rate_limit.ts";
@@ -24,18 +24,6 @@ Deno.serve(async (req) => {
     const userAgent = req.headers.get("user-agent") ?? "unknown";
 
     try {
-        const rate = await checkRateLimit(ipAddress, "general", { perMin: 12, perHour: 120 });
-        if (!rate.allowed) {
-            await logSystemAction({
-                actionType: "security:rate_limit",
-                actionDescription: "Rate limit exceeded for admin-adjust-credits",
-                ipAddress,
-                userAgent,
-                metadata: { retry_after: rate.retryAfter },
-            });
-            return jsonResponse({ error: "Too many requests" }, 429);
-        }
-
         if (!authHeader?.startsWith("Bearer ")) {
             await logSystemAction({
                 actionType: "auth:login_attempt",
@@ -48,22 +36,48 @@ Deno.serve(async (req) => {
         }
 
         const { userId } = await requireJwt(authHeader);
+        const callerIsSuperAdmin = await isSuperAdmin(userId);
+        if (!callerIsSuperAdmin) {
+            const rate = await checkRateLimit(ipAddress, "general", { perMin: 12, perHour: 120 });
+            if (!rate.allowed) {
+                await logSystemAction({
+                    actionType: "security:rate_limit",
+                    actionDescription: "Rate limit exceeded for admin-adjust-credits",
+                    ipAddress,
+                    userAgent,
+                    metadata: { retry_after: rate.retryAfter },
+                });
+                return jsonResponse({ error: "Too many requests" }, 429);
+            }
+        }
+
         await requireSystemAdmin(authHeader);
 
-        const { workspace_id, credit_type, amount_delta, reason, target_user_id } = await req.json();
-        if (!workspace_id || !credit_type || !reason || amount_delta == null) {
+        const { workspace_id, credit_type, amount_delta, mode, new_balance, reason, target_user_id, idempotency_key } = await req.json();
+        if (!workspace_id || !credit_type || !reason) {
             return validationErrorResponse(
-                "workspace_id, credit_type, amount_delta, and reason are required",
+                "workspace_id, credit_type, and reason are required",
                 corsHeaders,
             );
+        }
+
+        const effectiveMode = mode === "set" ? "set" : "adjust";
+        if (effectiveMode === "adjust" && amount_delta == null) {
+            return validationErrorResponse("amount_delta is required for adjust mode", corsHeaders);
+        }
+        if (effectiveMode === "set" && new_balance == null) {
+            return validationErrorResponse("new_balance is required for set mode", corsHeaders);
         }
 
         const result = await adminAdjustCredits({
             authHeader,
             workspaceId: workspace_id,
             creditType: credit_type,
-            amountDelta: Number(amount_delta),
+            mode: effectiveMode,
+            amountDelta: amount_delta == null ? undefined : Number(amount_delta),
+            newBalance: new_balance == null ? undefined : Number(new_balance),
             reason,
+            idempotencyKey: idempotency_key ?? undefined,
             targetUserId: target_user_id ?? null,
             ipAddress,
             userAgent,
@@ -77,7 +91,7 @@ Deno.serve(async (req) => {
             actionDescription: "Admin credits adjustment request completed",
             ipAddress,
             userAgent,
-            metadata: { credit_type, amount_delta, reason },
+            metadata: { credit_type, amount_delta, new_balance, mode: effectiveMode, reason, idempotency_key },
         });
 
         return jsonResponse(result);

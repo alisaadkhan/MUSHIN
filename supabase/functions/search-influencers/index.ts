@@ -1,4 +1,4 @@
-import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
+import { isSuperAdmin, performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Redis } from "https://esm.sh/@upstash/redis";
 import { checkRateLimit, corsHeaders } from "../_shared/rate_limit.ts";
@@ -75,6 +75,8 @@ Deno.serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    const callerIsSuperAdmin = await isSuperAdmin(userData.user.id);
+
     const { data: workspaceId, error: wsError } = await supabase.rpc("get_user_workspace_id");
     if (wsError || !workspaceId) {
       return new Response(JSON.stringify({ error: "No workspace found" }),
@@ -82,15 +84,19 @@ Deno.serve(async (req) => {
     }
 
     // Rate limit by workspace ID (not spoofable x-forwarded-for)
-    const { allowed } = await checkRateLimit(workspaceId as string, "search");
-    if (!allowed) {
-      return new Response(JSON.stringify({ error: "Rate limit exceeded" }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!callerIsSuperAdmin) {
+      const { allowed } = await checkRateLimit(workspaceId as string, "search");
+      if (!allowed) {
+        return new Response(JSON.stringify({ error: "Rate limit exceeded" }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
 
     const serviceClient = await performPrivilegedWrite({
         authHeader: req.headers.get("Authorization"),
         action: "gateway:privileged-client-bootstrap",
+      endpoint: "search-influencers",
+      ipAddress: ip,
         execute: async (_ctx, client) => client,
     });
 
@@ -255,21 +261,24 @@ Deno.serve(async (req) => {
         }).sort((a: any, b: any) => b._search_score - a._search_score).slice(0, 50);
 
         // Log search + cache results
-        await Promise.all([
+        const writeOps = [
           serviceClient.from("search_history").insert({
             workspace_id: workspaceId, query, platform,
             location: location || null, result_count: scoredDbResults.length, filters: {},
           }),
-          serviceClient.rpc("consume_search_credit", { ws_id: workspaceId }).catch(() => null),
           serviceClient.from("credits_usage").insert({ workspace_id: workspaceId, action_type: "search", amount: 1 }),
-        ]);
+        ];
+        if (!callerIsSuperAdmin) {
+          writeOps.push(serviceClient.rpc("consume_search_credit", { ws_id: workspaceId }).catch(() => null));
+        }
+        await Promise.all(writeOps);
 
         if (redis && scoredDbResults.length > 0) {
           redis.set(cacheKey, JSON.stringify(scoredDbResults), { ex: 1800 }).catch(() => null);
         }
 
         return new Response(
-          JSON.stringify({ results: scoredDbResults, credits_remaining: (workspace?.search_credits_remaining || 1) - 1, source: "db" }),
+          JSON.stringify({ results: scoredDbResults, credits_remaining: callerIsSuperAdmin ? Number.MAX_SAFE_INTEGER : (workspace?.search_credits_remaining || 1) - 1, source: "db" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -280,14 +289,16 @@ Deno.serve(async (req) => {
     }
 
     // Deduct credit BEFORE Serper call ΓÇö prevents free searches if downstream crashes
-    try {
-      await serviceClient.rpc("consume_search_credit", { ws_id: workspaceId });
-    } catch (error: any) {
-      if (error.code === "P0001") {
-        return new Response(JSON.stringify({ error: "Insufficient credits" }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!callerIsSuperAdmin) {
+      try {
+        await serviceClient.rpc("consume_search_credit", { ws_id: workspaceId });
+      } catch (error: any) {
+        if (error.code === "P0001") {
+          return new Response(JSON.stringify({ error: "Insufficient credits" }),
+            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        throw error;
       }
-      throw error;
     }
 
     const SERPER_API_KEY = Deno.env.get("SERPER_API_KEY");

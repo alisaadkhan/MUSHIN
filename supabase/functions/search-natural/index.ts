@@ -1,4 +1,4 @@
-import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
+import { isSuperAdmin, performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 // @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Redis } from "https://esm.sh/@upstash/redis";
@@ -65,11 +65,16 @@ Deno.serve(async (req) => {
             });
         }
 
+        const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
         const serviceClient = await performPrivilegedWrite({
-        authHeader: req.headers.get("Authorization"),
-        action: "gateway:privileged-client-bootstrap",
-        execute: async (_ctx, client) => client,
-    });
+            authHeader: req.headers.get("Authorization"),
+            action: "gateway:privileged-client-bootstrap",
+            endpoint: "search-natural",
+            ipAddress,
+            execute: async (_ctx, client) => client,
+        });
+
+        const callerIsSuperAdmin = await isSuperAdmin(userData.user.id);
 
         const { data: ws } = await serviceClient
             .from("workspaces")
@@ -77,7 +82,7 @@ Deno.serve(async (req) => {
             .eq("id", workspaceId)
             .single();
 
-        if (!ws || ws.ai_credits_remaining <= 0) {
+        if (!callerIsSuperAdmin && (!ws || ws.ai_credits_remaining <= 0)) {
             return new Response(JSON.stringify({ error: "No AI credits remaining" }), {
                 status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" }
             });
@@ -129,15 +134,17 @@ Deno.serve(async (req) => {
         // The consume_ai_credit() SQL function is atomic and raises P0001
         // on insufficient balance, so no negative balances are possible.
         // ============================================================
-        try {
-            await serviceClient.rpc("consume_ai_credit", { ws_id: workspaceId });
-        } catch (creditErr: any) {
-            if (creditErr.code === "P0001") {
-                return new Response(JSON.stringify({ error: "No AI credits remaining" }), {
-                    status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" }
-                });
+        if (!callerIsSuperAdmin) {
+            try {
+                await serviceClient.rpc("consume_ai_credit", { ws_id: workspaceId });
+            } catch (creditErr: any) {
+                if (creditErr.code === "P0001") {
+                    return new Response(JSON.stringify({ error: "No AI credits remaining" }), {
+                        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" }
+                    });
+                }
+                throw creditErr;
             }
-            throw creditErr;
         }
 
         // 1. Generate Embedding for the Search Query via HuggingFace BGE-large
@@ -146,9 +153,11 @@ Deno.serve(async (req) => {
             vector = await generateEmbedding(query, HUGGINGFACE_API_KEY);
         } catch (embErr: any) {
             // Refund the credit — the embedding failed before any value was delivered
-            await serviceClient.rpc("admin_adjust_credits", {
-                ws_id: workspaceId, credit_type: "ai", delta: 1
-            }).catch(() => null);
+            if (!callerIsSuperAdmin) {
+                await serviceClient.rpc("admin_adjust_credits", {
+                    ws_id: workspaceId, credit_type: "ai", delta: 1
+                }).catch(() => null);
+            }
             console.error("HuggingFace embedding error:", embErr?.message);
             return new Response(JSON.stringify({ error: "AI search temporarily unavailable. Your credit has been refunded." }), {
                 status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -183,7 +192,7 @@ Deno.serve(async (req) => {
 
         return new Response(JSON.stringify({
             results: hydratedResults,
-            credits_remaining: ws.ai_credits_remaining - 1
+            credits_remaining: callerIsSuperAdmin ? Number.MAX_SAFE_INTEGER : ws.ai_credits_remaining - 1
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     } catch (err: any) {

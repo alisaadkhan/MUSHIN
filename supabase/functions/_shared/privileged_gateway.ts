@@ -1,4 +1,6 @@
+// @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { enforceGlobalRateLimit } from "./global_rate_limit.ts";
 
 export type WorkspaceRole = "owner" | "admin" | "member";
 
@@ -114,9 +116,27 @@ export async function performPrivilegedRead<T>(args: {
   requestedWorkspaceId?: string | null;
   allowedRoles?: WorkspaceRole[];
   action: string;
+  endpoint?: string;
+  ipAddress?: string | null;
   execute: (ctx: AuthContext, client: ReturnType<typeof createPrivilegedClient>) => Promise<T>;
 }): Promise<T> {
   const { userId } = await requireJwt(args.authHeader ?? null);
+  try {
+    const superAdmin = await isSuperAdmin(userId);
+    const rateLimit = await enforceGlobalRateLimit({
+      userId,
+      ipAddress: args.ipAddress ?? null,
+      endpoint: args.endpoint ?? args.action,
+      isAdmin: true,
+      isSuperAdmin: superAdmin,
+    });
+    if (!rateLimit.allowed) {
+      throw new Error(`Rate limit exceeded. Retry after ${rateLimit.retryAfter}s`);
+    }
+  } catch (rateErr) {
+    console.warn("[privileged_gateway] global rate-limit unavailable, continuing fail-open:", rateErr);
+  }
+
   const membership = await requireWorkspaceMembership(userId, args.requestedWorkspaceId);
   if (args.allowedRoles?.length) {
     requireRole(membership.role, args.allowedRoles);
@@ -141,9 +161,27 @@ export async function performPrivilegedWrite<T>(args: {
   requestedWorkspaceId?: string | null;
   allowedRoles?: WorkspaceRole[];
   action: string;
+  endpoint?: string;
+  ipAddress?: string | null;
   execute: (ctx: AuthContext, client: ReturnType<typeof createPrivilegedClient>) => Promise<T>;
 }): Promise<T> {
   const { userId } = await requireJwt(args.authHeader ?? null);
+  try {
+    const superAdmin = await isSuperAdmin(userId);
+    const rateLimit = await enforceGlobalRateLimit({
+      userId,
+      ipAddress: args.ipAddress ?? null,
+      endpoint: args.endpoint ?? args.action,
+      isAdmin: true,
+      isSuperAdmin: superAdmin,
+    });
+    if (!rateLimit.allowed) {
+      throw new Error(`Rate limit exceeded. Retry after ${rateLimit.retryAfter}s`);
+    }
+  } catch (rateErr) {
+    console.warn("[privileged_gateway] global rate-limit unavailable, continuing fail-open:", rateErr);
+  }
+
   const membership = await requireWorkspaceMembership(userId, args.requestedWorkspaceId);
   if (args.allowedRoles?.length) {
     requireRole(membership.role, args.allowedRoles);
@@ -213,14 +251,31 @@ export async function requireSystemAdmin(authHeader: string | null): Promise<{ u
     .from("user_roles")
     .select("role")
     .eq("user_id", userId)
-    .eq("role", "system_admin")
-    .maybeSingle();
+    .in("role", ["system_admin", "super_admin"]);
 
-  if (error || !data) {
+  if (error || !data || data.length === 0) {
     throw new Error("Forbidden");
   }
 
   return { userId };
+}
+
+export async function isSuperAdmin(userId: string): Promise<boolean> {
+  const privilegedClient = createPrivilegedClient();
+  const { data, error } = await privilegedClient
+    .from("user_roles")
+    .select("user_id")
+    .eq("user_id", userId)
+    .eq("role", "super_admin")
+    .maybeSingle();
+
+  if (error) throw error;
+  return Boolean(data);
+}
+
+export async function hasUnlimitedCredits(authHeader: string | null): Promise<boolean> {
+  const { userId } = await requireJwt(authHeader);
+  return isSuperAdmin(userId);
 }
 
 type AuditMeta = {
@@ -258,8 +313,11 @@ export async function adminAdjustCredits(args: {
   authHeader: string | null;
   workspaceId: string;
   creditType: AdminCreditType;
-  amountDelta: number;
+  amountDelta?: number;
+  mode?: "adjust" | "set";
+  newBalance?: number;
   reason: string;
+  idempotencyKey?: string;
   targetUserId?: string | null;
   ipAddress?: string | null;
   userAgent?: string | null;
@@ -269,58 +327,52 @@ export async function adminAdjustCredits(args: {
   if (!sanitizeUuid(args.workspaceId)) {
     throw new Error("Invalid workspaceId");
   }
-  if (!Number.isInteger(args.amountDelta) || args.amountDelta === 0) {
-    throw new Error("amountDelta must be a non-zero integer");
+  const mode = args.mode ?? "adjust";
+  if (mode === "adjust") {
+    if (!Number.isInteger(args.amountDelta) || (args.amountDelta ?? 0) === 0) {
+      throw new Error("amountDelta must be a non-zero integer for adjust mode");
+    }
+  } else if (mode === "set") {
+    if (!Number.isInteger(args.newBalance) || (args.newBalance ?? -1) < 0) {
+      throw new Error("newBalance must be a non-negative integer for set mode");
+    }
+  } else {
+    throw new Error("Invalid mode");
   }
 
-  const creditColumnMap: Record<AdminCreditType, string> = {
-    search: "search_credits_remaining",
-    ai: "ai_credits_remaining",
-    email: "email_sends_remaining",
-    enrichment: "enrichment_credits_remaining",
-  };
-  const column = creditColumnMap[args.creditType];
   const client = createPrivilegedClient();
 
-  const { data: workspace, error: workspaceError } = await client
-    .from("workspaces")
-    .select(`id, ${column}`)
-    .eq("id", args.workspaceId)
-    .single();
-  if (workspaceError || !workspace) throw new Error("Workspace not found");
-
-  const currentValue = Number(workspace[column] ?? 0);
-  const nextValue = Math.max(0, currentValue + args.amountDelta);
-
-  const { error: updateError } = await client
-    .from("workspaces")
-    .update({ [column]: nextValue })
-    .eq("id", args.workspaceId);
-  if (updateError) throw updateError;
-
-  const { error: usageError } = await client.from("credits_usage").insert({
-    workspace_id: args.workspaceId,
-    action_type: `admin_${args.creditType}_adjustment`,
-    amount: args.amountDelta,
-    reference_id: null,
+  const { data: mutationResult, error: mutationError } = await client.rpc("admin_mutate_workspace_credit", {
+    p_workspace_id: args.workspaceId,
+    p_credit_type: args.creditType,
+    p_mode: mode,
+    p_delta: mode === "adjust" ? args.amountDelta ?? null : null,
+    p_new_balance: mode === "set" ? args.newBalance ?? null : null,
+    p_reason: args.reason,
+    p_actor_user_id: userId,
+    p_target_user_id: args.targetUserId ?? null,
+    p_idempotency_key: args.idempotencyKey ?? null,
+    p_ip_address: args.ipAddress ?? null,
+    p_user_agent: args.userAgent ?? null,
   });
-  if (usageError) throw usageError;
+  if (mutationError) throw mutationError;
 
   await appendSystemAuditLog({
     actorUserId: userId,
     targetUserId: args.targetUserId ?? null,
     workspaceId: args.workspaceId,
-    actionType: "admin:credits:adjust",
+    actionType: mode === "set" ? "admin:credits:set" : "admin:credits:adjust",
     actionDescription: "System admin adjusted workspace credits",
     details: {
       ipAddress: args.ipAddress,
       userAgent: args.userAgent,
       metadata: {
         credit_type: args.creditType,
-        amount_delta: args.amountDelta,
+        amount_delta: mode === "adjust" ? args.amountDelta ?? null : null,
+        new_balance_target: mode === "set" ? args.newBalance ?? null : null,
         reason: args.reason,
-        previous_balance: currentValue,
-        new_balance: nextValue,
+        mutation_result: mutationResult,
+        idempotency_key: args.idempotencyKey ?? null,
       },
     },
   });
@@ -329,8 +381,8 @@ export async function adminAdjustCredits(args: {
     success: true,
     workspaceId: args.workspaceId,
     creditType: args.creditType,
-    previousBalance: currentValue,
-    newBalance: nextValue,
+    mode,
+    result: mutationResult,
   };
 }
 

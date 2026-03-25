@@ -1,4 +1,4 @@
-import { adminSetPlan, requireJwt, requireSystemAdmin } from "../_shared/privileged_gateway.ts";
+import { adminSetPlan, isSuperAdmin, requireJwt, requireSystemAdmin } from "../_shared/privileged_gateway.ts";
 import { logAdminAction, logSystemAction } from "../_shared/audit_logger.ts";
 import { safeErrorResponse, validationErrorResponse } from "../_shared/errors.ts";
 import { checkRateLimit, corsHeaders } from "../_shared/rate_limit.ts";
@@ -20,17 +20,6 @@ Deno.serve(async (req: Request) => {
   const userAgent = req.headers.get("user-agent") ?? "unknown";
 
   try {
-    const rate = await checkRateLimit(ipAddress, "general", { perMin: 10, perHour: 100 });
-    if (!rate.allowed) {
-      await logSystemAction({
-        actionType: "security:rate_limit",
-        actionDescription: "Rate limit exceeded for admin-set-plan",
-        ipAddress,
-        userAgent,
-      });
-      return jsonResponse({ error: "Too many requests" }, 429);
-    }
-
     if (!authHeader?.startsWith("Bearer ")) {
       await logSystemAction({
         actionType: "auth:login_attempt",
@@ -43,6 +32,20 @@ Deno.serve(async (req: Request) => {
     }
 
     const { userId: actorUserId } = await requireJwt(authHeader);
+    const callerIsSuperAdmin = await isSuperAdmin(actorUserId);
+    if (!callerIsSuperAdmin) {
+      const rate = await checkRateLimit(ipAddress, "general", { perMin: 10, perHour: 100 });
+      if (!rate.allowed) {
+        await logSystemAction({
+          actionType: "security:rate_limit",
+          actionDescription: "Rate limit exceeded for admin-set-plan",
+          ipAddress,
+          userAgent,
+        });
+        return jsonResponse({ error: "Too many requests" }, 429);
+      }
+    }
+
     await requireSystemAdmin(authHeader);
 
     const { workspace_id, new_plan, reason, target_user_id } = await req.json();

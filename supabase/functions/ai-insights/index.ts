@@ -1,4 +1,4 @@
-import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
+import { isSuperAdmin, performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { generateText, extractJsonFromText } from "../_shared/huggingface.ts";
 const ALLOWED_ORIGIN = Deno.env.get("APP_URL") || "https://mushin.app";
@@ -80,11 +80,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+
     const adminClient = await performPrivilegedWrite({
         authHeader: req.headers.get("Authorization"),
         action: "gateway:privileged-client-bootstrap",
+      endpoint: "ai-insights",
+      ipAddress,
         execute: async (_ctx, client) => client,
     });
+
+    const callerIsSuperAdmin = await isSuperAdmin(userId);
 
     const { data: membership } = await adminClient
       .from("workspace_members")
@@ -105,7 +111,7 @@ Deno.serve(async (req) => {
       .eq("id", membership.workspace_id)
       .single();
 
-    if (!ws || ws.ai_credits_remaining <= 0) {
+    if (!callerIsSuperAdmin && (!ws || ws.ai_credits_remaining <= 0)) {
       return new Response(JSON.stringify({ error: "AI credits exhausted. Upgrade your plan to continue using AI features.", code: "CREDITS_EXHAUSTED", status: 402 }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -132,12 +138,14 @@ Deno.serve(async (req) => {
     }
 
     // Deduct credit BEFORE AI call to prevent race condition double-spend.
-    const { error: creditErr } = await adminClient.rpc("consume_ai_credit", { ws_id: membership.workspace_id });
-    if (creditErr) {
-      console.error("[ai-insights] Pre-deduction failed:", creditErr);
-      return new Response(JSON.stringify({ error: "Credit deduction failed. Please try again.", code: "CREDIT_DEDUCT_FAILED", status: 500 }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (!callerIsSuperAdmin) {
+      const { error: creditErr } = await adminClient.rpc("consume_ai_credit", { ws_id: membership.workspace_id });
+      if (creditErr) {
+        console.error("[ai-insights] Pre-deduction failed:", creditErr);
+        return new Response(JSON.stringify({ error: "Credit deduction failed. Please try again.", code: "CREDIT_DEDUCT_FAILED", status: 500 }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     let result: any;
@@ -161,8 +169,10 @@ Deno.serve(async (req) => {
     } catch (aiErr: any) {
       console.error("[ai-insights] AI call failed:", aiErr.message);
       // Restore credit on AI failure
-      const { error: restoreErr } = await adminClient.rpc("restore_ai_credit", { ws_id: membership.workspace_id });
-      if (restoreErr) console.error("[ai-insights] Credit restore failed:", restoreErr);
+      if (!callerIsSuperAdmin) {
+        const { error: restoreErr } = await adminClient.rpc("restore_ai_credit", { ws_id: membership.workspace_id });
+        if (restoreErr) console.error("[ai-insights] Credit restore failed:", restoreErr);
+      }
       const isRateLimit = aiErr.message?.includes("429");
       return new Response(JSON.stringify({
         error: isRateLimit

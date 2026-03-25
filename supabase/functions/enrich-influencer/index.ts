@@ -1,5 +1,4 @@
-import { getServiceRoleKey } from "../_shared/privileged_gateway.ts";
-import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
+import { getServiceRoleKey, isSuperAdmin, performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Redis } from "https://esm.sh/@upstash/redis";
 import { checkRateLimit, corsHeaders } from "../_shared/rate_limit.ts";
@@ -294,15 +293,9 @@ if (Deno.env.get("UPSTASH_REDIS_REST_URL") && Deno.env.get("UPSTASH_REDIS_REST_T
 Deno.serve(async (req: Request) => {
     if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
     const t0 = performance.now();
+    const ip = req.headers.get('x-forwarded-for') ?? 'unknown';
 
     try {
-        const ip = req.headers.get('x-forwarded-for') ?? 'unknown';
-        const { allowed } = await checkRateLimit(ip, 'enrich');
-        if (!allowed) {
-            return new Response(JSON.stringify({ error: 'Rate limit exceeded' }),
-                { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        }
-
         const authHeader = req.headers.get("Authorization");
         if (!authHeader?.startsWith("Bearer ")) {
             return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -313,9 +306,20 @@ Deno.serve(async (req: Request) => {
         const { data: { user } } = await supabase.auth.getUser(token);
         if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+        const callerIsSuperAdmin = await isSuperAdmin(user.id);
+        if (!callerIsSuperAdmin) {
+            const { allowed } = await checkRateLimit(ip, 'enrich');
+            if (!allowed) {
+                return new Response(JSON.stringify({ error: 'Rate limit exceeded' }),
+                    { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            }
+        }
+
         const serviceClient = await performPrivilegedWrite({
         authHeader: req.headers.get("Authorization"),
         action: "gateway:privileged-client-bootstrap",
+        endpoint: "enrich-influencer",
+        ipAddress: ip,
         execute: async (_ctx, client) => client,
     });
 
@@ -497,16 +501,18 @@ Deno.serve(async (req: Request) => {
         }
 
         // Success -> Deduct Credits Atomically
-        try {
-            await serviceClient.rpc('consume_enrichment_credit', { ws_id: workspaceId });
-        } catch (error: any) {
-            if (error.code === 'P0001') {
-                return new Response(
-                    JSON.stringify({ error: 'Insufficient credits', code: "CREDITS_EXHAUSTED" }),
-                    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-                );
+        if (!callerIsSuperAdmin) {
+            try {
+                await serviceClient.rpc('consume_enrichment_credit', { ws_id: workspaceId });
+            } catch (error: any) {
+                if (error.code === 'P0001') {
+                    return new Response(
+                        JSON.stringify({ error: 'Insufficient credits', code: "CREDITS_EXHAUSTED" }),
+                        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                    );
+                }
+                throw error;
             }
-            throw error;
         }
 
         await serviceClient.from("credits_usage").insert({ workspace_id: workspaceId, action_type: "enrichment", amount: 1 });
@@ -566,7 +572,7 @@ Deno.serve(async (req: Request) => {
 
         const isStale = profile?.last_enriched_at ? (Date.now() - new Date(profile.last_enriched_at).getTime()) / (1000 * 60 * 60 * 24) > (profile.enrichment_ttl_days ?? 30) : false;
 
-        return new Response(JSON.stringify({ success: true, profile, data_source: dataSource, is_stale: isStale, credits_remaining: (workspace?.enrichment_credits_remaining || 1) - 1 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true, profile, data_source: dataSource, is_stale: isStale, credits_remaining: callerIsSuperAdmin ? Number.MAX_SAFE_INTEGER : (workspace?.enrichment_credits_remaining || 1) - 1 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     } catch (err: any) {
         // HIGH-04: Log internally, return generic safe error to client
         console.error(`[enrich] Unhandled error for ${req.url}:`, err.message ?? err);

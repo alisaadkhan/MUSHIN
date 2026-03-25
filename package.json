@@ -26,7 +26,10 @@
     "test:e2e:capture:full": "cross-env COMBO_LIMIT=120 PROFILE_DEPTH=5 playwright test --project=deep-capture --workers=1",
     "test:e2e:all": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "auth:generate-test-token": "npx tsx scripts/generate_test_token.ts",
+    "backup:nightly": "powershell -ExecutionPolicy Bypass -File ./scripts/nightly_backup_job.ps1",
+    "platform:verify": "node scripts/platform_verify.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -113,6 +116,7 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
+    "tsx": "^4.20.5",
     "vite": "^5.4.19",
     "vitest": "^3.2.4"
   }
