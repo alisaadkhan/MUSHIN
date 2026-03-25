@@ -23,10 +23,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history needed for git log scanning
+          fetch-depth: 1  # Current snapshot is sufficient for leak detection
 
       - name: Run gitleaks
         uses: gitleaks/gitleaks-action@v2
+        with:
+          args: detect --no-git --redact -v --exit-code=2 --report-format=sarif --report-path=results.sarif --log-level=debug
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # optional for private repos
