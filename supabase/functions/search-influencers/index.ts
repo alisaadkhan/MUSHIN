@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     const rawQuery = requestBody?.query ?? "";
     const rawPlatform = requestBody?.platform ?? "";
 
-    const rawSanitized = rawQuery.trim().replace(/[^a-zA-Z0-9\s\u0600-\u06FF\-\.]/g, "").trim();
+    const rawSanitized = rawQuery.trim().replace(/[^a-zA-Z0-9\s\u0600-\u06FF.-]/g, "").trim();
     // Normalize query: collapse name variants and detect language
     const sanitized = rawSanitized ? normalizeQuery(rawSanitized) || rawSanitized : rawSanitized;
     const queryLanguage = detectLanguage(rawSanitized);
@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
     const { platform: _platformIgnored, location: rawLocation, followerRange, engagementRange } = requestBody;
     // Sanitize location ΓÇö strip anything that isn't letters/spaces/hyphens
     const location = typeof rawLocation === "string"
-      ? rawLocation.replace(/[^a-zA-Z\s\-]/g, "").trim().slice(0, 50)
+      ? rawLocation.replace(/[^a-zA-Z\s-]/g, "").trim().slice(0, 50)
       : "";
 
     const cacheKey = `search:${query.toLowerCase().trim()}:${platform}:${location || "any"}:${followerRange || "any"}`;
@@ -348,7 +348,7 @@ Deno.serve(async (req) => {
     console.log("Serper queries to run:", queryVariants.map(v => `[${v.strategy}] ${v.query}`).join(" | "));
 
     let serperData: any = { organic: [], knowledgeGraph: null };
-    let profileImageMap: Map<string, string> = new Map();
+    const profileImageMap: Map<string, string> = new Map();
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
@@ -508,7 +508,7 @@ Deno.serve(async (req) => {
       ...sortByQuality(qualityFilter(tier2)),
     ];
 
-    let finalResults = candidates.slice(0, MAX_RESULTS);
+    const finalResults = candidates.slice(0, MAX_RESULTS);
 
     // If below minimum, relax quality threshold completely and fill up from remaining
     if (finalResults.length < MIN_RESULTS) {
@@ -526,7 +526,7 @@ Deno.serve(async (req) => {
 
     const rawResults = await Promise.all(
       finalResults.map(async (item: any) => {
-        let username = extractUsername(item.link, platform);
+        const username = extractUsername(item.link, platform);
         if (!username) return null;
 
         let title = item.title || "";

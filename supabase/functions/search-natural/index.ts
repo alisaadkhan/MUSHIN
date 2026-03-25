@@ -114,8 +114,16 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Sanitize query: max 500 chars, strip control chars (prompt injection / DoS prevention)
-        const query = rawQuery.trim().replace(/[\x00-\x1F\x7F]/g, "").slice(0, 500);
+        // Sanitize query: max 500 chars, strip control chars (prompt injection / DoS prevention).
+        // Implemented via code-point filtering to avoid ESLint `no-control-regex`.
+        const query = Array.from(rawQuery.trim())
+            .filter((ch) => {
+                const codePoint = ch.codePointAt(0)!;
+                // Keep printable ASCII + all non-control Unicode code points.
+                return codePoint >= 0x20 && codePoint !== 0x7f;
+            })
+            .join("")
+            .slice(0, 500);
         if (query.length < 2) {
             return new Response(JSON.stringify({ error: "Query too short" }), {
                 status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }

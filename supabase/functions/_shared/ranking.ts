@@ -650,7 +650,7 @@ export function snippetRelevanceScore(query: string, snippet: string): number {
 
   const queryTerms = query
     .toLowerCase()
-    .split(/[\s,;:!?()\[\]{}/\\|<>+=*&^%$#@~`'"]+/)
+    .split(/[\s,;:!?()[\]{}/\\|<>+=*&^%$#@~`'"]+/)
     .filter((t) => t.length >= 3);
 
   if (queryTerms.length === 0) return 0;

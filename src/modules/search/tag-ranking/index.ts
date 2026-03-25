@@ -40,7 +40,7 @@ export const TAG_SPAM: ReadonlySet<string> = new Set([
 export function normalizeTag(raw: string): string | null {
   const n = raw
     .toLowerCase()
-    .replace(/[#@_\-\.]/g, " ")
+    .replace(/[#@_\-.]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
   if (!n || TAG_SPAM.has(n)) return null;

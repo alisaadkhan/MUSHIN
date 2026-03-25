@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { enforceGlobalRateLimit } from "./global_rate_limit.ts";
 
@@ -134,7 +133,17 @@ export async function performPrivilegedRead<T>(args: {
       throw new Error(`Rate limit exceeded. Retry after ${rateLimit.retryAfter}s`);
     }
   } catch (rateErr) {
-    console.warn("[privileged_gateway] global rate-limit unavailable, continuing fail-open:", rateErr);
+    const isDev = Deno.env.get("ENVIRONMENT") === "development";
+    if (isDev) {
+      console.warn(
+        "[privileged_gateway] global rate-limit unavailable, continuing fail-open (dev only):",
+        rateErr,
+      );
+    } else {
+      // SECURITY: do not allow privileged (admin/system) endpoints to bypass
+      // rate limiting when the control plane is unhealthy.
+      throw new Error("Rate limit unavailable");
+    }
   }
 
   const membership = await requireWorkspaceMembership(userId, args.requestedWorkspaceId);
@@ -179,7 +188,17 @@ export async function performPrivilegedWrite<T>(args: {
       throw new Error(`Rate limit exceeded. Retry after ${rateLimit.retryAfter}s`);
     }
   } catch (rateErr) {
-    console.warn("[privileged_gateway] global rate-limit unavailable, continuing fail-open:", rateErr);
+    const isDev = Deno.env.get("ENVIRONMENT") === "development";
+    if (isDev) {
+      console.warn(
+        "[privileged_gateway] global rate-limit unavailable, continuing fail-open (dev only):",
+        rateErr,
+      );
+    } else {
+      // SECURITY: do not allow privileged (admin/system) endpoints to bypass
+      // rate limiting when the control plane is unhealthy.
+      throw new Error("Rate limit unavailable");
+    }
   }
 
   const membership = await requireWorkspaceMembership(userId, args.requestedWorkspaceId);

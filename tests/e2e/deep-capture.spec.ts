@@ -616,7 +616,7 @@ async function extractProfilePageData(page: Page, profileUrl: string): Promise<P
         el => el.textContent?.includes("AI Evaluation Report")
       );
 
-      let evalData = {
+      const evalData = {
         overall_score:      overallScore,
         engagement_tier:    null as string | null,
         engagement_rate:    null as string | null,

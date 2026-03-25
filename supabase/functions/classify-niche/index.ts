@@ -2,7 +2,7 @@ import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { safeErrorResponse } from "../_shared/errors.ts";
 import { corsHeaders } from "../_shared/rate_limit.ts";
-import { generateText, extractJsonFromText, extractTagsFromBio, normalizeTags } from "../\_shared/huggingface.ts";
+import { generateText, extractJsonFromText, extractTagsFromBio, normalizeTags } from "../_shared/huggingface.ts";
 Deno.serve(async (req) => {
     if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
     try {
@@ -75,7 +75,7 @@ Brand safety rating: safe, caution, or risk. Return ONLY the JSON, no explanatio
             } catch (aiErr: any) {
                 console.warn("[classify-niche] AI failed, using keyword fallback:", aiErr.message);
                 // Fallback: keyword-based classification
-                const { inferNiche } = await import("../\_shared/niche.ts");
+                const { inferNiche } = await import("../_shared/niche.ts");
                 const nicheData = inferNiche("", combinedCaptions.substring(0, 500), "");
                 analysis = {
                     niches: nicheData.niche !== "General" ? [nicheData.niche] : ["General"],
@@ -86,7 +86,7 @@ Brand safety rating: safe, caution, or risk. Return ONLY the JSON, no explanatio
             }
         } else {
             // No API key: keyword fallback only
-            const { inferNiche } = await import("../\_shared/niche.ts");
+            const { inferNiche } = await import("../_shared/niche.ts");
             const nicheData = inferNiche("", combinedCaptions.substring(0, 500), "");
             analysis = {
                 niches: nicheData.niche !== "General" ? [nicheData.niche] : ["General"],

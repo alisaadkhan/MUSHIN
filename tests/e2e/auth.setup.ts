@@ -29,10 +29,31 @@ setup("authenticate", async ({ page }) => {
 
   await page.fill("input[type='email']", email);
   await page.fill("input[type='password']", password);
-  await page.click("button[type='submit']");
+
+  // Turnstile may take a moment to load and mint a valid captcha token.
+  // The auth UI disables submit until captchaToken is present.
+  const submitButton = page.locator("button[type='submit']");
+  const captchaError = page.getByText(/CAPTCHA failed to load/i);
+
+  // Wait for either: submit becomes enabled, or Turnstile fails permanently.
+  const submitEnabledPromise = expect(submitButton).toBeEnabled({ timeout: 60_000 });
+  await Promise.race([
+    submitEnabledPromise,
+    captchaError
+      .first()
+      .waitFor({ state: "visible", timeout: 15_000 })
+      .then(() => {
+        throw new Error(
+          "Turnstile CAPTCHA failed to load in the E2E browser environment. " +
+            "Verify your Cloudflare Turnstile site-key and that the test hostname " +
+            "(e.g. localhost:8080) is included in the allowlist. E2E auth cannot proceed."
+        );
+      }),
+  ]);
+  await submitButton.click();
 
   // Wait until we land on a dashboard page (not /auth)
-  await expect(page).not.toHaveURL(/\/auth/, { timeout: 20_000 });
+  await expect(page).not.toHaveURL(/\/auth/, { timeout: 60_000 });
 
   await page.context().storageState({ path: STATE_PATH });
   console.log(`✅ Auth state saved to ${STATE_PATH}`);

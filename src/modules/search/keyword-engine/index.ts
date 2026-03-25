@@ -164,7 +164,7 @@ export function extractQueryStrings(variants: QueryVariant[]): string[] {
  */
 export function extractContactEmail(text: string): string | null {
   if (!text) return null;
-  const EMAIL_RE = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
+  const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
   const BLOCKLIST = new Set(["noreply", "no-reply", "support", "info", "hello", "contact"]);
   const matches = text.match(EMAIL_RE);
   if (!matches) return null;

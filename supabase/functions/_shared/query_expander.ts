@@ -134,7 +134,7 @@ const NICHE_CONTENT_TERMS: Record<string, string[]> = {
  */
 export function extractContactEmail(text: string): string | null {
   if (!text) return null;
-  const EMAIL_RE = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
+  const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
   const BLOCKLIST = new Set([
     "example@example.com", "test@test.com", "email@email.com",
     // Prefix-based matches (checked via lower.split("@")[0] + "@")
@@ -248,10 +248,10 @@ export function expandSerperQueries(
 /** Patterns that extract a platform handle or channel ID from a URL or @mention. */
 const SOCIAL_PATTERNS: { platform: string; re: RegExp }[] = [
   { platform: "instagram", re: /(?:instagram\.com\/|instagram:\s*@?)([A-Za-z0-9._]{1,30})/i },
-  { platform: "youtube",   re: /(?:youtube\.com\/(?:@|c\/|channel\/|user\/))([A-Za-z0-9_\-]{1,64})/i },
+  { platform: "youtube",   re: /(?:youtube\.com\/(?:@|c\/|channel\/|user\/))([A-Za-z0-9_-]{1,64})/i },
   { platform: "tiktok",    re: /(?:tiktok\.com\/@?)([A-Za-z0-9._]{1,30})/i },
   { platform: "twitter",   re: /(?:twitter\.com\/|x\.com\/|twitter:\s*@?)([A-Za-z0-9_]{1,15})/i },
-  { platform: "facebook",  re: /(?:facebook\.com\/|fb\.com\/)([A-Za-z0-9.\-]{1,50})/i },
+  { platform: "facebook",  re: /(?:facebook\.com\/|fb\.com\/)([A-Za-z0-9.-]{1,50})/i },
 ];
 
 /** Generic @mention pattern — only used when no URL match is found. */

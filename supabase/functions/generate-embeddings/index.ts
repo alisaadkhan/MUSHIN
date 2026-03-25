@@ -30,7 +30,7 @@ Deno.serve(async (req: Request) => {
             status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
     }
-    const { generateEmbedding } = await import("../\_shared/huggingface.ts");
+    const { generateEmbedding } = await import("../_shared/huggingface.ts");
 
     const serviceClient = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey, {
         auth: { autoRefreshToken: false, persistSession: false }

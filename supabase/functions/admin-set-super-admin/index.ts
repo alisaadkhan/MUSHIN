@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { createPrivilegedClient, isSuperAdmin, requireJwt, sanitizeUuid } from "../_shared/privileged_gateway.ts";
 import { safeErrorResponse, validationErrorResponse } from "../_shared/errors.ts";
 import { corsHeaders } from "../_shared/rate_limit.ts";

@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
         const postsPayload = posts.map(p => ({ id: p.id, caption: p.caption, date: p.posted_at }));
 
         const HF_API_KEY = Deno.env.get("HUGGINGFACE_API_KEY");
-        const { generateText: hfGenerate, extractJsonFromText } = await import("../\_shared/huggingface.ts");
+        const { generateText: hfGenerate, extractJsonFromText } = await import("../_shared/huggingface.ts");
 
         let analysis: { mentions: Array<{ post_id: string; brand_name: string; category: string }> } = { mentions: [] };
 
