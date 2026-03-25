@@ -19,7 +19,26 @@ if (Deno.env.get("UPSTASH_REDIS_REST_URL") && Deno.env.get("UPSTASH_REDIS_REST_T
   });
 }
 
+function buildCorsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") ?? "";
+  const appUrl = Deno.env.get("APP_URL") || "https://mushin.app";
+  const allowed = new Set<string>([
+    appUrl,
+    "http://localhost:5173",
+    "http://localhost:3000",
+  ]);
+  if (origin.endsWith(".vercel.app")) {
+    allowed.add(origin);
+  }
+  return {
+    ...corsHeaders,
+    "Access-Control-Allow-Origin": allowed.has(origin) ? origin : appUrl,
+    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+  };
+}
+
 Deno.serve(async (req) => {
+  const corsHeaders = buildCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
