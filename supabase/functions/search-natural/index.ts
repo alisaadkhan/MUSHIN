@@ -4,17 +4,32 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Redis } from "https://esm.sh/@upstash/redis";
 import { generateEmbedding } from "../_shared/huggingface.ts";
 const APP_URL = Deno.env.get("APP_URL") || "https://mushin.app";
-// CORS: lock to known app origin — do NOT use wildcard (security: CSRF/data-harvesting prevention)
-const corsHeaders = {
-    "Access-Control-Allow-Origin": APP_URL,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+
+function buildCorsHeaders(req: Request) {
+    const origin = req.headers.get("Origin") ?? "";
+    const allowed = new Set<string>([
+        APP_URL,
+        "http://localhost:5173",
+        "http://localhost:3000",
+    ]);
+    if (origin.endsWith(".vercel.app")) {
+        allowed.add(origin);
+    }
+    return {
+        "Access-Control-Allow-Origin": allowed.has(origin) ? origin : APP_URL,
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+        "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    };
+}
 
 // CSRF origin guard — rejects cross-origin state-mutating requests
 function isOriginAllowed(req: Request): boolean {
     const origin = req.headers.get("Origin");
     if (!origin) return true; // server-to-server (no Origin header) — allowed
-    return origin === APP_URL;
+    return origin === APP_URL
+        || origin === "http://localhost:5173"
+        || origin === "http://localhost:3000"
+        || origin.endsWith(".vercel.app");
 }
 
 // Initialize Redis client if env vars are present (fallback to none if missing)
@@ -27,6 +42,7 @@ if (Deno.env.get("UPSTASH_REDIS_REST_URL") && Deno.env.get("UPSTASH_REDIS_REST_T
 }
 
 Deno.serve(async (req) => {
+    const corsHeaders = buildCorsHeaders(req);
     if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
     // CSRF: reject requests from unknown origins (MED-07)

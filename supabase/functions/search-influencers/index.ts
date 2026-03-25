@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
             ? "Please select at least one platform to search creators."
             : "query and platform are required",
         }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
