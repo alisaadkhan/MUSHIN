@@ -280,6 +280,32 @@ interface SearchResult {
   tags?: string[];
 }
 
+function dedupeSearchResults(input: SearchResult[]): SearchResult[] {
+  const merged = new Map<string, SearchResult>();
+  for (const item of input) {
+    const platform = (item.platform ?? "").toLowerCase();
+    const username = (item.username ?? "").trim().toLowerCase().replace(/^@/, "");
+    const link = (item.link ?? "").trim().toLowerCase();
+    const key = username ? `${platform}:${username}` : `${platform}:link:${link}`;
+
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, item);
+      continue;
+    }
+
+    const existingScore = Number(existing._search_score ?? 0);
+    const incomingScore = Number(item._search_score ?? 0);
+    if (incomingScore >= existingScore) {
+      merged.set(key, { ...existing, ...item, _search_score: Math.max(existingScore, incomingScore) });
+    } else {
+      merged.set(key, { ...item, ...existing, _search_score: Math.max(existingScore, incomingScore) });
+    }
+  }
+
+  return [...merged.values()];
+}
+
 function formatFollowers(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
   if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, "") + "K";
@@ -433,7 +459,7 @@ export default function SearchPage() {
           return;
         }
 
-        sortedResults = data.results || [];
+        sortedResults = dedupeSearchResults(data.results || []);
         creditsLeft = data.credits_remaining ?? null;
       } else {
         // ── Multi-platform: parallel calls per platform, merge & deduplicate ───
@@ -444,18 +470,14 @@ export default function SearchPage() {
             })
           )
         );
-        const seen = new Set<string>();
         const merged: SearchResult[] = [];
         for (const r of responses) {
           if (r.status === "fulfilled" && !r.value.error && r.value.data?.results) {
-            for (const item of r.value.data.results) {
-              const key = `${item.platform?.toLowerCase()}:${item.username}`;
-              if (!seen.has(key)) { seen.add(key); merged.push(item); }
-            }
+            merged.push(...r.value.data.results);
             if (r.value.data.credits_remaining != null) creditsLeft = r.value.data.credits_remaining;
           }
         }
-        sortedResults = merged.sort((a, b) => (b._search_score ?? 0) - (a._search_score ?? 0));
+        sortedResults = dedupeSearchResults(merged).sort((a, b) => (b._search_score ?? 0) - (a._search_score ?? 0));
       }
 
       setResults(sortedResults);

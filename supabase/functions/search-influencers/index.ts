@@ -11,6 +11,7 @@ import { computeSearchScore, computeSearchScoreV2, snippetRelevanceScore, detect
 import { normalizeQuery, detectLanguage } from "../_shared/language.ts";
 import { getTagScore, normalizeTags } from "../_shared/tag_intelligence.ts";
 import { expandSerperQueries, extractContactEmail, detectSocialLinks } from "../_shared/query_expander.ts";
+import { dedupeCreatorResults, runProgressiveResultFallback } from "../_shared/search_result_fallback.ts";
 let redis: Redis | null = null;
 if (Deno.env.get("UPSTASH_REDIS_REST_URL") && Deno.env.get("UPSTASH_REDIS_REST_TOKEN")) {
   redis = new Redis({
@@ -207,18 +208,25 @@ Deno.serve(async (req) => {
     const queryWords = query.toLowerCase().replace(/[^a-z0-9 ]/g, "").split(" ").filter(w => w.length > 2);
 
     try {
-      const { data: dbRows } = await serviceClient.rpc("tag_match_influencers", {
-        p_platform:      platform,
-        p_tags:          queryWords,
-        p_niche:         queryNichePre,
-        p_min_followers: dbMinFollowers === Infinity ? 0 : dbMinFollowers,
-        p_max_followers: dbMaxFollowers === Infinity ? 9_999_999_999 : dbMaxFollowers,
-        p_min_er:        minEr,
-        p_city:          queryCityPre ?? null,
-        p_limit:         80,
-      });
+      const dbAttempts = [queryCityPre ?? null];
+      if (queryCityPre) dbAttempts.push(null);
 
-      const dbResults = (dbRows ?? []) as any[];
+      const dbRowsMerged: any[] = [];
+      for (const cityAttempt of dbAttempts) {
+        const { data: dbRows } = await serviceClient.rpc("tag_match_influencers", {
+          p_platform:      platform,
+          p_tags:          queryWords,
+          p_niche:         queryNichePre,
+          p_min_followers: dbMinFollowers === Infinity ? 0 : dbMinFollowers,
+          p_max_followers: dbMaxFollowers === Infinity ? 9_999_999_999 : dbMaxFollowers,
+          p_min_er:        minEr,
+          p_city:          cityAttempt,
+          p_limit:         80,
+        });
+        dbRowsMerged.push(...((dbRows ?? []) as any[]));
+      }
+
+      const dbResults = dedupeCreatorResults(dbRowsMerged as any[]);
       const enrichedDbResults = dbResults.filter((r: any) => r.enrichment_status === "success");
 
       if (enrichedDbResults.length >= MIN_DB_RESULTS) {
@@ -297,7 +305,14 @@ Deno.serve(async (req) => {
         }
 
         return new Response(
-          JSON.stringify({ results: scoredDbResults, credits_remaining: callerIsSuperAdmin ? Number.MAX_SAFE_INTEGER : (workspace?.search_credits_remaining || 1) - 1, source: "db" }),
+          JSON.stringify({
+            results: scoredDbResults,
+            credits_remaining: callerIsSuperAdmin ? Number.MAX_SAFE_INTEGER : (workspace?.search_credits_remaining || 1) - 1,
+            source: "db",
+            fallback_tier: "strict",
+            query_variants_used: ["db_primary", "db_city_relaxed"],
+            deduped_results_count: scoredDbResults.length,
+          }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -340,9 +355,10 @@ Deno.serve(async (req) => {
     // Run PRIMARY + all expansions in parallel for broader creator discovery.
     // This surfaces creators who appear under different search phrasings
     // (e.g. "tech youtuber" vs "tech influencer" vs "technology reviewer").
-    const queryVariants = hasForeignLocation
+    const queryVariantsRaw = hasForeignLocation
       ? [{ query: `${query} ${platform} influencer`.trim(), strategy: "primary" as const, weight: 1.0 }]
       : expandSerperQueries(query, platform, cityForQuery);
+    const queryVariants = queryVariantsRaw.slice(0, 6);
 
     const primaryVariant = queryVariants[0];
     console.log("Serper queries to run:", queryVariants.map(v => `[${v.strategy}] ${v.query}`).join(" | "));
@@ -585,17 +601,7 @@ Deno.serve(async (req) => {
     );
 
     const results = rawResults.filter(Boolean);
-    const seen = new Set();
-    const uniqueResults = results.filter((r: any) => {
-      // Normalize to lowercase + strip leading @ before dedup so that
-      // expansion queries returning the same profile in different casing
-      // are correctly recognised as duplicates.
-      const normalizedUsername = r.username.toLowerCase().replace(/^@/, "");
-      const key = `${r.platform}:${normalizedUsername}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+    const uniqueResults = dedupeCreatorResults(results as any[]);
 
     // Early exit when no results ΓÇö avoids .in('username', []) Postgres crash
     if (uniqueResults.length === 0) {
@@ -610,23 +616,8 @@ Deno.serve(async (req) => {
     }
 
     let filteredResults = uniqueResults;
-    if (followerRange && followerRange !== "any" && rangeMap[followerRange]) {
-      const [min, max] = rangeMap[followerRange];
-      filteredResults = uniqueResults.filter((r: any) =>
-        r.extracted_followers != null && r.extracted_followers >= min && r.extracted_followers <= max
-      );
-    }
 
-    // Engagement rate filter ─ only applied when results carry real engagement data
-    if (engagementRange && engagementRange !== "any" && engRangeMap[engagementRange]) {
-      const [minEngagement, maxEngagement] = engRangeMap[engagementRange];
-      filteredResults = filteredResults.filter((r: any) =>
-        r.engagement_rate != null && r.engagement_rate >= minEngagement && r.engagement_rate <= maxEngagement
-      );
-    }
-
-    // Content language filter ─ uses the query-language signal already attached to results.
-    // MED-08: Validate contentLanguage against strict allowlist before use in any filter logic.
+    // Content language filter input validation.
     const ALLOWED_CONTENT_LANGUAGES = ["any", "urdu", "english", "bilingual"] as const;
     type ContentLanguage = typeof ALLOWED_CONTENT_LANGUAGES[number];
     const rawContentLanguage: unknown = requestBody?.contentLanguage;
@@ -634,21 +625,6 @@ Deno.serve(async (req) => {
       typeof rawContentLanguage === "string" && ALLOWED_CONTENT_LANGUAGES.includes(rawContentLanguage as ContentLanguage)
         ? (rawContentLanguage as ContentLanguage)
         : null;
-    if (contentLanguage && contentLanguage !== "any") {
-      const URDU_CHARS = /[\u0600-\u06FF]/;
-      filteredResults = filteredResults.filter((r: any) => {
-        const lang: string = (r._query_language || "").toLowerCase();
-        const snippet: string = r.snippet || r.bio || "";
-        const hasUrdu = URDU_CHARS.test(snippet) || lang.includes("urdu") || lang.includes("roman");
-        const hasEnglish = /[a-zA-Z]{3,}/.test(snippet);
-        // If no language signal at all, keep the result (best-effort)
-        if (!hasUrdu && !hasEnglish) return true;
-        if (contentLanguage === "urdu")     return hasUrdu;
-        if (contentLanguage === "english")  return hasEnglish && !hasUrdu;
-        if (contentLanguage === "bilingual") return hasUrdu && hasEnglish;
-        return true;
-      });
-    }
 
     // Merge real profile data (avatar, bio, follower count, engagement) for enriched creators
     const usernames = uniqueResults.map((r: any) => r.username.replace("@", ""));
@@ -770,6 +746,18 @@ Deno.serve(async (req) => {
       })
       .sort((a: any, b: any) => b._search_score - a._search_score);
 
+    const fallbackSelection = runProgressiveResultFallback(sortedResults as any[], {
+      followerRange: followerRange || null,
+      engagementRange: engagementRange || null,
+      contentLanguage: contentLanguage || "any",
+      followerMap: rangeMap,
+      engagementMap: engRangeMap,
+    });
+    const fallbackResults = fallbackSelection.results;
+    console.log(
+      `[search-influencers] fallback tier=${fallbackSelection.tier} attempts=${JSON.stringify(fallbackSelection.attempts)}`,
+    );
+
     // @deprecated v1 formula (computeSearchScore) kept for reference — remove after 2026-04-06
     // nameSim×0.35 + engQuality×0.25 + authenticity×0.15
     //   + growthStability×0.10 + nicheMatch×0.10 + locationMatch×0.05 − botRisk×0.40
@@ -823,20 +811,25 @@ Deno.serve(async (req) => {
       workspace_id: workspaceId, query, platform,
       location: location || null,
       // result_count reflects what the user actually sees (post-filter)
-      result_count: sortedResults.length,
-      filters: { followerRange: followerRange || null },
+      result_count: fallbackResults.length,
+      filters: {
+        followerRange: followerRange || null,
+        engagementRange: engagementRange || null,
+        contentLanguage: contentLanguage || "any",
+        fallbackTier: fallbackSelection.tier,
+      },
     });
 
     await serviceClient.from("credits_usage").insert({
       workspace_id: workspaceId, action_type: "search", amount: 1,
     });
 
-    if (redis && sortedResults.length > 0) {
+    if (redis && fallbackResults.length > 0) {
       try {
         // Cache SORTED + filtered results (same as what is returned to client)
-        await redis.set(cacheKey, JSON.stringify(sortedResults), { ex: 3600 });
+        await redis.set(cacheKey, JSON.stringify(fallbackResults), { ex: 3600 });
         const batch = redis.pipeline();
-        for (const result of sortedResults) {
+        for (const result of fallbackResults) {
           if (!result.username) continue;
           const cleanUsername = result.username.replace("@", "");
           const tKey = `tag:${cleanUsername}:${platform}`;
@@ -850,11 +843,30 @@ Deno.serve(async (req) => {
     const t1 = performance.now();
     await serviceClient.from("admin_audit_log").insert({
       action: "search", admin_user_id: userData.user.id,
-      details: { query, platform, location, latency_ms: Math.round(t1 - t0), result_count: enrichedResults.length, cached: false }
+      details: {
+        query,
+        platform,
+        location,
+        latency_ms: Math.round(t1 - t0),
+        result_count: fallbackResults.length,
+        cached: false,
+        fallback_tier: fallbackSelection.tier,
+        fallback_attempts: fallbackSelection.attempts,
+        query_variants: queryVariants.map((v) => v.strategy),
+        dedup_before: results.length,
+        dedup_after: uniqueResults.length,
+      }
     }); // { error } silently ignored
 
     return new Response(
-      JSON.stringify({ results: sortedResults, credits_remaining: (workspace?.search_credits_remaining || 1) - 1 }),
+      JSON.stringify({
+        results: fallbackResults,
+        credits_remaining: (workspace?.search_credits_remaining || 1) - 1,
+        fallback_tier: fallbackSelection.tier,
+        fallback_attempts: fallbackSelection.attempts,
+        query_variants_used: queryVariants.map((v) => v.strategy),
+        deduped_results_count: uniqueResults.length,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
