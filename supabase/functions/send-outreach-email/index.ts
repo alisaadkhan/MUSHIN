@@ -98,6 +98,10 @@ Deno.serve(async (req) => {
 
     // SEC-11: strip CR/LF from from_name to prevent email header injection
     const safeFromName = (from_name ?? "").replace(/[\r\n]+/g, " ").trim().slice(0, 100);
+    // SEC-11: strip CR/LF from reply_to to prevent email header injection
+    const safeReplyTo = reply_to
+      ? reply_to.replace(/[\r\n]+/g, "").trim().slice(0, 254) || undefined
+      : undefined;
 
     // SEC-04: Deduct credit BEFORE sending — prevents double-send race condition.
     // If email send fails we restore the credit.
@@ -124,7 +128,7 @@ Deno.serve(async (req) => {
         to: [to],
         subject,
         html: body,
-        reply_to: reply_to || undefined,
+        reply_to: safeReplyTo,
       }),
     });
 
@@ -137,8 +141,10 @@ Deno.serve(async (req) => {
         const { error: restoreEmailErr } = await adminClient.rpc("restore_email_credit", { ws_id: membership.workspace_id });
         if (restoreEmailErr) console.error("[send-outreach-email] Credit restore failed:", restoreEmailErr.message);
       }
+      // Log full Resend error server-side only — never expose internal API details to client
+      console.error("[send-outreach-email] Resend failure detail:", JSON.stringify(resendData));
       return new Response(
-        JSON.stringify({ error: "Failed to send email", details: resendData }),
+        JSON.stringify({ error: "Failed to send email. Please try again." }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

@@ -1,10 +1,22 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { safeErrorResponse } from "../_shared/errors.ts";
+import { checkRateLimit } from "../_shared/rate_limit.ts";
+
 const APP_URL = Deno.env.get("APP_URL") || "https://mushin.app";
 const corsHeaders = {
     "Access-Control-Allow-Origin": APP_URL,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+/** Validates that the URL has a safe scheme (http/https only). */
+function isValidTrackingUrl(url: string): boolean {
+    try {
+        const parsed = new URL(url);
+        return parsed.protocol === "https:" || parsed.protocol === "http:";
+    } catch {
+        return false;
+    }
+}
 
 // Cryptographically secure tracking code — collision-resistant up to 10M+ codes
 function generateTrackingCode(): string {
@@ -33,9 +45,27 @@ Deno.serve(async (req) => {
         const { data: userData, error: userError } = await supabase.auth.getUser(token);
         if (userError || !userData?.user) throw new Error("Unauthorized");
 
+        // Rate limit: 60 requests/min, 300/hr per IP (prevent link-spam abuse)
+        const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+        const rl = await checkRateLimit(ipAddress, "general");
+        if (!rl.allowed) {
+            return new Response(
+                JSON.stringify({ error: "Too many requests. Please slow down.", retryAfter: rl.retryAfter }),
+                { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": String(rl.retryAfter ?? 60) } }
+            );
+        }
+
         const { campaign_id, influencer_id, original_url } = await req.json();
         if (!campaign_id || !influencer_id || !original_url) {
-            return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400, headers: corsHeaders });
+            return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        // SEC: reject non-http(s) URLs to prevent javascript:/data: stored XSS via tracking links
+        if (!isValidTrackingUrl(original_url)) {
+            return new Response(
+                JSON.stringify({ error: "original_url must use http or https scheme" }),
+                { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
         }
 
         // Verify user has access to this campaign

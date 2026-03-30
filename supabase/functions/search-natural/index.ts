@@ -1,5 +1,4 @@
 import { isSuperAdmin, performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
-// @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Redis } from "https://esm.sh/@upstash/redis";
 import { generateEmbedding } from "../_shared/huggingface.ts";
@@ -131,7 +130,16 @@ Deno.serve(async (req) => {
         }
 
         // Attempt to Fetch from Cache
-        const cacheKey = `search:${query.toLowerCase().trim()}:${platform || 'all'}`;
+        // Cache key is SHA-256 hashed to prevent injection / key-length issues with long queries
+        const cacheKeyRaw = `sn:${query.toLowerCase().trim()}:${platform || "all"}`;
+        const cacheKeyBytes = await crypto.subtle.digest(
+            "SHA-256",
+            new TextEncoder().encode(cacheKeyRaw),
+        );
+        const cacheKey = Array.from(new Uint8Array(cacheKeyBytes))
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("")
+            .substring(0, 48);
         if (redis) {
             try {
                 const cached = await redis.get(cacheKey);
@@ -176,11 +184,14 @@ Deno.serve(async (req) => {
         try {
             vector = await generateEmbedding(query, HUGGINGFACE_API_KEY);
         } catch (embErr: any) {
-            // Refund the credit — the embedding failed before any value was delivered
+            // Refund the credit — the embedding failed before any value was delivered.
+            // Uses restore_ai_credit which is the correct atomic credit restore RPC.
             if (!callerIsSuperAdmin) {
-                await serviceClient.rpc("admin_adjust_credits", {
-                    ws_id: workspaceId, credit_type: "ai", delta: 1
-                }).catch(() => null);
+                await serviceClient
+                    .rpc("restore_ai_credit", { ws_id: workspaceId })
+                    .catch((e: unknown) => {
+                        console.error("[search-natural] Credit restore failed after embedding error:", e);
+                    });
             }
             console.error("HuggingFace embedding error:", embErr?.message);
             return new Response(JSON.stringify({ error: "AI search temporarily unavailable. Your credit has been refunded." }), {
