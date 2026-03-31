@@ -31,3 +31,5 @@ CON
 tests/e2e/.auth/
 test-results/
 playwright-report/
+.vercel
+.env*.local

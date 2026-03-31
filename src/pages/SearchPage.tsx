@@ -448,7 +448,7 @@ export default function SearchPage() {
         const endpoint = isAiSearch ? "search-natural" : "search-influencers";
         const body = isAiSearch
           ? { query: query.trim(), platform: platforms[0], location: selectedCity }
-          : { query: query.trim(), platform: platforms[0], location: selectedCity, followerRange, engagementRange, contentLanguage };
+          : { query: query.trim(), platform: platforms[0], location: selectedCity, followerRange, engagementRange, contentLanguage, niches: selectedNiches };
 
         const { data, error } = await supabase.functions.invoke(endpoint, { body });
         if (error) throw error;
@@ -466,7 +466,7 @@ export default function SearchPage() {
         const responses = await Promise.allSettled(
           platforms.map(p =>
             supabase.functions.invoke("search-influencers", {
-              body: { query: query.trim(), platform: p, location: selectedCity, followerRange, engagementRange, contentLanguage },
+              body: { query: query.trim(), platform: p, location: selectedCity, followerRange, engagementRange, contentLanguage, niches: selectedNiches },
             })
           )
         );

@@ -1,4 +1,5 @@
 import { isSuperAdmin, performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
+import { logApiUsageAsync } from "../_shared/telemetry.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { generateText, extractJsonFromText } from "../_shared/huggingface.ts";
 const ALLOWED_ORIGIN = Deno.env.get("APP_URL") || "https://mushin.app";
@@ -46,11 +47,17 @@ Return ONLY the JSON. Engagement benchmarks: Instagram 1-3%, TikTok 3-6%, YouTub
 
 
 Deno.serve(async (req) => {
+  const startTime = Date.now();
+  let statusCode = 200;
+  let requestUserId: string | undefined = undefined;
+  let workspaceIdStr: string | undefined = undefined;
+
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
+      statusCode = 401;
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -66,12 +73,23 @@ Deno.serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     if (userError || !user) {
+      statusCode = 401;
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const userId = user.id;
+    requestUserId = userId;
+
+    // Check account restriction
+    const { data: profile } = await supabase.from("profiles").select("is_restricted").eq("id", userId).single();
+    if (profile?.is_restricted) {
+      statusCode = 403;
+      return new Response(JSON.stringify({ error: "Account restricted. Contact support." }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const HUGGINGFACE_API_KEY = Deno.env.get("HUGGINGFACE_API_KEY");
     if (!HUGGINGFACE_API_KEY) {
@@ -100,10 +118,12 @@ Deno.serve(async (req) => {
       .single();
 
     if (!membership) {
+      statusCode = 400;
       return new Response(JSON.stringify({ error: "No workspace found", code: "NO_WORKSPACE", status: 400 }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    workspaceIdStr = membership.workspace_id;
 
     const { data: ws } = await adminClient
       .from("workspaces")
@@ -112,6 +132,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (!callerIsSuperAdmin && (!ws || ws.ai_credits_remaining <= 0)) {
+      statusCode = 402;
       return new Response(JSON.stringify({ error: "AI credits exhausted. Upgrade your plan to continue using AI features.", code: "CREDITS_EXHAUSTED", status: 402 }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -132,6 +153,7 @@ Deno.serve(async (req) => {
     } else if (type === "evaluate") {
       promptConfig = buildEvaluate(data);
     } else {
+      statusCode = 400;
       return new Response(JSON.stringify({ error: "Invalid type. Use: summarize, fraud-check, recommend, evaluate" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -142,6 +164,7 @@ Deno.serve(async (req) => {
       const { error: creditErr } = await adminClient.rpc("consume_ai_credit", { ws_id: membership.workspace_id });
       if (creditErr) {
         console.error("[ai-insights] Pre-deduction failed:", creditErr);
+        statusCode = 500;
         return new Response(JSON.stringify({ error: "Credit deduction failed. Please try again.", code: "CREDIT_DEDUCT_FAILED", status: 500 }), {
           status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -168,12 +191,16 @@ Deno.serve(async (req) => {
       }
     } catch (aiErr: any) {
       console.error("[ai-insights] AI call failed:", aiErr.message);
-      // Restore credit on AI failure
+      // Restore credit on AI failure (with idempotency to prevent double-refund in case of retries)
       if (!callerIsSuperAdmin) {
-        const { error: restoreErr } = await adminClient.rpc("restore_ai_credit", { ws_id: membership.workspace_id });
+        const { error: restoreErr } = await adminClient.rpc("restore_ai_credit", { 
+          ws_id: membership.workspace_id,
+          i_key: crypto.randomUUID()
+        });
         if (restoreErr) console.error("[ai-insights] Credit restore failed:", restoreErr);
       }
       const isRateLimit = aiErr.message?.includes("429");
+      statusCode = isRateLimit ? 429 : 502;
       return new Response(JSON.stringify({
         error: isRateLimit
           ? "Rate limit exceeded. Please try again in a moment."
@@ -194,8 +221,19 @@ Deno.serve(async (req) => {
   } catch (error) {
     // HIGH-04: Never expose raw internal error details
     console.error("ai-insights unhandled error:", error);
+    statusCode = 500;
     return new Response(JSON.stringify({ error: "Internal server error", code: "INTERNAL_ERROR" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } finally {
+    // SEC-14: Asynchronously log API usage telemetry without blocking the response
+    logApiUsageAsync({
+      endpoint: "ai-insights",
+      request_id: crypto.randomUUID(),
+      latency_ms: Date.now() - startTime,
+      status_code: statusCode,
+      user_id: requestUserId,
+      workspace_id: workspaceIdStr
     });
   }
 });

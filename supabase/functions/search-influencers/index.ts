@@ -1,4 +1,5 @@
 import { isSuperAdmin, performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
+import { logApiUsageAsync } from "../_shared/telemetry.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Redis } from "https://esm.sh/@upstash/redis";
 import { checkRateLimit, corsHeaders } from "../_shared/rate_limit.ts";
@@ -11,7 +12,6 @@ import { computeSearchScore, computeSearchScoreV2, snippetRelevanceScore, detect
 import { normalizeQuery, detectLanguage } from "../_shared/language.ts";
 import { getTagScore, normalizeTags } from "../_shared/tag_intelligence.ts";
 import { expandSerperQueries, extractContactEmail, detectSocialLinks } from "../_shared/query_expander.ts";
-import { dedupeCreatorResults, runProgressiveResultFallback } from "../_shared/search_result_fallback.ts";
 let redis: Redis | null = null;
 if (Deno.env.get("UPSTASH_REDIS_REST_URL") && Deno.env.get("UPSTASH_REDIS_REST_TOKEN")) {
   redis = new Redis({
@@ -20,6 +20,11 @@ if (Deno.env.get("UPSTASH_REDIS_REST_URL") && Deno.env.get("UPSTASH_REDIS_REST_T
   });
 }
 
+// RC-06: Load explicit preview origins from env — never use *.vercel.app wildcard.
+const PREVIEW_ORIGINS_SI: Set<string> = new Set(
+  (Deno.env.get("ALLOWED_PREVIEW_ORIGINS") ?? "")
+    .split(",").map((s: string) => s.trim()).filter(Boolean)
+);
 function buildCorsHeaders(req: Request) {
   const origin = req.headers.get("Origin") ?? "";
   const appUrl = Deno.env.get("APP_URL") || "https://mushin.app";
@@ -27,10 +32,8 @@ function buildCorsHeaders(req: Request) {
     appUrl,
     "http://localhost:5173",
     "http://localhost:3000",
+    ...PREVIEW_ORIGINS_SI,
   ]);
-  if (origin.endsWith(".vercel.app")) {
-    allowed.add(origin);
-  }
   return {
     ...corsHeaders,
     "Access-Control-Allow-Origin": allowed.has(origin) ? origin : appUrl,
@@ -39,6 +42,11 @@ function buildCorsHeaders(req: Request) {
 }
 
 Deno.serve(async (req) => {
+  const startTime = Date.now();
+  let statusCode = 200;
+  let userId: string | undefined = undefined;
+  let workspaceIdStr: string | undefined = undefined;
+
   const corsHeaders = buildCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -77,6 +85,7 @@ Deno.serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
+      statusCode = 401;
       return new Response(JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -91,22 +100,35 @@ Deno.serve(async (req) => {
 
     const { data: userData, error: userError } = await supabase.auth.getUser(token);
     if (userError || !userData?.user) {
+      statusCode = 401;
       return new Response(JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    userId = userData.user.id;
+
+    // Reject if user is restricted
+    const { data: profile } = await supabase.from("profiles").select("is_restricted").eq("id", userId).single();
+    if (profile?.is_restricted) {
+      statusCode = 403;
+      return new Response(JSON.stringify({ error: "Account restricted. Contact support." }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const callerIsSuperAdmin = await isSuperAdmin(userData.user.id);
 
     const { data: workspaceId, error: wsError } = await supabase.rpc("get_user_workspace_id");
     if (wsError || !workspaceId) {
+      statusCode = 400;
       return new Response(JSON.stringify({ error: "No workspace found" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    workspaceIdStr = workspaceId;
 
     // Rate limit by workspace ID (not spoofable x-forwarded-for)
     if (!callerIsSuperAdmin) {
       const { allowed } = await checkRateLimit(workspaceId as string, "search");
       if (!allowed) {
+        statusCode = 429;
         return new Response(JSON.stringify({ error: "Rate limit exceeded" }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -144,7 +166,6 @@ Deno.serve(async (req) => {
         details: { searches_last_5m: recentSearches, ip_address: ip },
       });
       console.warn(`[search-influencers] High velocity anomaly for WS ${workspaceId} (IP: ${ip})`);
-      // Block the request — anomaly threshold means the workspace is abusing the API
       return new Response(JSON.stringify({ error: "Search rate limit exceeded. Please slow down." }),
         { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -176,7 +197,9 @@ Deno.serve(async (req) => {
     // If we already have ≥ MIN_DB_RESULTS enriched profiles for this query,
     // return them immediately. This dramatically reduces external API usage
     // once the creator index grows.
-    const MIN_DB_RESULTS = 20;
+    // RC-03: Lowered from 20 to 5 — niche/city queries rarely have 20 enriched
+    // profiles; using stubs with follower data is better than always falling to Serper.
+    const MIN_DB_RESULTS = 5;
     const queryNicheDataPre = inferNiche(query, "", query);
     const queryNichePre = queryNicheDataPre.confidence >= 0.3 ? queryNicheDataPre.niche : null;
     const queryCityPre = extractCity(`${query} ${location || ""}`, query)
@@ -208,28 +231,28 @@ Deno.serve(async (req) => {
     const queryWords = query.toLowerCase().replace(/[^a-z0-9 ]/g, "").split(" ").filter(w => w.length > 2);
 
     try {
-      const dbAttempts = [queryCityPre ?? null];
-      if (queryCityPre) dbAttempts.push(null);
+      const { data: dbRows } = await serviceClient.rpc("tag_match_influencers", {
+        p_platform:      platform,
+        p_tags:          queryWords,
+        p_niche:         queryNichePre,
+        p_min_followers: dbMinFollowers === Infinity ? 0 : dbMinFollowers,
+        p_max_followers: dbMaxFollowers === Infinity ? 9_999_999_999 : dbMaxFollowers,
+        p_min_er:        minEr,
+        p_city:          queryCityPre ?? null,
+        p_limit:         80,
+      });
 
-      const dbRowsMerged: any[] = [];
-      for (const cityAttempt of dbAttempts) {
-        const { data: dbRows } = await serviceClient.rpc("tag_match_influencers", {
-          p_platform:      platform,
-          p_tags:          queryWords,
-          p_niche:         queryNichePre,
-          p_min_followers: dbMinFollowers === Infinity ? 0 : dbMinFollowers,
-          p_max_followers: dbMaxFollowers === Infinity ? 9_999_999_999 : dbMaxFollowers,
-          p_min_er:        minEr,
-          p_city:          cityAttempt,
-          p_limit:         80,
-        });
-        dbRowsMerged.push(...((dbRows ?? []) as any[]));
-      }
-
-      const dbResults = dedupeCreatorResults(dbRowsMerged as any[]);
-      const enrichedDbResults = dbResults.filter((r: any) => r.enrichment_status === "success");
+      const dbResults = (dbRows ?? []) as any[];
+      // RC-03: Include stubs that have follower data — they're useful for ranking
+      // even without full profile enrichment. Only truly empty stubs are excluded.
+      const enrichedDbResults = dbResults.filter(
+        (r: any) => r.enrichment_status === "success" || r.follower_count != null
+      );
 
       if (enrichedDbResults.length >= MIN_DB_RESULTS) {
+        // Log which tier produced results for observability
+        const fullyEnriched = dbResults.filter((r: any) => r.enrichment_status === "success").length;
+        console.log(`[search-influencers] DB-first HIT: ${fullyEnriched} enriched + ${enrichedDbResults.length - fullyEnriched} stubs with follower data`);
         console.log(`[search-influencers] DB-first hit: ${enrichedDbResults.length} enriched profiles, skipping Serper`);
 
         // Re-use ranking infrastructure on DB results
@@ -305,14 +328,7 @@ Deno.serve(async (req) => {
         }
 
         return new Response(
-          JSON.stringify({
-            results: scoredDbResults,
-            credits_remaining: callerIsSuperAdmin ? Number.MAX_SAFE_INTEGER : (workspace?.search_credits_remaining || 1) - 1,
-            source: "db",
-            fallback_tier: "strict",
-            query_variants_used: ["db_primary", "db_city_relaxed"],
-            deduped_results_count: scoredDbResults.length,
-          }),
+          JSON.stringify({ results: scoredDbResults, credits_remaining: callerIsSuperAdmin ? Number.MAX_SAFE_INTEGER : (workspace?.search_credits_remaining || 1) - 1, source: "db" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -355,10 +371,11 @@ Deno.serve(async (req) => {
     // Run PRIMARY + all expansions in parallel for broader creator discovery.
     // This surfaces creators who appear under different search phrasings
     // (e.g. "tech youtuber" vs "tech influencer" vs "technology reviewer").
-    const queryVariantsRaw = hasForeignLocation
+    // RC-05: Pass detected niche so expansion generates niche-specific queries
+    // (e.g. "food blogger lahore" → Food niche terms, not General's "content creator").
+    const queryVariants = hasForeignLocation
       ? [{ query: `${query} ${platform} influencer`.trim(), strategy: "primary" as const, weight: 1.0 }]
-      : expandSerperQueries(query, platform, cityForQuery);
-    const queryVariants = queryVariantsRaw.slice(0, 6);
+      : expandSerperQueries(query, platform, cityForQuery, queryNichePre ?? "General");
 
     const primaryVariant = queryVariants[0];
     console.log("Serper queries to run:", queryVariants.map(v => `[${v.strategy}] ${v.query}`).join(" | "));
@@ -601,23 +618,34 @@ Deno.serve(async (req) => {
     );
 
     const results = rawResults.filter(Boolean);
-    const uniqueResults = dedupeCreatorResults(results as any[]);
-
-    // Early exit when no results ΓÇö avoids .in('username', []) Postgres crash
+    const seen = new Set();
+    const uniqueResults = results.filter((r: any) => {
+      // Normalize to lowercase + strip leading @ before dedup so that
+      // expansion queries returning the same profile in different casing
+      // are correctly recognised as duplicates.
+      const normalizedUsername = r.username.toLowerCase().replace(/^@/, "");
+      const key = `${r.platform}:${normalizedUsername}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    // Early exit when no results — avoids .in('username', []) Postgres crash
     if (uniqueResults.length === 0) {
       await serviceClient.from("search_history").insert({
         workspace_id: workspaceId, query, platform,
         location: location || null, result_count: 0, filters: {},
-      }); // { error } silently ignored
+      });
       return new Response(
-        JSON.stringify({ results: [], credits_remaining: (workspace?.search_credits_remaining || 1) - 1 }),
+        JSON.stringify({
+          results: [],
+          credits_remaining: (workspace?.search_credits_remaining || 1) - 1,
+          _search_meta: { fallback_tier: 0, tier_label: "no_serper_results", variants_run: queryVariants.length, dedup_before: rawResults.filter(Boolean).length, dedup_after: 0 },
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    let filteredResults = uniqueResults;
-
-    // Content language filter input validation.
+    // Content language filter — validate against strict allowlist first
     const ALLOWED_CONTENT_LANGUAGES = ["any", "urdu", "english", "bilingual"] as const;
     type ContentLanguage = typeof ALLOWED_CONTENT_LANGUAGES[number];
     const rawContentLanguage: unknown = requestBody?.contentLanguage;
@@ -625,6 +653,101 @@ Deno.serve(async (req) => {
       typeof rawContentLanguage === "string" && ALLOWED_CONTENT_LANGUAGES.includes(rawContentLanguage as ContentLanguage)
         ? (rawContentLanguage as ContentLanguage)
         : null;
+
+    // Helper: apply content-language filter to a candidate set
+    const applyLangFilter = (candidates: any[]): any[] => {
+      if (!contentLanguage || contentLanguage === "any") return candidates;
+      const URDU_CHARS = /[\u0600-\u06FF]/;
+      return candidates.filter((r: any) => {
+        const lang: string = (r._query_language || "").toLowerCase();
+        const snippet: string = r.snippet || r.bio || "";
+        const hasUrdu = URDU_CHARS.test(snippet) || lang.includes("urdu") || lang.includes("roman");
+        const hasEnglish = /[a-zA-Z]{3,}/.test(snippet);
+        if (!hasUrdu && !hasEnglish) return true; // no signal — keep
+        if (contentLanguage === "urdu")      return hasUrdu;
+        if (contentLanguage === "english")   return hasEnglish && !hasUrdu;
+        if (contentLanguage === "bilingual") return hasUrdu && hasEnglish;
+        return true;
+      });
+    };
+
+    // Helper: apply follower range filter (soft — only hard-drop confirmed out-of-range)
+    const applyFollowerFilter = (candidates: any[], range: string): any[] => {
+      if (!range || range === "any" || !rangeMap[range]) return candidates;
+      const [min, max] = rangeMap[range];
+      return candidates.filter((r: any) => {
+        if (r.extracted_followers == null) return true; // unknown FC: keep, score penalised
+        return r.extracted_followers >= min && (max === Infinity || r.extracted_followers <= max);
+      });
+    };
+
+    // Helper: apply engagement filter (soft — skip benchmark estimates)
+    const applyEngagementFilter = (candidates: any[], range: string): any[] => {
+      if (!range || range === "any" || !engRangeMap[range]) return candidates;
+      const [minEng, maxEng] = engRangeMap[range];
+      return candidates.filter((r: any) => {
+        if (!r.engagement_rate || r.engagement_source === "benchmark_estimate") return true;
+        return r.engagement_rate >= minEng && r.engagement_rate <= maxEng;
+      });
+    };
+
+    // Minimum result threshold that satisfies the user (below this → try next tier)
+    const TIER_MIN = 3;
+    const hasFollowerFilter  = !!(followerRange  && followerRange  !== "any" && rangeMap[followerRange]);
+    const hasEngagementFilter = !!(engagementRange && engagementRange !== "any" && engRangeMap[engagementRange]);
+
+    interface FallbackTier { tier: number; label: string; result: any[] }
+    let activeTier: FallbackTier = { tier: 0, label: "none", result: [] };
+
+    // Tier 1 — all filters applied (strict)
+    {
+      let t = applyFollowerFilter(uniqueResults, followerRange);
+      t = applyEngagementFilter(t, engagementRange);
+      t = applyLangFilter(t);
+      console.log(`[search] T1 strict: ${t.length} results`);
+      if (t.length >= TIER_MIN || (!hasFollowerFilter && !hasEngagementFilter)) {
+        activeTier = { tier: 1, label: "strict", result: t };
+      }
+    }
+
+    // Tier 2 — relax engagement only (keep follower filter)
+    if (!activeTier.tier && hasEngagementFilter) {
+      let t = applyFollowerFilter(uniqueResults, followerRange);
+      t = applyLangFilter(t);
+      console.log(`[search] T2 relax-engagement: ${t.length} results`);
+      if (t.length >= TIER_MIN) activeTier = { tier: 2, label: "relax_engagement", result: t };
+    }
+
+    // Tier 3 — relax follower only (keep engagement filter)
+    if (!activeTier.tier && hasFollowerFilter) {
+      let t = applyEngagementFilter(uniqueResults, engagementRange);
+      t = applyLangFilter(t);
+      console.log(`[search] T3 relax-follower: ${t.length} results`);
+      if (t.length >= TIER_MIN) activeTier = { tier: 3, label: "relax_follower", result: t };
+    }
+
+    // Tier 4 — relax both follower + engagement (language only)
+    if (!activeTier.tier && (hasFollowerFilter || hasEngagementFilter)) {
+      const t = applyLangFilter(uniqueResults);
+      console.log(`[search] T4 relax-both: ${t.length} results`);
+      if (t.length >= TIER_MIN) activeTier = { tier: 4, label: "relax_follower_engagement", result: t };
+    }
+
+    // Tier 5 — full relax: all filters off, pure relevance ranking
+    if (!activeTier.tier) {
+      console.log(`[search] T5 full-relax: ${uniqueResults.length} results`);
+      activeTier = { tier: 5, label: "full_relax", result: uniqueResults };
+    }
+
+    const TIER_LABELS: Record<number, string> = {
+      1: "strict", 2: "relax_engagement", 3: "relax_follower",
+      4: "relax_follower_engagement", 5: "full_relax",
+    };
+    console.log(`[search] Fallback tier ${activeTier.tier} (${activeTier.label}): ${activeTier.result.length} candidates after fallback`);
+
+    // Track whether follower filter was actually applied in the winning tier
+    const followerFilterActive = activeTier.tier <= 3 && hasFollowerFilter;
+    const filteredResults: any[] = activeTier.result;
 
     // Merge real profile data (avatar, bio, follower count, engagement) for enriched creators
     const usernames = uniqueResults.map((r: any) => r.username.replace("@", ""));
@@ -710,6 +833,17 @@ Deno.serve(async (req) => {
     // v2 Multi-factor ranking — see _shared/ranking.ts for full scoring logic.
     // Formula: keywordRel×0.35 + tagStrength×0.20 + semanticSim×0.20
     //        + engQuality×0.15 + authenticity×0.10
+    // RC-01/02 scoring: apply score penalties for out-of-preferred-range results
+    // so they sort to the bottom rather than being hard-dropped entirely.
+    const followerPenalty = (r: any): number => {
+      if (!followerFilterActive || !rangeMap[followerRange]) return 1.0;
+      if (r.extracted_followers == null) return 0.6; // unknown follower count — mild penalty
+      const [min, max] = rangeMap[followerRange];
+      if (r.extracted_followers < min * 0.5 || (max !== Infinity && r.extracted_followers > max * 2)) return 0.2;
+      if (r.extracted_followers < min || (max !== Infinity && r.extracted_followers > max)) return 0.5;
+      return 1.0;
+    };
+
     const sortedResults = enrichedResults
       .filter((r: any) => {
         // Hard reject: verified real engagement data below absolute bot floor (0.3 %)
@@ -723,7 +857,7 @@ Deno.serve(async (req) => {
         const creatorTags = cached?.tags ? normalizeTags(cached.tags) : [];
         const tagScore = getTagScore(query, creatorTags);
 
-        const score = computeSearchScoreV2({
+        const baseScore = computeSearchScoreV2({
           query,
           displayName:                  r.title ?? "",
           username:                     r.username ?? "",
@@ -736,27 +870,31 @@ Deno.serve(async (req) => {
           city:                         r.city_extracted ?? null,
           queryCity,
           tags:                         creatorTags,
-          semanticSimilarity:           snippetRelevanceScore(query, r.snippet ?? ""), // live snippet signal
+          semanticSimilarity:           snippetRelevanceScore(query, r.snippet ?? ""),
           precomputedAuthenticityScore: cached?.authenticity_score ?? null,
           precomputedEngagementQuality: cached?.engagement_quality_score ?? null,
           recencySignal:                computeRecencySignal(r.last_enriched_at ?? null),
           intent:                       queryIntent,
         });
-        return { ...r, _search_score: score, _tag_score: tagScore, _query_language: queryLanguage, _intent: queryIntent.intent, tags: creatorTags };
+        // RC-01: multiply by follower-range penalty so out-of-range creators sort last
+        const score = baseScore * followerPenalty(r);
+        return {
+          ...r,
+          _search_score: score,
+          _tag_score: tagScore,
+          _query_language: queryLanguage,
+          _intent: queryIntent.intent,
+          tags: creatorTags,
+          // Expose filter meta to frontend for contextual messaging
+          _follower_filter_active: followerFilterActive,
+          _follower_in_range: r.extracted_followers != null
+            ? (() => { if (!rangeMap[followerRange]) return true; const [mn,mx] = rangeMap[followerRange]; return r.extracted_followers >= mn && (mx === Infinity || r.extracted_followers <= mx); })()
+            : null,
+        };
       })
       .sort((a: any, b: any) => b._search_score - a._search_score);
 
-    const fallbackSelection = runProgressiveResultFallback(sortedResults as any[], {
-      followerRange: followerRange || null,
-      engagementRange: engagementRange || null,
-      contentLanguage: contentLanguage || "any",
-      followerMap: rangeMap,
-      engagementMap: engRangeMap,
-    });
-    const fallbackResults = fallbackSelection.results;
-    console.log(
-      `[search-influencers] fallback tier=${fallbackSelection.tier} attempts=${JSON.stringify(fallbackSelection.attempts)}`,
-    );
+    console.log(`[search] Final results: ${sortedResults.length} (post-scoring), deduped from ${uniqueResults.length} unique, ${uniqueResults.length - filteredResults.length} soft-filtered`);
 
     // @deprecated v1 formula (computeSearchScore) kept for reference — remove after 2026-04-06
     // nameSim×0.35 + engQuality×0.25 + authenticity×0.15
@@ -811,25 +949,20 @@ Deno.serve(async (req) => {
       workspace_id: workspaceId, query, platform,
       location: location || null,
       // result_count reflects what the user actually sees (post-filter)
-      result_count: fallbackResults.length,
-      filters: {
-        followerRange: followerRange || null,
-        engagementRange: engagementRange || null,
-        contentLanguage: contentLanguage || "any",
-        fallbackTier: fallbackSelection.tier,
-      },
+      result_count: sortedResults.length,
+      filters: { followerRange: followerRange || null },
     });
 
     await serviceClient.from("credits_usage").insert({
       workspace_id: workspaceId, action_type: "search", amount: 1,
     });
 
-    if (redis && fallbackResults.length > 0) {
+    if (redis && sortedResults.length > 0) {
       try {
         // Cache SORTED + filtered results (same as what is returned to client)
-        await redis.set(cacheKey, JSON.stringify(fallbackResults), { ex: 3600 });
+        await redis.set(cacheKey, JSON.stringify(sortedResults), { ex: 3600 });
         const batch = redis.pipeline();
-        for (const result of fallbackResults) {
+        for (const result of sortedResults) {
           if (!result.username) continue;
           const cleanUsername = result.username.replace("@", "");
           const tKey = `tag:${cleanUsername}:${platform}`;
@@ -843,36 +976,40 @@ Deno.serve(async (req) => {
     const t1 = performance.now();
     await serviceClient.from("admin_audit_log").insert({
       action: "search", admin_user_id: userData.user.id,
-      details: {
-        query,
-        platform,
-        location,
-        latency_ms: Math.round(t1 - t0),
-        result_count: fallbackResults.length,
-        cached: false,
-        fallback_tier: fallbackSelection.tier,
-        fallback_attempts: fallbackSelection.attempts,
-        query_variants: queryVariants.map((v) => v.strategy),
-        dedup_before: results.length,
-        dedup_after: uniqueResults.length,
-      }
+      details: { query, platform, location, latency_ms: Math.round(t1 - t0), result_count: enrichedResults.length, cached: false }
     }); // { error } silently ignored
 
     return new Response(
       JSON.stringify({
-        results: fallbackResults,
+        results: sortedResults,
         credits_remaining: (workspace?.search_credits_remaining || 1) - 1,
-        fallback_tier: fallbackSelection.tier,
-        fallback_attempts: fallbackSelection.attempts,
-        query_variants_used: queryVariants.map((v) => v.strategy),
-        deduped_results_count: uniqueResults.length,
+        _search_meta: {
+          fallback_tier: activeTier.tier,
+          tier_label: activeTier.label,
+          variants_run: queryVariants.length,
+          dedup_before: rawResults.filter(Boolean).length,
+          dedup_after: uniqueResults.length,
+          filtered_after_tier: filteredResults.length,
+          result_count: sortedResults.length,
+        },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
   } catch (err: any) {
     console.error("Unexpected error:", err);
+    statusCode = 500;
     return new Response(JSON.stringify({ error: "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  } finally {
+    // SEC-14: Asynchronously log API usage telemetry without blocking the response
+    logApiUsageAsync({
+      endpoint: "search-influencers",
+      request_id: crypto.randomUUID(),
+      latency_ms: Date.now() - startTime,
+      status_code: statusCode,
+      user_id: userId,
+      workspace_id: workspaceIdStr
+    });
   }
 });

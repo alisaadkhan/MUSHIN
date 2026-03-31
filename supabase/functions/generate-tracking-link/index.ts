@@ -8,11 +8,38 @@ const corsHeaders = {
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-/** Validates that the URL has a safe scheme (http/https only). */
+/** Validates that the URL has a safe scheme (http/https only) and is not a private/internal IP. */
 function isValidTrackingUrl(url: string): boolean {
     try {
         const parsed = new URL(url);
-        return parsed.protocol === "https:" || parsed.protocol === "http:";
+        if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
+        
+        // SEC-12: Strict SSRF Protection — Block private/internal networks
+        const hostname = parsed.hostname.toLowerCase();
+        
+        // Block localhost and standard internal domains
+        if (hostname === "localhost" || hostname.endsWith(".local") || hostname.endsWith(".internal")) {
+            return false;
+        }
+        
+        // Block IPv4 private ranges: 127.x.x.x, 10.x.x.x, 172.16.x.x-172.31.x.x, 192.168.x.x
+        // Block IPv6 localhost
+        if (
+            hostname.startsWith("127.") || 
+            hostname.startsWith("10.") || 
+            hostname.startsWith("192.168.") ||
+            hostname === "[::1]"
+        ) {
+            return false;
+        }
+        
+        // More robust check for 172.16.x.x - 172.31.x.x
+        if (hostname.startsWith("172.")) {
+            const secondOctet = parseInt(hostname.split(".")[1], 10);
+            if (secondOctet >= 16 && secondOctet <= 31) return false;
+        }
+
+        return true;
     } catch {
         return false;
     }

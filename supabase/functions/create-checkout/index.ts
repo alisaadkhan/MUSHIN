@@ -74,7 +74,18 @@ Deno.serve(async (req) => {
     const customers = await stripe.customers.list({ email: userData.user.email, limit: 1 });
     const customerId = customers.data.length > 0 ? customers.data[0].id : undefined;
 
-    const origin = req.headers.get("origin") || "http://localhost:3000";
+    // M-01: Validate origin against a strict allowlist before embedding it in Stripe redirect
+    // URLs. An unvalidated Origin header could be spoofed by the browser to redirect users
+    // to an attacker-controlled domain after checkout completes.
+    const REDIRECT_ORIGIN_ALLOWLIST = new Set([
+      Deno.env.get("APP_URL") || "https://mushin.app",
+      "http://localhost:3000",
+      "http://localhost:5173",
+    ]);
+    const rawOrigin = req.headers.get("origin") ?? "";
+    const origin = REDIRECT_ORIGIN_ALLOWLIST.has(rawOrigin)
+      ? rawOrigin
+      : (Deno.env.get("APP_URL") || "https://mushin.app");
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,

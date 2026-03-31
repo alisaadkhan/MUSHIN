@@ -1,4 +1,5 @@
 import { getServiceRoleKey, isSuperAdmin, performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
+import { logApiUsageAsync } from "../_shared/telemetry.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Redis } from "https://esm.sh/@upstash/redis";
 import { checkRateLimit, corsHeaders } from "../_shared/rate_limit.ts";
@@ -291,25 +292,42 @@ if (Deno.env.get("UPSTASH_REDIS_REST_URL") && Deno.env.get("UPSTASH_REDIS_REST_T
 // ΓöÇΓöÇ Main handler ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 // ΓöÇΓöÇ Main handler ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 Deno.serve(async (req: Request) => {
+    const startTime = Date.now();
+    let statusCode = 200;
+    let userId: string | undefined = undefined;
+    let workspaceIdStr: string | undefined = undefined;
+
     if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-    const t0 = performance.now();
     const ip = req.headers.get('x-forwarded-for') ?? 'unknown';
 
     try {
         const authHeader = req.headers.get("Authorization");
         if (!authHeader?.startsWith("Bearer ")) {
+            statusCode = 401;
             return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
         const token = authHeader.replace("Bearer ", "");
         const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
         const { data: { user } } = await supabase.auth.getUser(token);
-        if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        if (!user) {
+            statusCode = 401;
+            return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        userId = user.id;
+
+        // Reject if user is restricted
+        const { data: userProfile } = await supabase.from("profiles").select("is_restricted").eq("id", userId).single();
+        if (userProfile?.is_restricted) {
+            statusCode = 403;
+            return new Response(JSON.stringify({ error: "Account restricted. Contact support." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
 
         const callerIsSuperAdmin = await isSuperAdmin(user.id);
         if (!callerIsSuperAdmin) {
             const { allowed } = await checkRateLimit(ip, 'enrich');
             if (!allowed) {
+                statusCode = 429;
                 return new Response(JSON.stringify({ error: 'Rate limit exceeded' }),
                     { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
             }
@@ -324,7 +342,11 @@ Deno.serve(async (req: Request) => {
     });
 
         const { data: workspaceId } = await supabase.rpc("get_user_workspace_id");
-        if (!workspaceId) return new Response(JSON.stringify({ error: "No workspace" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        if (!workspaceId) {
+            statusCode = 400;
+            return new Response(JSON.stringify({ error: "No workspace" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        workspaceIdStr = workspaceId;
 
         const { data: workspace } = await serviceClient
             .from("workspaces")
@@ -565,7 +587,7 @@ Deno.serve(async (req: Request) => {
                 details: {
                     username,
                     platform,
-                    latency_ms: Math.round(t1 - t0)
+                    latency_ms: Math.round(t1 - startTime)
                 }
             });
         }
@@ -576,6 +598,17 @@ Deno.serve(async (req: Request) => {
     } catch (err: any) {
         // HIGH-04: Log internally, return generic safe error to client
         console.error(`[enrich] Unhandled error for ${req.url}:`, err.message ?? err);
+        statusCode = 500;
         return new Response(JSON.stringify({ error: "Internal server error", code: "INTERNAL_ERROR" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    } finally {
+        // SEC-14: Asynchronously log API usage telemetry without blocking the response
+        logApiUsageAsync({
+            endpoint: "enrich-influencer",
+            request_id: crypto.randomUUID(),
+            latency_ms: Date.now() - startTime,
+            status_code: statusCode,
+            user_id: userId,
+            workspace_id: workspaceIdStr
+        });
     }
 });

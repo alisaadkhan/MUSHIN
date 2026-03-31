@@ -1,4 +1,5 @@
 import { isSuperAdmin, performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
+import { logApiUsageAsync } from "../_shared/telemetry.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Redis } from "https://esm.sh/@upstash/redis";
 import { generateEmbedding } from "../_shared/huggingface.ts";
@@ -41,6 +42,11 @@ if (Deno.env.get("UPSTASH_REDIS_REST_URL") && Deno.env.get("UPSTASH_REDIS_REST_T
 }
 
 Deno.serve(async (req) => {
+    const startTime = Date.now();
+    let statusCode = 200;
+    let userId: string | undefined = undefined;
+    let workspaceId: string | undefined = undefined;
+
     const corsHeaders = buildCorsHeaders(req);
     if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -66,21 +72,40 @@ Deno.serve(async (req) => {
             { global: { headers: { Authorization: authHeader } } }
         );
 
-        const { data: userData, error: userError } = await supabase.auth.getUser(token);
+        const { data: userData, error: userError } = await supabase.auth.getUser();
         if (userError || !userData?.user) {
-            return new Response(JSON.stringify({ error: "Unauthorized" }), {
+            statusCode = 401;
+            return new Response(JSON.stringify({ error: "Invalid token" }), {
                 status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
             });
         }
+        userId = userData.user.id;
 
-        const { data: workspaceId } = await supabase.rpc("get_user_workspace_id");
+        // Fetch user profile to check for restrictions
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("is_restricted")
+            .eq("id", userId)
+            .single();
+
+        if (profile?.is_restricted) {
+            statusCode = 403;
+            return new Response(JSON.stringify({ error: "Account restricted. Contact support." }), {
+                status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+        }
+
+        // Add rate-limiting check directly hooked to user/IP context
+        const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+
+        const { data: wIdData } = await supabase.rpc("get_user_workspace_id");
+        workspaceId = wIdData;
         if (!workspaceId) {
             return new Response(JSON.stringify({ error: "No workspace found" }), {
                 status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
             });
         }
 
-        const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
         const serviceClient = await performPrivilegedWrite({
             authHeader: req.headers.get("Authorization"),
             action: "gateway:privileged-client-bootstrap",
@@ -91,14 +116,33 @@ Deno.serve(async (req) => {
 
         const callerIsSuperAdmin = await isSuperAdmin(userData.user.id);
 
-        const { data: ws } = await serviceClient
-            .from("workspaces")
-            .select("ai_credits_remaining")
-            .eq("id", workspaceId)
-            .single();
+        let ws: any = null;
+        if (!callerIsSuperAdmin) {
+            const { data: mData, error: mErr } = await supabase
+                .from("workspace_members")
+                .select("workspace_id")
+                .eq("workspace_id", workspaceId)
+                .eq("user_id", userData.user.id)
+                .maybeSingle();
+
+            if (mErr || !mData) {
+                statusCode = 403;
+                return new Response(JSON.stringify({ error: "Unauthorized access to workspace" }), {
+                    status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" }
+                });
+            }
+
+            const { data: wsData } = await serviceClient
+                .from("workspaces")
+                .select("ai_credits_remaining, id")
+                .eq("id", workspaceId)
+                .single();
+            ws = wsData;
+        }
 
         if (!callerIsSuperAdmin && (!ws || ws.ai_credits_remaining <= 0)) {
-            return new Response(JSON.stringify({ error: "No AI credits remaining" }), {
+            statusCode = 402;
+            return new Response(JSON.stringify({ error: "Insufficient AI Search credits." }), {
                 status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" }
             });
         }
@@ -131,7 +175,8 @@ Deno.serve(async (req) => {
 
         // Attempt to Fetch from Cache
         // Cache key is SHA-256 hashed to prevent injection / key-length issues with long queries
-        const cacheKeyRaw = `sn:${query.toLowerCase().trim()}:${platform || "all"}`;
+        // Include workspaceId for strict tenant isolation
+        const cacheKeyRaw = `sn:${workspaceId}:${query.toLowerCase().trim()}:${platform || "all"}`;
         const cacheKeyBytes = await crypto.subtle.digest(
             "SHA-256",
             new TextEncoder().encode(cacheKeyRaw),
@@ -188,7 +233,10 @@ Deno.serve(async (req) => {
             // Uses restore_ai_credit which is the correct atomic credit restore RPC.
             if (!callerIsSuperAdmin) {
                 await serviceClient
-                    .rpc("restore_ai_credit", { ws_id: workspaceId })
+                    .rpc("restore_ai_credit", { 
+                        ws_id: workspaceId,
+                        i_key: crypto.randomUUID()
+                    })
                     .catch((e: unknown) => {
                         console.error("[search-natural] Credit restore failed after embedding error:", e);
                     });
@@ -233,8 +281,19 @@ Deno.serve(async (req) => {
     } catch (err: any) {
         // HIGH-04: Never expose raw error messages/stack traces to clients
         console.error("AI Search Error:", err);
+        statusCode = 500;
         return new Response(JSON.stringify({ error: "Internal server error" }), {
             status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+    } finally {
+        // SEC-14: Asynchronously log API usage telemetry without blocking the response
+        logApiUsageAsync({
+            endpoint: "search-natural",
+            request_id: crypto.randomUUID(),
+            latency_ms: Date.now() - startTime,
+            status_code: statusCode,
+            user_id: userId,
+            workspace_id: workspaceId
         });
     }
 });
