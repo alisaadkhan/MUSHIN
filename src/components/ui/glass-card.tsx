@@ -1,13 +1,16 @@
-import * as React from "react"
-import { cn } from "@/lib/utils"
+import * as React from "react";
+import { cn } from "@/lib/utils";
+import { motion, type MotionValue } from "framer-motion";
 
 export interface GlassCardProps extends React.HTMLAttributes<HTMLDivElement> {
   intensity?: "low" | "medium" | "high";
   interactive?: boolean;
+  mouseX?: MotionValue<number>;
+  mouseY?: MotionValue<number>;
 }
 
 const GlassCard = React.forwardRef<HTMLDivElement, GlassCardProps>(
-  ({ className, intensity = "medium", interactive = false, children, ...props }, ref) => {
+  ({ className, intensity = "medium", interactive = false, mouseX, mouseY, children, ...props }, ref) => {
     
     // Intensity defines the blur mapping and opacity floors
     const bgMap = {
@@ -27,6 +30,16 @@ const GlassCard = React.forwardRef<HTMLDivElement, GlassCardProps>(
         )}
         {...props}
       >
+        {/* Spotlight Effect Layer */}
+        {mouseX && mouseY && (
+          <motion.div
+            className="pointer-events-none absolute -inset-px rounded-2xl opacity-0 transition duration-300 group-hover:opacity-100"
+            style={{
+              background: `radial-gradient(600px circle at ${mouseX}px ${mouseY}px, rgba(168,85,247,0.15), transparent 80%)`,
+            }}
+          />
+        )}
+
         {/* Inner 1px Highlight mimicking macOS/SaaS depth */}
         <div className="absolute inset-0 pointer-events-none rounded-2xl border border-white/[0.05]" style={{ transform: 'scale(0.995)' }} />
         
@@ -38,10 +51,10 @@ const GlassCard = React.forwardRef<HTMLDivElement, GlassCardProps>(
           {children}
         </div>
       </div>
-    )
+    );
   }
-)
+);
 
-GlassCard.displayName = "GlassCard"
+GlassCard.displayName = "GlassCard";
 
-export { GlassCard }
+export { GlassCard };

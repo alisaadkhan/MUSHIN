@@ -35,7 +35,7 @@ import { SimilarCreatorsSection } from "@/components/influencer/SimilarCreatorsS
 import { PythonAnalyticsPanel } from "@/components/influencer/PythonAnalyticsPanel";
 import { AudienceDemographics } from "@/components/influencer/AudienceDemographics";
 import { ProfileSummary } from "@/components/influencer/ProfileSummary";
-import { GlassCard } from "@/components/ui/GlassCard";
+import { GlassCard } from "@/components/ui/glass-card";
 
 // Types
 interface PythonAnalyticsData {
@@ -88,14 +88,14 @@ export default function InfluencerProfilePage() {
     if (!platform || !username) return;
     setAnalyticsLoading(true);
     try {
-      const metrics = {
+      const metrics: any = {
         follower_count: profile?.metrics?.followers ?? profile?.metrics?.subscriber_count ?? profile?.follower_count ?? null,
         following_count: profile?.metrics?.following_count ?? profile?.following_count ?? null,
         posts_count: profile?.metrics?.posts_count ?? null,
         engagement_rate: profile?.metrics?.engagement_rate ?? profile?.engagement_rate ?? null,
         avg_likes: profile?.metrics?.avg_likes ?? null,
         avg_comments: profile?.metrics?.avg_comments ?? null,
-        avg_views: profile?.metrics?.avg_views ?? null,
+        avg_views: (profile?.metrics as any)?.avg_views ?? null,
       };
       const { data: wsData } = await supabase.from("workspace_members").select("workspace_id").limit(1).maybeSingle();
       const { data, error } = await supabase.functions.invoke("ai-analytics", {
@@ -414,6 +414,7 @@ export default function InfluencerProfilePage() {
                   engagementRate={engagementRate} 
                   postsCount={postsCount} 
                   primaryNiche={niche} 
+                  recentFollowerDelta={followerHistory.length >= 2 ? (followerHistory[followerHistory.length - 1].follower_count - followerHistory[0].follower_count) : null}
                   className="bg-transparent border-0 p-0 shadow-none" 
                />
                <BrandFitMeterPanel platform={platform as any} followerCount={followers} engagementRate={engagementRate} botProbability={botProbability} creatorNiche={niche} className="bg-transparent border-0 p-0 shadow-none" />

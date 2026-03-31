@@ -1,6 +1,6 @@
 import React from 'react';
 import { BarChart3 } from 'lucide-react';
-import { GlassCard } from '@/components/ui/GlassCard';
+import { GlassCard } from '@/components/ui/glass-card';
 
 interface BotDetectionResult {
   data_available: boolean;

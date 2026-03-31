@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { GlassCard } from '@/components/ui/GlassCard';
+import { GlassCard } from '@/components/ui/glass-card';
 import { 
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, 
   DropdownMenuSeparator, DropdownMenuTrigger 

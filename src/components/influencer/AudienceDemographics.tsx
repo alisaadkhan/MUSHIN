@@ -1,6 +1,6 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { GlassCard } from '@/components/ui/GlassCard';
+import { GlassCard } from '@/components/ui/glass-card';
 
 interface AudienceDemographicsProps {
   ageRange?: string;

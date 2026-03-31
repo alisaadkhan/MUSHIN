@@ -2,7 +2,7 @@ import React from 'react';
 import { ShieldCheck, Globe, Sparkles, MapPin, Calendar, Heart, Share2, ExternalLink, RefreshCw, BarChart3, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { GlassCard } from '@/components/ui/GlassCard';
+import { GlassCard } from '@/components/ui/glass-card';
 import { EvaluationScoreBadge } from '@/components/influencer/EvaluationScoreBadge';
 import { DataStalenessBadge } from '@/components/influencer/DataStalenessBadge';
 import { useMouseSpotlight } from '@/hooks/useMouseSpotlight';

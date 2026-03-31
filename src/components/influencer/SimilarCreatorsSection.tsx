@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Sparkles } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
-import { GlassCard } from '@/components/ui/GlassCard';
+import { GlassCard } from '@/components/ui/glass-card';
 
 export function SimilarCreatorsSection({ profileId, currentPlatform }: { profileId: string; currentPlatform: string }) {
   const [similar, setSimilar] = useState<any[]>([]);
