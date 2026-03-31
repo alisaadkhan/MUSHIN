@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=Roboto:wght@400;500;600;700;900&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -80,8 +81,9 @@
   .glass-card {
     background: rgba(255,255,255,0.03);
     border: 1px solid rgba(255,255,255,0.08);
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(12px);
     border-radius: var(--radius);
+    box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.05), 0 4px 24px rgba(0,0,0,0.4);
   }
   .glass-card-hover {
     background: rgba(255,255,255,0.03);
@@ -146,10 +148,19 @@
     box-shadow: 0 0 16px rgba(168,85,247,0.3);
     transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
   }
-  .btn-primary-alive:hover {
+  .btn-primary-alive:hover:not(:disabled) {
     background: hsl(270 91% 58%);
-    box-shadow: 0 0 24px rgba(168,85,247,0.45);
+    box-shadow: 0 0 28px rgba(168,85,247,0.5);
     transform: translateY(-1px);
+  }
+  .btn-primary-alive:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 0 12px rgba(168,85,247,0.2);
+  }
+  .btn-primary-alive:disabled {
+    opacity: 0.38;
+    box-shadow: none;
+    cursor: not-allowed;
   }
   .shadow-glass {
     backdrop-filter: blur(12px); background: rgba(13,13,13,0.92);
@@ -207,6 +218,83 @@
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
     }
+  }
+
+  /* ── Auth-specific utilities ───────────────────────── */
+  .auth-tab {
+    flex: 1; padding: 0.625rem 0.75rem;
+    font-size: 0.75rem; font-weight: 600;
+    border-radius: calc(var(--radius) - 2px);
+    transition: all 0.18s ease;
+    letter-spacing: 0.02em;
+    min-height: 44px;
+  }
+  .auth-tab-active {
+    background: rgba(168,85,247,0.16);
+    color: #A855F7;
+    border: 1px solid rgba(168,85,247,0.35);
+    box-shadow: inset 0 1px 0 rgba(168,85,247,0.1);
+  }
+  .auth-tab-inactive {
+    color: rgba(255,255,255,0.42);
+    border: 1px solid transparent;
+  }
+  .auth-tab-inactive:hover {
+    color: rgba(255,255,255,0.75);
+    background: rgba(255,255,255,0.04);
+  }
+  .google-btn {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.14);
+    transition: background 0.18s, border-color 0.18s, transform 0.15s;
+    height: 44px;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+  .google-btn:hover {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.22);
+    transform: translateY(-1px);
+  }
+  .google-btn:active {
+    transform: translateY(0);
+  }
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .captcha-skeleton {
+    height: 65px;
+    border-radius: var(--radius);
+    background: linear-gradient(90deg,
+      rgba(255,255,255,0.04) 25%,
+      rgba(255,255,255,0.08) 50%,
+      rgba(255,255,255,0.04) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .auth-divider {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 1.25rem 0;
+  }
+  .auth-divider::before,
+  .auth-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(255,255,255,0.08);
+  }
+  /* ── Fade-up entry animation ────────────────────────── */
+  @keyframes auth-enter {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .auth-card-enter {
+    animation: auth-enter 0.45s cubic-bezier(0.22,1,0.36,1) forwards;
   }
 
   @media (max-width: 1024px) {
