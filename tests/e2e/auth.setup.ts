@@ -1,17 +1,7 @@
-/**
- * auth.setup.ts
- *
- * Logs in once with PLAYWRIGHT_EMAIL / PLAYWRIGHT_PASSWORD and saves the
- * resulting browser storage state to tests/e2e/.auth/state.json.
- * All other test projects depend on this project and reuse the saved state,
- * keeping the test suite fast and credential-safe.
- */
-
 import { test as setup, expect } from "@playwright/test";
 import path from "path";
 
-// Use process.cwd() (workspace root) to avoid __dirname ESM issues
-const STATE_PATH = path.join(process.cwd(), "tests/e2e/.auth/state.json");
+const authFile = path.resolve(".auth/state.json");
 
 setup("authenticate", async ({ page }) => {
   const email = process.env.PLAYWRIGHT_EMAIL;
@@ -19,42 +9,30 @@ setup("authenticate", async ({ page }) => {
 
   if (!email || !password) {
     throw new Error(
-      "PLAYWRIGHT_EMAIL and PLAYWRIGHT_PASSWORD must be set in your environment. " +
-      "Create a test account in Supabase with ≥20 search credits."
+      "Missing PLAYWRIGHT_EMAIL or PLAYWRIGHT_PASSWORD environment variables. " +
+        "Run tests with `PLAYWRIGHT_EMAIL=xxx PLAYWRIGHT_PASSWORD=xxx npx playwright test`"
     );
   }
 
   await page.goto("/auth");
-  await expect(page.locator("input[type='email']")).toBeVisible({ timeout: 15_000 });
+  
+  // Directly interact with the primary authentication form elements
+  const emailLocator = page.locator("input[type='email']", { hasText: "" }).first().or(page.locator('input[placeholder="you@brand.pk"]'));
+  await expect(emailLocator).toBeVisible({ timeout: 15_000 });
+  await emailLocator.fill(email);
+  
+  const pwLocator = page.locator('input[type="password"]').first();
+  await pwLocator.fill(password);
 
-  await page.fill("input[type='email']", email);
-  await page.fill("input[type='password']", password);
-
-  // Turnstile may take a moment to load and mint a valid captcha token.
-  // The auth UI disables submit until captchaToken is present.
-  const submitButton = page.locator("button[type='submit']");
-  const captchaError = page.getByText(/CAPTCHA failed to load/i);
-
-  // Wait for either: submit becomes enabled, or Turnstile fails permanently.
-  const submitEnabledPromise = expect(submitButton).toBeEnabled({ timeout: 60_000 });
-  await Promise.race([
-    submitEnabledPromise,
-    captchaError
-      .first()
-      .waitFor({ state: "visible", timeout: 15_000 })
-      .then(() => {
-        throw new Error(
-          "Turnstile CAPTCHA failed to load in the E2E browser environment. " +
-            "Verify your Cloudflare Turnstile site-key and that the test hostname " +
-            "(e.g. localhost:8080) is included in the allowlist. E2E auth cannot proceed."
-        );
-      }),
-  ]);
+  const submitButton = page.getByRole("button", { name: /sign in/i }).first();
+  
+  // Wait for submission to become fully active natively (assuming Turnstile is correctly disabled via VITE_DISABLE_CAPTCHA)
+  await expect(submitButton).toBeEnabled({ timeout: 15_000 });
   await submitButton.click();
 
-  // Wait until we land on a dashboard page (not /auth)
-  await expect(page).not.toHaveURL(/\/auth/, { timeout: 60_000 });
+  // Validate we reach the dashboard successfully
+  await page.waitForURL("**/dashboard", { timeout: 15_000 });
+  await expect(page.locator('h1, h2, span', { hasText: /Dashboard|Overview/i }).first()).toBeVisible({ timeout: 15_000 });
 
-  await page.context().storageState({ path: STATE_PATH });
-  console.log(`✅ Auth state saved to ${STATE_PATH}`);
+  await page.context().storageState({ path: authFile });
 });

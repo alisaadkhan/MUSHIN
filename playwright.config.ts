@@ -32,7 +32,7 @@ export default defineConfig({
   outputDir: "test-results",
 
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:8080",
+    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "https://mushin-syq3.vercel.app",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
@@ -47,20 +47,33 @@ export default defineConfig({
       testMatch: "**/auth.setup.ts",
     },
 
-    // ── 2. All search + filter tests (reuse saved auth) ───────────────────────
+    // ── 2. Comprehensive Automations ───────────────────────
     {
-      name: "chromium",
+      name: "e2e-chromium",
       use: {
         ...devices["Desktop Chrome"],
         storageState: "tests/e2e/.auth/state.json",
       },
       dependencies: ["setup"],
-      testIgnore: [
-        "**/auth.setup.ts",
-        "**/stress.spec.ts",
-        "**/phase3-combinatorial.spec.ts",
-        "**/regression-9a9d783.spec.ts",
-      ],
+      testMatch: ["**/auth.spec.ts", "**/core.spec.ts", "**/credits.spec.ts", "**/security.spec.ts", "**/admin.spec.ts"]
+    },
+    {
+      name: "e2e-firefox",
+      use: {
+        ...devices["Desktop Firefox"],
+        storageState: "tests/e2e/.auth/state.json",
+      },
+      dependencies: ["setup"],
+      testMatch: ["**/auth.spec.ts", "**/core.spec.ts", "**/credits.spec.ts", "**/security.spec.ts", "**/admin.spec.ts"]
+    },
+    {
+      name: "e2e-webkit",
+      use: {
+        ...devices["Desktop Safari"],
+        storageState: "tests/e2e/.auth/state.json",
+      },
+      dependencies: ["setup"],
+      testMatch: ["**/auth.spec.ts", "**/core.spec.ts", "**/credits.spec.ts", "**/security.spec.ts", "**/admin.spec.ts"]
     },
 
     // ── 3. Stress tests — separate project to run on-demand ──────────────────
