@@ -33,7 +33,7 @@
     }
   ],
   "rewrites": [
-    { "source": "/(?!_)(.*)", "destination": "/" }
+    { "source": "/((?!_).*)", "destination": "/index.html" }
   ],
   "experimentalServices": {
     "frontend": {
