@@ -32,17 +32,8 @@
       ]
     }
   ],
-  "rewrites": [
-    { "source": "/((?!_).*)", "destination": "/index.html" }
-  ],
-  "experimentalServices": {
-    "frontend": {
-      "routePrefix": "/",
-      "framework": "vite"
-    },
-    "python-analytics": {
-      "entrypoint": "services/python-analytics",
-      "routePrefix": "/_/python-analytics"
-    }
-  }
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/.*", "dest": "/index.html" }
+  ]
 }
