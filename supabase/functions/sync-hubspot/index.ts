@@ -1,6 +1,7 @@
 import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { safeErrorResponse } from "../_shared/errors.ts";
+import { assertNoSecretsInRequestBody } from "../_shared/secrets.ts";
 const APP_URL = Deno.env.get("APP_URL") || "https://mushin.app";
 const corsHeaders = {
   "Access-Control-Allow-Origin": APP_URL,
@@ -32,7 +33,9 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
-    const { contacts, workspace_id } = await req.json();
+    const requestBody = await req.json();
+    assertNoSecretsInRequestBody(requestBody, "sync-hubspot");
+    const { contacts, workspace_id } = requestBody;
 
     if (!workspace_id || !contacts?.length) {
       return new Response(JSON.stringify({ error: "Missing workspace_id or contacts" }), {

@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { enforceGlobalRateLimit } from "./global_rate_limit.ts";
+import { getSecret } from "./secrets.ts";
 
 export type WorkspaceRole = "owner" | "admin" | "member";
 
@@ -10,7 +11,7 @@ export type AuthContext = {
 };
 
 function getRequiredEnv(name: string): string {
-  const value = Deno.env.get(name);
+  const value = getSecret(name, { endpoint: "_shared/privileged_gateway", required: false });
   if (!value || !value.trim()) {
     throw new Error(`Missing required environment variable: ${name}`);
   }

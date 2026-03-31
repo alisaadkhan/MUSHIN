@@ -2,7 +2,8 @@ import { isSuperAdmin, performPrivilegedWrite } from "../_shared/privileged_gate
 import { logApiUsageAsync } from "../_shared/telemetry.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Redis } from "https://esm.sh/@upstash/redis";
-import { checkRateLimit, corsHeaders } from "../_shared/rate_limit.ts";
+import { checkRateLimit, corsHeaders, tooManyRequests } from "../_shared/rate_limit.ts";
+import { assertNoSecretsInRequestBody } from "../_shared/secrets.ts";
 import { inferNiche } from "../_shared/niche.ts";
 import { extractCity } from "../_shared/geo.ts";
 import { extractFollowers } from "../_shared/followers.ts";
@@ -52,6 +53,7 @@ Deno.serve(async (req) => {
 
   try {
     const requestBody = await req.json();
+    assertNoSecretsInRequestBody(requestBody, "search-influencers");
     const rawQuery = requestBody?.query ?? "";
     const rawPlatform = requestBody?.platform ?? "";
 
@@ -124,13 +126,13 @@ Deno.serve(async (req) => {
     }
     workspaceIdStr = workspaceId;
 
-    // Rate limit by workspace ID (not spoofable x-forwarded-for)
+    // Dual-layer rate limit: both per-IP and per-workspace must pass.
     if (!callerIsSuperAdmin) {
-      const { allowed } = await checkRateLimit(workspaceId as string, "search");
-      if (!allowed) {
+      const ipRate = await checkRateLimit(ip, "search");
+      const workspaceRate = await checkRateLimit(workspaceId as string, "search", { isWorkspace: true });
+      if (!ipRate.allowed || !workspaceRate.allowed) {
         statusCode = 429;
-        return new Response(JSON.stringify({ error: "Rate limit exceeded" }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return tooManyRequests(Math.max(ipRate.retryAfter ?? 0, workspaceRate.retryAfter ?? 0), corsHeaders);
       }
     }
 

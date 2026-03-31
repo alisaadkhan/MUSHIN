@@ -11,6 +11,7 @@ const TURNSTILE_SITE_KEY = import.meta.env.VITE_DISABLE_CAPTCHA === "true"
 import { AuroraBackground } from "@/components/layout/AuroraBackground";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { GlassCard } from "@/components/ui/glass-card";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -351,7 +352,7 @@ export default function Auth() {
 
           {/* ── Verification Notice ─────────────────────────────────────────── */}
           {mode === "verification-notice" && (
-            <div className="glass-card p-6 space-y-5 auth-card-enter">
+            <GlassCard className="p-6 space-y-5 auth-card-enter">
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
                   <Mail className="h-4 w-4 text-primary" />
@@ -386,12 +387,13 @@ export default function Auth() {
                   Back to sign in
                 </Button>
               </div>
-            </div>
+            </GlassCard>
           )}
 
           {/* ── MFA Challenge ──────────────────────────────────────────────── */}
           {mode === "mfa-challenge" && (
-            <form onSubmit={handleMfaVerify} className="glass-card p-6 space-y-5 auth-card-enter">
+            <GlassCard className="p-6 space-y-5 auth-card-enter">
+              <form onSubmit={handleMfaVerify} className="space-y-5">
               <button
                 type="button"
                 onClick={() => { setMode("sign-in"); supabase.auth.signOut(); }}
@@ -435,11 +437,13 @@ export default function Auth() {
                 Verify →
               </Button>
             </form>
+            </GlassCard>
           )}
 
           {/* ── Sign In ────────────────────────────────────────────────────── */}
           {mode === "sign-in" && (
-            <form onSubmit={handleSignIn} className="glass-card p-6 space-y-5 auth-card-enter">
+            <GlassCard className="p-6 space-y-5 auth-card-enter">
+              <form onSubmit={handleSignIn} className="space-y-5">
               <div>
                 <h2
                   className="text-[1.375rem] font-extrabold text-foreground leading-tight"
@@ -529,11 +533,13 @@ export default function Auth() {
                 Sign In
               </Button>
             </form>
+            </GlassCard>
           )}
 
           {/* ── Sign Up ────────────────────────────────────────────────────── */}
           {mode === "sign-up" && (
-            <form onSubmit={handleSignUp} className="glass-card p-6 space-y-5 auth-card-enter">
+            <GlassCard className="p-6 space-y-5 auth-card-enter">
+              <form onSubmit={handleSignUp} className="space-y-5">
               <div>
                 <h2
                   className="text-[1.375rem] font-extrabold text-foreground leading-tight"
@@ -631,11 +637,13 @@ export default function Auth() {
                 Create Account →
               </Button>
             </form>
+            </GlassCard>
           )}
 
           {/* ── Forgot Password ─────────────────────────────────────────────── */}
           {mode === "forgot-password" && (
-            <form onSubmit={handleForgotPassword} className="glass-card p-6 space-y-5 auth-card-enter">
+            <GlassCard className="p-6 space-y-5 auth-card-enter">
+              <form onSubmit={handleForgotPassword} className="space-y-5">
               <button
                 type="button"
                 onClick={() => setMode("sign-in")}
@@ -674,6 +682,7 @@ export default function Auth() {
                 Send Reset Link
               </Button>
             </form>
+            </GlassCard>
           )}
         </div>
       </div>

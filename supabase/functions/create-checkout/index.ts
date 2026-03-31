@@ -2,6 +2,7 @@ import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { safeErrorResponse } from "../_shared/errors.ts";
 import { checkRateLimit } from "../_shared/rate_limit.ts";
+import { assertNoSecretsInRequestBody, getSecret } from "../_shared/secrets.ts";
 
 // Restrict origin to the application domain — never allow wildcard on billing endpoints
 const ALLOWED_ORIGIN = Deno.env.get("APP_URL") || "https://mushin.app";
@@ -36,7 +37,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    const stripeKey = getSecret("STRIPE_SECRET_KEY", { endpoint: "create-checkout" });
     if (!stripeKey) throw new Error("STRIPE_SECRET_KEY not configured");
 
     const supabase = createClient(
@@ -51,7 +52,9 @@ Deno.serve(async (req) => {
     const { data: userData, error: userError } = await supabase.auth.getUser(token);
     if (userError || !userData.user?.email) throw new Error("Not authenticated");
 
-    const { priceId } = await req.json().catch(() => ({}));
+    const requestBody = await req.json().catch(() => ({}));
+    assertNoSecretsInRequestBody(requestBody, "create-checkout");
+    const { priceId } = requestBody;
     if (!priceId || typeof priceId !== 'string') throw new Error("priceId is required");
     // Sanitise: priceId must look like a Stripe Price ID (price_*)
     if (!/^price_[a-zA-Z0-9]{10,}$/.test(priceId)) {

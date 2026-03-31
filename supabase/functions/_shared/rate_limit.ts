@@ -5,6 +5,8 @@ export const corsHeaders = {
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+import { getSecret } from "./secrets.ts";
+
 // supabase/functions/_shared/rate_limit.ts
 // Per-IP rate limiting with sliding windows for multiple time horizons.
 // Protects: signup (5/min, 20/hour), login (10/min, 50/hour),
@@ -22,13 +24,13 @@ const LIMITS: Record<Action, { perMin: number; perHour: number }> = {
 };
 
 export async function checkRateLimit(
-    ip: string,
+    subjectId: string,
     action: Action = 'general',
-    customLimits?: { perMin?: number; perHour?: number }
+    options?: { perMin?: number; perHour?: number; isWorkspace?: boolean }
 ): Promise<{ allowed: boolean; remaining: number; retryAfter?: number }> {
 
-    const url = Deno.env.get('UPSTASH_REDIS_REST_URL');
-    const token = Deno.env.get('UPSTASH_REDIS_REST_TOKEN');
+    const url = getSecret('UPSTASH_REDIS_REST_URL', { endpoint: '_shared/rate_limit', required: false });
+    const token = getSecret('UPSTASH_REDIS_REST_TOKEN', { endpoint: '_shared/rate_limit', required: false });
 
     if (!url || !token) {
         // SECURITY: Fail CLOSED — never allow unlimited traffic when the rate-limit
@@ -45,13 +47,16 @@ export async function checkRateLimit(
     }
 
     const limits = {
-        perMin: customLimits?.perMin ?? LIMITS[action].perMin,
-        perHour: customLimits?.perHour ?? LIMITS[action].perHour,
+        perMin: options?.perMin ?? LIMITS[action].perMin,
+        perHour: options?.perHour ?? LIMITS[action].perHour,
     };
 
+    const scope = options?.isWorkspace ? 'workspace' : 'ip';
+    const keySubject = (subjectId || 'unknown').trim() || 'unknown';
+
     const now = Math.floor(Date.now() / 1000);
-    const minKey = `rl:${action}:${ip}:min:${Math.floor(now / 60)}`;
-    const hourKey = `rl:${action}:${ip}:hr:${Math.floor(now / 3600)}`;
+    const minKey = `rl:${scope}:${action}:${keySubject}:min:${Math.floor(now / 60)}`;
+    const hourKey = `rl:${scope}:${action}:${keySubject}:hr:${Math.floor(now / 3600)}`;
 
     const res = await fetch(`${url}/pipeline`, {
         method: 'POST',
@@ -99,4 +104,16 @@ export function createLogger(requestId: string, fn: string) {
         warn: (msg: string, data?: object) => console.warn(JSON.stringify({ level: 'WARN', msg, request_id: ctx.request_id, function: ctx.fn, ...data, ts: ctx.ts() })),
         error: (msg: string, data?: object) => console.error(JSON.stringify({ level: 'ERROR', msg, request_id: ctx.request_id, function: ctx.fn, ...data, ts: ctx.ts() })),
     };
+}
+
+export function tooManyRequests(retryAfterSeconds: number, headers: Record<string, string> = corsHeaders): Response {
+    const retryAfter = Math.max(1, Math.ceil(retryAfterSeconds || 60));
+    return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), {
+        status: 429,
+        headers: {
+            ...headers,
+            'Content-Type': 'application/json',
+            'Retry-After': String(retryAfter),
+        },
+    });
 }

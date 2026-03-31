@@ -3,6 +3,7 @@ import { logApiUsageAsync } from "../_shared/telemetry.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Redis } from "https://esm.sh/@upstash/redis";
 import { checkRateLimit, corsHeaders } from "../_shared/rate_limit.ts";
+import { assertNoSecretsInRequestBody, getSecret } from "../_shared/secrets.ts";
 import { extractCityFromBio } from "../_shared/geo.ts";
 import { computeQuickBotScore } from "../_shared/bot_signals.ts";
 // ── Shared Utilities ───────────────────────────────────────────────────────────
@@ -363,7 +364,9 @@ Deno.serve(async (req: Request) => {
         }
         // Credit decrement will happen atomically at the end
 
-        const { username, platform, bio, primary_niche, force_refresh } = await req.json();
+        const requestBody = await req.json();
+        assertNoSecretsInRequestBody(requestBody, "enrich-influencer");
+        const { username, platform, bio, primary_niche, force_refresh } = requestBody;
         if (!username || !platform) return new Response(JSON.stringify({ error: "Missing params" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
         // Ensure we don't accidentally enrich an invalid platform
@@ -393,8 +396,8 @@ Deno.serve(async (req: Request) => {
         // ΓöÇΓöÇ Execute Data Fetching ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         let enriched: any = null;
         let dataSource = "apify";
-        const ytKey = Deno.env.get("YOUTUBE_API_KEY");
-        const apifyKey = Deno.env.get("APIFY_API_KEY");
+        const ytKey = getSecret("YOUTUBE_API_KEY", { endpoint: "enrich-influencer", required: false });
+        const apifyKey = getSecret("APIFY_API_KEY", { endpoint: "enrich-influencer", required: false });
 
         try {
             if (platform === "youtube") {
