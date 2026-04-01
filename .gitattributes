@@ -1,0 +1,6 @@
+*webm export-ignore
+*mp4 export-ignore
+*png export-ignore
+test-results/ export-ignore
+playwright-report/ export-ignore
+trace.zip export-ignore
