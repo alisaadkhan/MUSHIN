@@ -78,6 +78,7 @@ export default function SearchPage() {
   const creditsExhausted = workspaceCredits?.search_credits_remaining === 0;
   const isFreePlan = workspaceCredits?.plan === "free";
   const hasAutoSearched = useRef(false);
+  const isSearchingRef = useRef(false);
 
   // Sync state to URL
   const syncParams = useCallback((overrides: Record<string, string> = {}) => {
@@ -102,13 +103,19 @@ export default function SearchPage() {
     });
 
   const handleSearch = async () => {
-    if (!query.trim()) return;
+    if (isSearchingRef.current || loading) return; // Strict debounce for rapid click
+    
+    if (!query.trim()) {
+      toast({ title: "Input Required", description: "Please enter a search term.", variant: "destructive" });
+      return;
+    }
     if (selectedPlatforms.length === 0) {
       toast({ title: "Signal Error", description: "Select at least one discovery node.", variant: "destructive" });
       return;
     }
     if (creditsExhausted) { toast({ title: "Cycle Restrict", description:"Credits exhausted." }); return; }
 
+    isSearchingRef.current = true;
     setLoading(true);
     setSearched(true);
     setVisibleCount(12);
@@ -134,9 +141,11 @@ export default function SearchPage() {
     } catch (err: any) {
       toast({ title: "Spectrum Failure", description: err.message, variant: "destructive" });
     } finally {
+      isSearchingRef.current = false;
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     if (searchParams.get("q") && !hasAutoSearched.current) {
@@ -201,22 +210,24 @@ export default function SearchPage() {
            loading={loading} 
          />
 
-         <div className="flex items-center justify-between">
-            <QuickFilters 
-              selectedPlatforms={selectedPlatforms}
-              togglePlatform={togglePlatform}
-              selectedCity={selectedCity}
-              setSelectedCity={setSelectedCity}
-              followerRange={followerRange}
-              setFollowerRange={setFollowerRange}
-              onAdvancedClick={() => setShowFilters(true)}
-              hasAdvancedActive={selectedNiches.length > 0 || tagFilter !== ""}
-            />
+         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex-1 w-full min-w-0">
+               <QuickFilters 
+                 selectedPlatforms={selectedPlatforms}
+                 togglePlatform={togglePlatform}
+                 selectedCity={selectedCity}
+                 setSelectedCity={setSelectedCity}
+                 followerRange={followerRange}
+                 setFollowerRange={setFollowerRange}
+                 onAdvancedClick={() => setShowFilters(true)}
+                 hasAdvancedActive={selectedNiches.length > 0 || tagFilter !== ""}
+               />
+            </div>
             {searched && results.length > 0 && (
               <Button 
                 variant="ghost" 
                 onClick={() => setShowSaveSearch(true)}
-                className="h-10 text-[9px] font-black uppercase tracking-widest text-white/20 hover:text-white transition-all"
+                className="h-10 text-[9px] font-black uppercase tracking-widest text-white/20 hover:text-white transition-all self-start lg:self-auto shrink-0"
               >
                 Calibration Marker
               </Button>

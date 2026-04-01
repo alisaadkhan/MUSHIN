@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
     const rawQuery = requestBody?.query ?? "";
     const rawPlatform = requestBody?.platform ?? "";
 
-    const rawSanitized = rawQuery.trim().replace(/[^a-zA-Z0-9\s\u0600-\u06FF.-]/g, "").trim();
+    const rawSanitized = rawQuery.trim().replace(/[^a-zA-Z0-9\s\u0600-\u06FF.\-_@]/g, "").trim();
     // Normalize query: collapse name variants and detect language
     const sanitized = rawSanitized ? normalizeQuery(rawSanitized) || rawSanitized : rawSanitized;
     const queryLanguage = detectLanguage(rawSanitized);

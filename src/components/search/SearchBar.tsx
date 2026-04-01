@@ -27,16 +27,16 @@ export function SearchBar({ query, setQuery, onSearch, loading }: SearchBarProps
         onKeyDown={(e) => e.key === "Enter" && onSearch()}
         style={{ fontFamily: "'Inter', sans-serif" }} // Better input reading
       />
-      <div className="absolute right-3 top-2.5">
+      <div className="absolute right-2 sm:right-3 top-2 sm:top-2.5">
         <Button 
           onClick={onSearch} 
           disabled={loading || !query.trim()}
-          className="h-11 px-8 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-black uppercase tracking-widest transition-all shadow-[0_0_30px_rgba(168,85,247,0.2)] active:scale-95"
+          className="h-12 w-12 sm:h-11 sm:w-auto sm:px-8 p-0 sm:p-auto rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-black uppercase tracking-widest transition-all shadow-[0_0_30px_rgba(168,85,247,0.2)] active:scale-95 flex items-center justify-center"
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
             <div className="flex items-center gap-2">
                <Zap size={14} className="fill-current" />
-               Run Intelligence
+               <span className="hidden sm:inline">Run Intelligence</span>
             </div>
           )}
         </Button>
