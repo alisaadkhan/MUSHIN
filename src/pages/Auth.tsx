@@ -65,6 +65,10 @@ function AuthTabs({ mode, onSwitch }: { mode: AuthMode; onSwitch: (m: AuthMode) 
 }
 
 // ─── CAPTCHA Block ─────────────────────────────────────────────────────────────
+// FIX: The widget must ALWAYS render in visible (non-zero-dimension) space.
+// Mounting it inside `sr-only` (width:1px, height:1px, overflow:hidden) while
+// waiting for a token causes Cloudflare to fail the challenge and emit 400020.
+// We now render the widget unconditionally and hide the skeleton once loaded.
 function CaptchaBlock({
   turnstileRef,
   onSuccess,
@@ -86,11 +90,21 @@ function CaptchaBlock({
 
   return (
     <div className="space-y-2">
-      {/* Skeleton shown while Turnstile hasn't loaded yet */}
+      {/* Skeleton: only shown while widget is initialising and no error yet */}
       {!captchaToken && !captchaError && (
         <div className="captcha-skeleton" aria-label="Loading security check…" />
       )}
-      <div className={captchaToken || captchaError ? "block" : "sr-only"}>
+      {/*
+        FIX: Render widget without sr-only wrapping.
+        sr-only sets width:1px / height:1px / overflow:hidden which stops
+        Cloudflare from measuring its iframe and causes error 400020.
+        Instead, hide it visually only after a valid token is captured so
+        the challenge always has real viewport dimensions while it renders.
+      */}
+      <div
+        aria-hidden={!!captchaToken}
+        style={captchaToken ? { position: "absolute", opacity: 0, pointerEvents: "none", height: 0, overflow: "hidden" } : undefined}
+      >
         <Turnstile
           ref={turnstileRef}
           siteKey={TURNSTILE_SITE_KEY}
@@ -143,8 +157,12 @@ export default function Auth() {
   const [cooldown, setCooldown]             = useState(false);  // submit rate-limit
   const [mfaCode, setMfaCode]               = useState("");
   const [mfaFactorId, setMfaFactorId]       = useState("");
-  const [captchaToken, setCaptchaToken]     = useState("");
-  const [captchaError, setCaptchaError]     = useState("");
+  // FIX: Separate CAPTCHA state per form.
+  // A single shared captchaToken state meant that a token captured by the
+  // sign-in widget was used against the sign-up endpoint (or vice-versa) when
+  // the user switched tabs — Supabase/Cloudflare rejected those cross-form tokens.
+  const [captchaSignIn, setCaptchaSignIn] = useState({ token: "", error: "" });
+  const [captchaSignUp, setCaptchaSignUp] = useState({ token: "", error: "" });
 
   const turnstileSignIn = useRef<TurnstileInstance>(null);
   const turnstileSignUp = useRef<TurnstileInstance>(null);
@@ -170,17 +188,24 @@ export default function Auth() {
   }, []);
 
   // ── CAPTCHA helpers ──────────────────────────────────────────────────────────
-  const resetCaptcha = useCallback((ref: React.RefObject<TurnstileInstance>) => {
-    ref.current?.reset();
-    setCaptchaToken("");
+  const resetSignInCaptcha = useCallback(() => {
+    turnstileSignIn.current?.reset();
+    setCaptchaSignIn({ token: "", error: "" });
   }, []);
 
-  const handleCaptchaError = useCallback((errorCode?: string) => {
-    setCaptchaToken("");
+  const resetSignUpCaptcha = useCallback(() => {
+    turnstileSignUp.current?.reset();
+    setCaptchaSignUp({ token: "", error: "" });
+  }, []);
+
+  const handleSignInCaptchaError = useCallback((errorCode?: string) => {
     const detail = errorCode ? ` (${errorCode})` : "";
-    setCaptchaError(
-      `Security check failed${detail}. Disable browser shields or try a different browser.`
-    );
+    setCaptchaSignIn({ token: "", error: `Security check failed${detail}. Disable browser shields or try a different browser.` });
+  }, []);
+
+  const handleSignUpCaptchaError = useCallback((errorCode?: string) => {
+    const detail = errorCode ? ` (${errorCode})` : "";
+    setCaptchaSignUp({ token: "", error: `Security check failed${detail}. Disable browser shields or try a different browser.` });
   }, []);
 
   // ── Submit rate-limit cooldown (1 s after failure) ───────────────────────────
@@ -189,18 +214,19 @@ export default function Auth() {
     setTimeout(() => setCooldown(false), 1000);
   }, []);
 
-  const captchaRequired = !!TURNSTILE_SITE_KEY && !captchaToken;
+  const signInCaptchaRequired = !!TURNSTILE_SITE_KEY && !captchaSignIn.token;
+  const signUpCaptchaRequired = !!TURNSTILE_SITE_KEY && !captchaSignUp.token;
 
   // ── Sign In ──────────────────────────────────────────────────────────────────
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (captchaRequired) {
+    if (signInCaptchaRequired) {
       toast({ title: "Please complete the security check", variant: "destructive" });
       return;
     }
     setSubmitting(true);
-    const { error } = await signIn(email, password, captchaToken || undefined);
-    resetCaptcha(turnstileSignIn);
+    const { error } = await signIn(email, password, captchaSignIn.token || undefined);
+    resetSignInCaptcha();
 
     if (error) {
       setSubmitting(false);
@@ -245,13 +271,13 @@ export default function Auth() {
       });
       return;
     }
-    if (captchaRequired) {
+    if (signUpCaptchaRequired) {
       toast({ title: "Please complete the security check", variant: "destructive" });
       return;
     }
     setSubmitting(true);
-    const { error } = await signUp(email, password, captchaToken || undefined);
-    resetCaptcha(turnstileSignUp);
+    const { error } = await signUp(email, password, captchaSignUp.token || undefined);
+    resetSignUpCaptcha();
     setSubmitting(false);
     if (error) {
       triggerCooldown();
@@ -325,7 +351,9 @@ export default function Auth() {
     );
   }
 
-  const isSubmitDisabled = submitting || cooldown || captchaRequired;
+  // Each form has its own disabled state based on its own CAPTCHA requirement
+  const isSignInDisabled = submitting || cooldown || signInCaptchaRequired;
+  const isSignUpDisabled = submitting || cooldown || signUpCaptchaRequired;
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -510,21 +538,21 @@ export default function Auth() {
                 </button>
               </div>
 
-              {/* CAPTCHA */}
+              {/* CAPTCHA — sign-in form uses its own isolated state */}
               <CaptchaBlock
                 turnstileRef={turnstileSignIn}
-                onSuccess={(token) => { setCaptchaToken(token); setCaptchaError(""); }}
-                onExpire={() => setCaptchaToken("")}
-                onLoad={() => setCaptchaError("")}
-                onError={handleCaptchaError}
-                captchaToken={captchaToken}
-                captchaError={captchaError}
+                onSuccess={(token) => setCaptchaSignIn({ token, error: "" })}
+                onExpire={() => setCaptchaSignIn(prev => ({ ...prev, token: "" }))}
+                onLoad={() => setCaptchaSignIn(prev => ({ ...prev, error: "" }))}
+                onError={handleSignInCaptchaError}
+                captchaToken={captchaSignIn.token}
+                captchaError={captchaSignIn.error}
               />
 
               <Button
                 type="submit"
                 className="w-full h-11 btn-primary-alive"
-                disabled={isSubmitDisabled}
+                disabled={isSignInDisabled}
               >
                 {submitting
                   ? <Loader2 className="h-4 w-4 animate-spin" />
@@ -614,21 +642,21 @@ export default function Auth() {
                 </Field>
               </div>
 
-              {/* CAPTCHA */}
+              {/* CAPTCHA — sign-up form uses its own isolated state */}
               <CaptchaBlock
                 turnstileRef={turnstileSignUp}
-                onSuccess={(token) => { setCaptchaToken(token); setCaptchaError(""); }}
-                onExpire={() => setCaptchaToken("")}
-                onLoad={() => setCaptchaError("")}
-                onError={handleCaptchaError}
-                captchaToken={captchaToken}
-                captchaError={captchaError}
+                onSuccess={(token) => setCaptchaSignUp({ token, error: "" })}
+                onExpire={() => setCaptchaSignUp(prev => ({ ...prev, token: "" }))}
+                onLoad={() => setCaptchaSignUp(prev => ({ ...prev, error: "" }))}
+                onError={handleSignUpCaptchaError}
+                captchaToken={captchaSignUp.token}
+                captchaError={captchaSignUp.error}
               />
 
               <Button
                 type="submit"
                 className="w-full h-11 btn-primary-alive"
-                disabled={isSubmitDisabled}
+                disabled={isSignUpDisabled}
               >
                 {submitting
                   ? <Loader2 className="h-4 w-4 animate-spin" />
