@@ -68,7 +68,7 @@ export default function LandingPage() {
 
   return (
     <MotionConfig transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}>
-      <div ref={vwRef} className="relative bg-[#060608] text-white selection:bg-purple-500/30 overflow-x-hidden pt-12">
+      <div ref={vwRef} className="relative bg-[#060608] text-white selection:bg-purple-500/30 overflow-x-hidden">
         <G />
 
         <nav className={`fixed top-6 left-1/2 -translate-x-1/2 z-[100] transition-all duration-500 ${navScrolled ? 'w-[min(90%,480px)]' : 'w-[min(90%,540px)]'}`}>
