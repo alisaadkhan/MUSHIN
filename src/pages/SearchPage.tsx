@@ -45,13 +45,6 @@ const PK_CITIES = [
   "Sialkot", "Gujranwala",
 ];
 
-const PK_NICHES = [
-  "Fashion", "Food", "Beauty", "Cricket", "Tech",
-  "Fitness", "Travel", "Gaming", "Music", "Education",
-  "Comedy", "Lifestyle", "Finance", "Health",
-  "Automotive", "Photography", "Art", "Sports", "News",
-];
-
 const FOLLOWER_RANGES = [
   { label: "Any size", value: "any" },
   { label: "Nano (1k–10k)", value: "1k-10k" },
@@ -70,26 +63,17 @@ interface FilterPanelProps {
   togglePlatform: (p: string) => void;
   selectedCity: string;
   setSelectedCity: (v: string) => void;
-  selectedNiches: string[];
-  toggleNiche: (n: string) => void;
   followerRange: string;
   setFollowerRange: (v: string) => void;
   tagFilter: string;
   setTagFilter: (v: string) => void;
-  engagementRange: string;
-  setEngagementRange: (v: string) => void;
-  contentLanguage: string;
-  setContentLanguage: (v: string) => void;
 }
 
 function FilterPanel({
   selectedPlatforms, togglePlatform,
   selectedCity, setSelectedCity,
-  selectedNiches, toggleNiche,
   followerRange, setFollowerRange,
   tagFilter, setTagFilter,
-  engagementRange, setEngagementRange,
-  contentLanguage, setContentLanguage,
 }: FilterPanelProps) {
   return (
     <div className="bg-background/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-5 space-y-5">
@@ -139,46 +123,6 @@ function FilterPanel({
         </select>
       </div>
 
-      {/* Niche */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-medium text-foreground">Niche</p>
-          {selectedNiches.length > 0 && (
-            <span
-              data-testid="niche-counter"
-              className={`text-xs font-medium ${selectedNiches.length >= MAX_NICHES ? "text-amber-500" : "text-muted-foreground"}`}
-            >
-              {selectedNiches.length}/{MAX_NICHES}{selectedNiches.length >= MAX_NICHES && " — limit reached"}
-            </span>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {PK_NICHES.map((n) => {
-            const isActive = selectedNiches.includes(n);
-            const isDisabled = !isActive && selectedNiches.length >= MAX_NICHES;
-            return (
-              <button
-                key={n}
-                data-testid={`niche-btn-${n.toLowerCase()}`}
-                data-active={isActive}
-                disabled={isDisabled}
-                onClick={() => toggleNiche(n)}
-                title={isDisabled ? "Max 3 niches — deselect one first" : undefined}
-                className={`px-2 py-1 text-xs rounded-full border transition-colors touch-manipulation ${
-                  isActive
-                    ? "border-primary text-primary bg-primary/5"
-                    : isDisabled
-                      ? "border-border text-muted-foreground/40 cursor-not-allowed opacity-40"
-                      : "border-border text-muted-foreground hover:border-primary hover:text-primary"
-                }`}
-              >
-                {n}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Follower range */}
       <div>
         <p className="text-xs font-medium text-foreground mb-2">Follower Range</p>
@@ -201,37 +145,6 @@ function FilterPanel({
           placeholder="#tech, #beauty..."
           className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
         />
-      </div>
-
-      {/* Engagement rate */}
-      <div>
-        <p className="text-xs font-medium text-foreground mb-2">Engagement Rate</p>
-        <select
-          value={engagementRange}
-          onChange={(e) => setEngagementRange(e.target.value)}
-          className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-        >
-          <option value="any">Any rate</option>
-          <option value="0-2">Low (0–2%)</option>
-          <option value="2-5">Good (2–5%)</option>
-          <option value="5-10">High (5–10%)</option>
-          <option value="10+">Viral (10%+)</option>
-        </select>
-      </div>
-
-      {/* Content language */}
-      <div>
-        <p className="text-xs font-medium text-foreground mb-2">Content Language</p>
-        <select
-          value={contentLanguage}
-          onChange={(e) => setContentLanguage(e.target.value)}
-          className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-        >
-          <option value="any">Any language</option>
-          <option value="urdu">Urdu / Roman Urdu</option>
-          <option value="english">English</option>
-          <option value="bilingual">Bilingual</option>
-        </select>
       </div>
     </div>
   );
@@ -336,12 +249,6 @@ export default function SearchPage() {
   );
   const [selectedCity, setSelectedCity] = useState(searchParams.get("city") || "All Pakistan");
   const [followerRange, setFollowerRange] = useState(searchParams.get("range") || "any");
-  const [engagementRange, setEngagementRange] = useState("any");
-  const [contentLanguage, setContentLanguage] = useState("any");
-  const [selectedNiches, setSelectedNiches] = useState<string[]>(
-    // Comma-separated in URL: "Fashion,Food" → ["Fashion", "Food"]
-    searchParams.get("niche") ? searchParams.get("niche")!.split(",").filter(Boolean) : []
-  );
 
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -380,18 +287,11 @@ export default function SearchPage() {
     if (selectedPlatforms[0]) next.platform = selectedPlatforms[0];
     if (selectedCity !== "All Pakistan") next.city = selectedCity;
     if (followerRange !== "any") next.range = followerRange;
-    if (selectedNiches.length > 0) next.niche = selectedNiches.join(",");
     setSearchParams({ ...next, ...overrides }, { replace: true });
-  }, [query, isAiSearch, selectedPlatforms, selectedCity, followerRange, selectedNiches, setSearchParams]);
+  }, [query, isAiSearch, selectedPlatforms, selectedCity, followerRange, setSearchParams]);
 
   const togglePlatform = (p: string) =>
     setSelectedPlatforms(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
-  const toggleNiche = (n: string) =>
-    setSelectedNiches(prev => {
-      if (prev.includes(n)) return prev.filter(x => x !== n);
-      if (prev.length >= MAX_NICHES) return prev; // silently cap — button is visually disabled
-      return [...prev, n];
-    });
 
   // Auto-run once on load — restore from session cache first (no credit burn on back-nav)
   useEffect(() => {
@@ -448,7 +348,7 @@ export default function SearchPage() {
         const endpoint = isAiSearch ? "search-natural" : "search-influencers";
         const body = isAiSearch
           ? { query: query.trim(), platform: platforms[0], location: selectedCity }
-          : { query: query.trim(), platform: platforms[0], location: selectedCity, followerRange, engagementRange, contentLanguage, niches: selectedNiches };
+          : { query: query.trim(), platform: platforms[0], location: selectedCity, followerRange };
 
         const { data, error } = await supabase.functions.invoke(endpoint, { body });
         if (error) throw error;
@@ -466,7 +366,7 @@ export default function SearchPage() {
         const responses = await Promise.allSettled(
           platforms.map(p =>
             supabase.functions.invoke("search-influencers", {
-              body: { query: query.trim(), platform: p, location: selectedCity, followerRange, engagementRange, contentLanguage, niches: selectedNiches },
+              body: { query: query.trim(), platform: p, location: selectedCity, followerRange },
             })
           )
         );
@@ -495,7 +395,6 @@ export default function SearchPage() {
         if (selectedPlatforms[0]) urlParams.set("platform", selectedPlatforms[0]);
         if (selectedCity !== "All Pakistan") urlParams.set("city", selectedCity);
         if (followerRange !== "any") urlParams.set("range", followerRange);
-        if (selectedNiches.length > 0) urlParams.set("niche", selectedNiches.join(","));
         sessionStorage.setItem("mushin_last_search_url", `?${urlParams.toString()}`);
       } catch { /* sessionStorage full — skip caching */ }
 
@@ -608,16 +507,10 @@ export default function SearchPage() {
             togglePlatform={togglePlatform}
             selectedCity={selectedCity}
             setSelectedCity={setSelectedCity}
-            selectedNiches={selectedNiches}
-            toggleNiche={toggleNiche}
             followerRange={followerRange}
             setFollowerRange={setFollowerRange}
             tagFilter={tagFilter}
             setTagFilter={setTagFilter}
-            engagementRange={engagementRange}
-            setEngagementRange={setEngagementRange}
-            contentLanguage={contentLanguage}
-            setContentLanguage={setContentLanguage}
           />
         </aside>
 
@@ -634,16 +527,10 @@ export default function SearchPage() {
               togglePlatform={togglePlatform}
               selectedCity={selectedCity}
               setSelectedCity={setSelectedCity}
-              selectedNiches={selectedNiches}
-              toggleNiche={toggleNiche}
               followerRange={followerRange}
               setFollowerRange={setFollowerRange}
               tagFilter={tagFilter}
               setTagFilter={setTagFilter}
-              engagementRange={engagementRange}
-              setEngagementRange={setEngagementRange}
-              contentLanguage={contentLanguage}
-              setContentLanguage={setContentLanguage}
             />
             <SheetFooter className="mt-6 gap-2 flex-col">
               <Button className="w-full btn-shine" onClick={() => { setShowMobileFilters(false); handleSearch(); }}>
@@ -686,9 +573,9 @@ export default function SearchPage() {
               aria-label="Open filters"
             >
               <Filter size={16} strokeWidth={1.5} />
-              {(selectedPlatforms.length > 0 || selectedNiches.length > 0 || selectedCity !== "All Pakistan" || followerRange !== "any") && (
+              {(selectedPlatforms.length > 0 || selectedCity !== "All Pakistan" || followerRange !== "any") && (
                 <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-primary text-[9px] text-white flex items-center justify-center font-bold leading-none">
-                  {selectedPlatforms.length + selectedNiches.length + (selectedCity !== "All Pakistan" ? 1 : 0) + (followerRange !== "any" ? 1 : 0)}
+                  {selectedPlatforms.length + (selectedCity !== "All Pakistan" ? 1 : 0) + (followerRange !== "any" ? 1 : 0)}
                 </span>
               )}
             </Button>
@@ -742,14 +629,8 @@ export default function SearchPage() {
           </div>
 
           {/* Active filter badges row (mobile) */}
-          {(selectedNiches.length > 0 || selectedCity !== "All Pakistan" || tagFilter.trim()) && (
+          {(selectedCity !== "All Pakistan" || tagFilter.trim()) && (
             <div className="flex flex-wrap gap-2 lg:hidden">
-              {selectedNiches.map(n => (
-                <button key={n} onClick={() => toggleNiche(n)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-primary/10 text-primary border border-primary/20">
-                  {n} <XIcon size={10} />
-                </button>
-              ))}
               {selectedCity !== "All Pakistan" && (
                 <button onClick={() => setSelectedCity("All Pakistan")}
                   className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-muted text-muted-foreground border border-border">
@@ -769,9 +650,7 @@ export default function SearchPage() {
           <div className="flex items-center justify-between min-h-[28px]">
             {searched && results.length > 0 && (() => {
               // Compute the effective count after client-side niche + tag filters
-              let visibleResults = selectedNiches.length > 0
-                ? results.filter((r) => r.niche && selectedNiches.includes(r.niche))
-                : results;
+              let visibleResults = results;
               if (tagFilter.trim()) {
                 const tf = tagFilter.toLowerCase().replace(/^#/, "");
                 visibleResults = visibleResults.filter(r => r.tags?.some(t => t.includes(tf)));
@@ -779,7 +658,7 @@ export default function SearchPage() {
               return (
                 <p data-testid="result-count" className="text-sm text-muted-foreground">
                   {visibleResults.length} result{visibleResults.length !== 1 ? "s" : ""} found
-                  {(selectedNiches.length > 0 || tagFilter.trim()) && results.length !== visibleResults.length && (
+                  {tagFilter.trim() && results.length !== visibleResults.length && (
                     <span className="text-xs ml-1 opacity-60">({results.length} total)</span>
                   )}
                   {selectedCity !== "All Pakistan" && <span> · <MapPin className="inline h-3 w-3 mb-0.5" /> {selectedCity}</span>}
@@ -810,9 +689,7 @@ export default function SearchPage() {
 
           {/* Results */}
           {!loading && searched && results.length > 0 && (() => {
-            let filtered = selectedNiches.length > 0
-              ? results.filter((r) => r.niche && selectedNiches.includes(r.niche))
-              : results;
+            let filtered = results;
             if (tagFilter.trim()) {
               const tf = tagFilter.toLowerCase().replace(/^#/, "");
               filtered = filtered.filter(r => r.tags?.some(t => t.includes(tf)));
@@ -832,7 +709,6 @@ export default function SearchPage() {
                       evaluatingUsername={evaluatingUsername}
                       evalLoading={evalLoading}
                       canUseAI={canUseAI}
-                      selectedNiches={selectedNiches}
                       navigate={navigate}
                       evaluateInfluencer={evaluateInfluencer}
                       setEvaluatingUsername={setEvaluatingUsername}
@@ -970,7 +846,6 @@ interface ResultCardProps {
   evaluatingUsername: string | null;
   evalLoading: boolean;
   canUseAI: () => boolean;
-  selectedNiches: string[];
   navigate: ReturnType<typeof useNavigate>;
   evaluateInfluencer: (params: {
     username: string; platform: string;
@@ -984,7 +859,7 @@ interface ResultCardProps {
   setShowCreateList: (v: boolean) => void;
 }
 
-function ResultCard({ c, isFreePlan, lists, cachedScores, evaluatingUsername, evalLoading, canUseAI, selectedNiches, navigate, evaluateInfluencer, setEvaluatingUsername, setCachedScores, handleAddToList, setPendingAddResult, setShowCreateList }: ResultCardProps) {
+function ResultCard({ c, isFreePlan, lists, cachedScores, evaluatingUsername, evalLoading, canUseAI, navigate, evaluateInfluencer, setEvaluatingUsername, setCachedScores, handleAddToList, setPendingAddResult, setShowCreateList }: ResultCardProps) {
   const displayName = c.full_name || c.title || c.username;
   const initials = displayName.split(" ").map((n: string) => n[0]).slice(0, 2).join("") || "?";
   const city = c.city_extracted || c.city;

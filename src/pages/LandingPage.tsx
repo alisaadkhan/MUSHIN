@@ -4,6 +4,7 @@ import { motion, useScroll, useTransform, useInView, animate, AnimatePresence, M
 import { CheckCircle, DollarSign, Info, Sparkles, ArrowRight, Search, Star, Shield, Zap, Users, Instagram, Youtube, TrendingUp, Globe, MapPin, X, Building2, ShoppingBag } from 'lucide-react';
 import { MushInLogo, MushInIcon } from '@/components/ui/MushInLogo';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
+import { LandingHero } from "@/components/landing/LandingHero";
 
 /* --- Global Styles ------------------------------------------------------------ */
 const G = () => <style>{`
