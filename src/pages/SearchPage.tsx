@@ -210,24 +210,22 @@ export default function SearchPage() {
            loading={loading} 
          />
 
-         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex-1 w-full min-w-0">
-               <QuickFilters 
-                 selectedPlatforms={selectedPlatforms}
-                 togglePlatform={togglePlatform}
-                 selectedCity={selectedCity}
-                 setSelectedCity={setSelectedCity}
-                 followerRange={followerRange}
-                 setFollowerRange={setFollowerRange}
-                 onAdvancedClick={() => setShowFilters(true)}
-                 hasAdvancedActive={selectedNiches.length > 0 || tagFilter !== ""}
-               />
-            </div>
+         <div className="flex items-center justify-between">
+            <QuickFilters 
+              selectedPlatforms={selectedPlatforms}
+              togglePlatform={togglePlatform}
+              selectedCity={selectedCity}
+              setSelectedCity={setSelectedCity}
+              followerRange={followerRange}
+              setFollowerRange={setFollowerRange}
+              onAdvancedClick={() => setShowFilters(true)}
+              hasAdvancedActive={selectedNiches.length > 0 || tagFilter !== ""}
+            />
             {searched && results.length > 0 && (
               <Button 
                 variant="ghost" 
                 onClick={() => setShowSaveSearch(true)}
-                className="h-10 text-[9px] font-black uppercase tracking-widest text-white/20 hover:text-white transition-all self-start lg:self-auto shrink-0"
+                className="h-10 text-[9px] font-black uppercase tracking-widest text-white/20 hover:text-white transition-all"
               >
                 Calibration Marker
               </Button>
