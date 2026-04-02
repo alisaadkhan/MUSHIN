@@ -1,6 +1,5 @@
 import { isSuperAdmin, performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { assertNoSecretsInRequestBody, getSecret } from "../_shared/secrets.ts";
 const APP_URL = Deno.env.get("APP_URL") ?? "";
 const corsHeaders = {
   "Access-Control-Allow-Origin": APP_URL || "https://mushin.app", // Never fall back to *
@@ -24,7 +23,7 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const resendApiKey = getSecret("RESEND_API_KEY", { endpoint: "send-outreach-email", required: false });
+    const resendApiKey = Deno.env.get("RESEND_API_KEY");
 
     if (!resendApiKey) {
       return new Response(JSON.stringify({ error: "RESEND_API_KEY not configured" }), {
@@ -87,9 +86,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const requestBody = await req.json();
-    assertNoSecretsInRequestBody(requestBody, "send-outreach-email");
-    const { to, subject, body, from_name, reply_to, card_id, campaign_id, username, platform } = requestBody;
+    const { to, subject, body, from_name, reply_to, card_id, campaign_id, username, platform } =
+      await req.json();
 
     if (!to || !subject || !body || !card_id || !campaign_id) {
       return new Response(
@@ -104,8 +102,6 @@ Deno.serve(async (req) => {
     const safeReplyTo = reply_to
       ? reply_to.replace(/[\r\n]+/g, "").trim().slice(0, 254) || undefined
       : undefined;
-    // SEC-11: strip CR/LF from subject to prevent email header injection
-    const safeSubject = (subject ?? "").replace(/[\r\n]+/g, " ").trim();
 
     // SEC-04: Deduct credit BEFORE sending — prevents double-send race condition.
     // If email send fails we restore the credit.
@@ -130,7 +126,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         from: safeFromName ? `${safeFromName} <onboarding@resend.dev>` : "onboarding@resend.dev",
         to: [to],
-        subject: safeSubject,
+        subject,
         html: body,
         reply_to: safeReplyTo,
       }),
@@ -140,12 +136,9 @@ Deno.serve(async (req) => {
 
     if (!resendRes.ok) {
       console.error("Resend API error:", resendData);
-      // Restore the credit since email failed to send (using idempotency key to prevent double refunds)
+      // Restore the credit since email failed to send
       if (!callerIsSuperAdmin) {
-        const { error: restoreEmailErr } = await adminClient.rpc("restore_email_credit", { 
-          ws_id: membership.workspace_id,
-          i_key: crypto.randomUUID()
-        });
+        const { error: restoreEmailErr } = await adminClient.rpc("restore_email_credit", { ws_id: membership.workspace_id });
         if (restoreEmailErr) console.error("[send-outreach-email] Credit restore failed:", restoreEmailErr.message);
       }
       // Log full Resend error server-side only — never expose internal API details to client

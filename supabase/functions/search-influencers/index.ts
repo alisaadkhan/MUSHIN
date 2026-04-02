@@ -1,9 +1,7 @@
 import { isSuperAdmin, performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
-import { logApiUsageAsync } from "../_shared/telemetry.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Redis } from "https://esm.sh/@upstash/redis";
-import { checkRateLimit, corsHeaders, tooManyRequests } from "../_shared/rate_limit.ts";
-import { assertNoSecretsInRequestBody } from "../_shared/secrets.ts";
+import { checkRateLimit, corsHeaders } from "../_shared/rate_limit.ts";
 import { inferNiche } from "../_shared/niche.ts";
 import { extractCity } from "../_shared/geo.ts";
 import { extractFollowers } from "../_shared/followers.ts";
@@ -43,21 +41,15 @@ function buildCorsHeaders(req: Request) {
 }
 
 Deno.serve(async (req) => {
-  const startTime = Date.now();
-  let statusCode = 200;
-  let userId: string | undefined = undefined;
-  let workspaceIdStr: string | undefined = undefined;
-
   const corsHeaders = buildCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const requestBody = await req.json();
-    assertNoSecretsInRequestBody(requestBody, "search-influencers");
     const rawQuery = requestBody?.query ?? "";
     const rawPlatform = requestBody?.platform ?? "";
 
-    const rawSanitized = rawQuery.trim().replace(/[^a-zA-Z0-9\s\u0600-\u06FF.\-_@]/g, "").trim();
+    const rawSanitized = rawQuery.trim().replace(/[^a-zA-Z0-9\s\u0600-\u06FF.-]/g, "").trim();
     // Normalize query: collapse name variants and detect language
     const sanitized = rawSanitized ? normalizeQuery(rawSanitized) || rawSanitized : rawSanitized;
     const queryLanguage = detectLanguage(rawSanitized);
@@ -87,7 +79,6 @@ Deno.serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      statusCode = 401;
       return new Response(JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -102,37 +93,24 @@ Deno.serve(async (req) => {
 
     const { data: userData, error: userError } = await supabase.auth.getUser(token);
     if (userError || !userData?.user) {
-      statusCode = 401;
       return new Response(JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    userId = userData.user.id;
-
-    // Reject if user is restricted
-    const { data: profile } = await supabase.from("profiles").select("is_restricted").eq("id", userId).single();
-    if (profile?.is_restricted) {
-      statusCode = 403;
-      return new Response(JSON.stringify({ error: "Account restricted. Contact support." }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const callerIsSuperAdmin = await isSuperAdmin(userData.user.id);
 
     const { data: workspaceId, error: wsError } = await supabase.rpc("get_user_workspace_id");
     if (wsError || !workspaceId) {
-      statusCode = 400;
       return new Response(JSON.stringify({ error: "No workspace found" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    workspaceIdStr = workspaceId;
 
-    // Dual-layer rate limit: both per-IP and per-workspace must pass.
+    // Rate limit by workspace ID (not spoofable x-forwarded-for)
     if (!callerIsSuperAdmin) {
-      const ipRate = await checkRateLimit(ip, "search");
-      const workspaceRate = await checkRateLimit(workspaceId as string, "search", { isWorkspace: true });
-      if (!ipRate.allowed || !workspaceRate.allowed) {
-        statusCode = 429;
-        return tooManyRequests(Math.max(ipRate.retryAfter ?? 0, workspaceRate.retryAfter ?? 0), corsHeaders);
+      const { allowed } = await checkRateLimit(workspaceId as string, "search");
+      if (!allowed) {
+        return new Response(JSON.stringify({ error: "Rate limit exceeded" }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     }
 
@@ -168,6 +146,7 @@ Deno.serve(async (req) => {
         details: { searches_last_5m: recentSearches, ip_address: ip },
       });
       console.warn(`[search-influencers] High velocity anomaly for WS ${workspaceId} (IP: ${ip})`);
+      // Block the request — anomaly threshold means the workspace is abusing the API
       return new Response(JSON.stringify({ error: "Search rate limit exceeded. Please slow down." }),
         { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -1000,18 +979,7 @@ Deno.serve(async (req) => {
 
   } catch (err: any) {
     console.error("Unexpected error:", err);
-    statusCode = 500;
     return new Response(JSON.stringify({ error: "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  } finally {
-    // SEC-14: Asynchronously log API usage telemetry without blocking the response
-    logApiUsageAsync({
-      endpoint: "search-influencers",
-      request_id: crypto.randomUUID(),
-      latency_ms: Date.now() - startTime,
-      status_code: statusCode,
-      user_id: userId,
-      workspace_id: workspaceIdStr
-    });
   }
 });
