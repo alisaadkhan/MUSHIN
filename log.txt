@@ -1,0 +1,352 @@
+commit 7f0c9ef645bf73f992a03891fea8712890665feb
+Author: alisaadkhan <alisaad75878@gmail.com>
+Date:   Thu Apr 2 17:42:25 2026 +0500
+
+    fix(landing): remove top padding void above navbar
+
+M	src/pages/LandingPage.tsx
+
+commit 67db65fd067e0dd41dc6d20df7501f2288310c04
+Author: alisaadkhan <alisaad75878@gmail.com>
+Date:   Thu Apr 2 17:37:30 2026 +0500
+
+    chore(ui): revert mobile layout optimizations to original specs
+
+M	src/components/search/SearchBar.tsx
+M	src/pages/SearchPage.tsx
+A	system.zip
+
+commit 8514066b835fd6312fb84ca47b98e01f09914e7c
+Author: alisaadkhan <alisaad75878@gmail.com>
+Date:   Wed Apr 1 14:55:27 2026 +0500
+
+    update gitattributes for zip export
+
+A	.gitattributes
+
+commit e638975733317adc0eafd24405a734f045bb6289
+Author: alisaadkhan <alisaad75878@gmail.com>
+Date:   Wed Apr 1 14:33:22 2026 +0500
+
+    fix(search): remediate regex edge cases, debounce rapid requests, and optimize mobile layouts
+
+M	src/components/search/SearchBar.tsx
+M	src/pages/SearchPage.tsx
+M	supabase/functions/search-influencers/index.ts
+
+commit 854d9926a3f6c6c6709c0190c38792ecb95dbbf3
+Author: alisaadkhan <alisaad75878@gmail.com>
+Date:   Wed Apr 1 09:43:12 2026 +0500
+
+    fix(auth): resolve Turnstile 400020 — remove sr-only widget mounting and split per-form captcha state
+    
+    ISSUE: Turnstile error 400020 blocked all authentication flows.
+    
+    ROOT CAUSE 1 (Primary):
+      The Turnstile widget was mounted inside an sr-only container while waiting
+      for a token. sr-only applies width:1px/height:1px/overflow:hidden via CSS,
+      which causes Cloudflare's challenge iframe to fail dimension measurement and
+      emit error 400020 (invalid widget render context).
+    
+    FIX: Render the widget in normal document flow at all times. Collapse it
+      visually (opacity:0, height:0) only AFTER a token has been successfully
+      captured — at that point the widget has already completed its work.
+    
+    ROOT CAUSE 2 (Secondary):
+      A single captchaToken state was shared between the sign-in and sign-up forms.
+      Switching tabs would carry a stale token from the other form, causing
+      Supabase to reject the mismatched token.
+    
+    FIX: Each form now has its own independent state object { token, error }
+      with matching error handlers and refs, ensuring tokens are always
+      consumed by the form that generated them.
+    
+    ALSO: Added @marsidev/react-turnstile to package.json (was missing).
+
+D	influenceiq-pro-system-5mb.zip
+D	influenceiq-pro-system.zip
+M	package-lock.json
+M	package.json
+M	src/pages/Auth.tsx
+
+commit 6988c35bc677443af8c827a5bdd5344bc835173f
+Author: alisaadkhan <alisaad75878@gmail.com>
+Date:   Tue Mar 31 21:45:28 2026 +0500
+
+    fix: resolve case-sensitive import build failures and TypeScript prop mismatches in Influencer suite
+
+A	build_error.txt
+M	src/components/influencer/AudienceDemographics.tsx
+M	src/components/influencer/ProfileSummary.tsx
+M	src/components/influencer/PythonAnalyticsPanel.tsx
+M	src/components/influencer/ResultCard.tsx
+M	src/components/influencer/SimilarCreatorsSection.tsx
+M	src/components/ui/glass-card.tsx
+M	src/pages/InfluencerProfilePage.tsx
+
+commit a820cca8c6303d8d66dbef5bead98f4392ddefbf
+Author: alisaadkhan <alisaad75878@gmail.com>
+Date:   Tue Mar 31 21:33:55 2026 +0500
+
+    refactor: modularize MUSHIN SaaS UI, implement high-density design strategy, and harden telemetry/security
+
+M	.env.example
+A	deploy3.txt
+A	deploy_prod.txt
+A	deploy_prod2.txt
+A	deploy_prod_final.txt
+A	influenceiq-pro-system-5mb.zip
+A	influenceiq-pro-system.zip
+A	ls_out.txt
+A	preview_url.txt
+A	src/components/analytics/AnalyticsCharts.tsx
+A	src/components/analytics/AnalyticsMetrics.tsx
+A	src/components/analytics/NicheLeaderboard.tsx
+A	src/components/campaigns/CampaignActions.tsx
+A	src/components/campaigns/CampaignKanban.tsx
+A	src/components/campaigns/CampaignsHeader.tsx
+A	src/components/dashboard/ActivityChart.tsx
+A	src/components/dashboard/ActivityList.tsx
+A	src/components/dashboard/CampaignsTable.tsx
+A	src/components/dashboard/DashboardMetrics.tsx
+A	src/components/influencer/AudienceDemographics.tsx
+A	src/components/influencer/DataStalenessBadge.tsx
+A	src/components/influencer/ProfileSummary.tsx
+A	src/components/influencer/PythonAnalyticsPanel.tsx
+A	src/components/influencer/ResultCard.tsx
+A	src/components/influencer/SimilarCreatorsSection.tsx
+A	src/components/landing/LandingAbout.tsx
+A	src/components/landing/LandingBackground.tsx
+A	src/components/landing/LandingCTA.tsx
+A	src/components/landing/LandingFAQ.tsx
+A	src/components/landing/LandingFeatures.tsx
+A	src/components/landing/LandingFooter.tsx
+A	src/components/landing/LandingHero.tsx
+A	src/components/landing/LandingPricing.tsx
+A	src/components/landing/LandingShared.tsx
+A	src/components/landing/LandingTestimonials.tsx
+A	src/components/lists/ListActions.tsx
+A	src/components/lists/ListsHeader.tsx
+A	src/components/lists/ListsTable.tsx
+A	src/components/search/FilterPanel.tsx
+A	src/components/search/QuickFilters.tsx
+A	src/components/search/SearchBar.tsx
+A	src/components/search/SearchGrid.tsx
+A	src/components/search/SearchHeader.tsx
+A	src/components/settings/ProfileTab.tsx
+A	src/components/settings/SecurityTab.tsx
+A	src/components/settings/SettingsNav.tsx
+A	src/components/settings/WorkspaceTab.tsx
+A	src/components/ui/bento-grid.tsx
+M	src/components/ui/button.tsx
+A	src/components/ui/glass-card.tsx
+M	src/components/ui/input.tsx
+A	src/hooks/useAnalyticsData.ts
+A	src/hooks/useDashboardData.ts
+A	src/hooks/useMouseSpotlight.ts
+M	src/index.css
+A	src/modules/search/constants.ts
+A	src/modules/search/search-utils.ts
+M	src/pages/AnalyticsPage.tsx
+M	src/pages/Auth.tsx
+M	src/pages/CampaignsPage.tsx
+M	src/pages/Index.tsx
+M	src/pages/InfluencerProfilePage.tsx
+M	src/pages/LandingPage.tsx
+M	src/pages/ListsPage.tsx
+M	src/pages/SearchPage.tsx
+M	src/pages/Settings.tsx
+A	src/test/search-recall.test.ts
+M	supabase/functions/_shared/privileged_gateway.ts
+A	supabase/functions/_shared/rate_limit.test.ts
+M	supabase/functions/_shared/rate_limit.ts
+A	supabase/functions/_shared/secrets.test.ts
+A	supabase/functions/_shared/secrets.ts
+A	supabase/functions/_shared/ssrf-fetch.ts
+A	supabase/functions/_shared/telemetry.ts
+M	supabase/functions/create-checkout/index.ts
+M	supabase/functions/enrich-influencer/index.ts
+M	supabase/functions/search-influencers/index.ts
+M	supabase/functions/send-outreach-email/index.ts
+M	supabase/functions/sync-hubspot/index.ts
+A	supabase/migrations/20260331120000_search_recall_improvements.sql
+A	supabase/migrations/20260331122000_advanced_analytics.sql
+A	supabase/migrations/20260331123000_restrict_admin_views.sql
+A	supabase/migrations/20260331_01_admin_restrict.sql
+A	supabase/migrations/20260331_02_idempotency_rls_fix.sql
+M	tailwind.config.ts
+A	test-debug.mjs
+A	test-http.js
+A	test-poll-dual.js
+A	test-poll.js
+A	test-root.js
+A	test_out.txt
+M	vercel.json
+
+commit c667c4ea79b54ceb65687024269c56f0db43c830
+Author: alisaadkhan <alisaad75878@gmail.com>
+Date:   Tue Mar 31 18:33:27 2026 +0500
+
+    refactor(auth): surgical UI refinement + security hardening
+
+M	src/components/layout/AuroraBackground.tsx
+M	src/components/ui/input.tsx
+M	src/index.css
+M	src/pages/Auth.tsx
+M	vercel.json
+
+commit 354407eedd4c5dbf9c46e71b4b1f0d918c6fe81d
+Author: alisaadkhan <alisaad75878@gmail.com>
+Date:   Tue Mar 31 17:32:55 2026 +0500
+
+    Deploy final exact Vercel SPA routing snippet from documentation
+
+M	vercel.json
+
+commit 6396ad9bad9b28adeb7c6c27730703c041bdee35
+Author: alisaadkhan <alisaad75878@gmail.com>
+Date:   Tue Mar 31 17:29:32 2026 +0500
+
+    Strip vercel routing and rely completely on Vite preset generated SPA fallback
+
+M	vercel.json
+
+commit ee5f8409c8953062b5165f9a1254ec504a7b7d5e
+Author: alisaadkhan <alisaad75878@gmail.com>
+Date:   Tue Mar 31 17:18:14 2026 +0500
+
+    Simplify SPA fallback using standard Vercel rewrites array
+
+M	vercel.json
+
+commit 6a100d0c97c4d85e70d994500264b860fbc312af
+Author: alisaadkhan <alisaad75878@gmail.com>
+Date:   Tue Mar 31 17:13:14 2026 +0500
+
+    Eliminate dead experimentalServices and enforce exact prescribed SPA routes fallback
+
+M	vercel.json
+
+commit c7a14791e68c7d416f3ada7d6ba25175f193291b
+Author: alisaadkhan <alisaad75878@gmail.com>
+Date:   Tue Mar 31 17:08:54 2026 +0500
+
+    Apply exact SPA negative lookahead rewrite for index.html on experimentalServices
+
+M	vercel.json
+
+commit 0a08e25a790473d282e8055d8289f6c85c4fe954
+Author: alisaadkhan <alisaad75878@gmail.com>
+Date:   Tue Mar 31 17:04:50 2026 +0500
+
+    Fix Vercel SPA routing globally with targeted rewrites excluding backend paths
+
+M	vercel.json
+
+commit 5325a59c6c60987929c2689ebf6a6280b5f0dadd
+Author: alisaadkhan <alisaad75878@gmail.com>
+Date:   Tue Mar 31 17:02:21 2026 +0500
+
+    Restore user-provided explicit routes fallback
+
+M	vercel.json
+
+commit 5d4f2cdaa2b355ba296fc3e8929d0fa9f9b83436
+Author: alisaadkhan <alisaad75878@gmail.com>
+Date:   Tue Mar 31 16:59:15 2026 +0500
+
+    Fix Vercel SPA by removing rewrites array enabling native experimentalServices fallback
+
+M	.gitignore
+M	out2.txt
+M	out3.txt
+M	out5.txt
+M	src/pages/SearchPage.tsx
+M	src/pages/admin/AdminDashboard.tsx
+M	supabase/.temp/cli-latest
+M	supabase/functions/ai-insights/index.ts
+M	supabase/functions/create-checkout/index.ts
+M	supabase/functions/enrich-influencer/index.ts
+M	supabase/functions/generate-tracking-link/index.ts
+M	supabase/functions/search-influencers/index.ts
+M	supabase/functions/search-natural/index.ts
+M	supabase/functions/send-outreach-email/index.ts
+M	vercel.json
+
+commit 625b9592bf9369be86f39a23b017efe3faecffaf
+Author: alisaadkhan <alisaad75878@gmail.com>
+Date:   Tue Mar 31 16:50:17 2026 +0500
+
+    Execute strict testing fallback, remove workarounds, update SPA routes
+
+M	playwright.config.ts
+M	src/pages/Auth.tsx
+A	tests/e2e/admin.spec.ts
+M	tests/e2e/auth.setup.ts
+A	tests/e2e/auth.spec.ts
+A	tests/e2e/core.spec.ts
+A	tests/e2e/credits.spec.ts
+A	tests/e2e/security.spec.ts
+M	vercel.json
+
+commit bd2ca69277074f4fce12041f6e4a3caeac9067ab
+Author: alisaadkhan <alisaad75878@gmail.com>
+Date:   Mon Mar 30 18:25:32 2026 +0500
+
+    security: fix 8 concrete bugs in edge functions
+    
+    - search-natural: remove @ts-nocheck to restore type safety
+    - search-natural: fix wrong credit refund RPC (admin_adjust_credits
+      does not exist; use restore_ai_credit) — credits were silently lost
+      on embedding failures
+    - search-natural: hash Redis cache key with SHA-256 to prevent
+      oversized/injectable cache keys on long queries
+    - generate-tracking-link: add per-IP rate limiting (60/min, 300/hr)
+      to prevent link-spam abuse
+    - generate-tracking-link: validate original_url scheme (http/https
+      only) to block stored javascript:/data: XSS via tracking links
+    - send-outreach-email: remove Resend API error details from client
+      response (logged server-side only) to prevent internal info leaks
+    - send-outreach-email: sanitize reply_to against CR/LF header
+      injection (from_name was already sanitized, reply_to was not)
+
+M	supabase/functions/generate-tracking-link/index.ts
+M	supabase/functions/search-natural/index.ts
+M	supabase/functions/send-outreach-email/index.ts
+
+commit eafe9d516e6c0ee5dc1b7acf8e137188e6c01e75
+Author: alisaadkhan <alisaad75878@gmail.com>
+Date:   Wed Mar 25 22:17:01 2026 +0500
+
+    feat: improve search recall with progressive fallback and dedup
+
+M	src/pages/SearchPage.tsx
+A	src/test/search-fallback.test.ts
+A	supabase/functions/_shared/search_result_fallback.ts
+M	supabase/functions/search-influencers/index.ts
+
+commit 3d1e0f6304decbc89d4e1cb925a6eea3060c0757
+Author: alisaadkhan <alisaad75878@gmail.com>
+Date:   Wed Mar 25 21:40:54 2026 +0500
+
+    chore: apply security and verification hardening updates
+
+M	eslint.config.js
+M	scripts/platform_verify.mjs
+M	src/modules/search/keyword-engine/index.ts
+M	src/modules/search/ranking/index.ts
+M	src/modules/search/tag-ranking/index.ts
+M	supabase/functions/_shared/privileged_gateway.ts
+M	supabase/functions/_shared/query_expander.ts
+M	supabase/functions/_shared/ranking.ts
+M	supabase/functions/_shared/tag_intelligence.ts
+M	supabase/functions/admin-set-super-admin/index.ts
+M	supabase/functions/alert-dispatcher/index.ts
+M	supabase/functions/classify-niche/index.ts
+M	supabase/functions/extract-brand-mentions/index.ts
+M	supabase/functions/generate-embeddings/index.ts
+M	supabase/functions/search-influencers/index.ts
+M	supabase/functions/search-natural/index.ts
+M	tailwind.config.ts
+M	tests/e2e/auth.setup.ts
+M	tests/e2e/deep-capture.spec.ts

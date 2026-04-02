@@ -185,19 +185,19 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="space-y-12 max-w-[1400px] mx-auto pb-24 px-6 animate-in fade-in duration-700">
-      {/* ── Search Header ─── */}
+    <div className="space-y-10 max-w-[1600px] mx-auto pb-20 animate-in fade-in duration-700">
+      {/* ── Search Topology Header ─── */}
       <SearchHeader 
         creditsRemaining={creditsRemaining} 
         creditsExhausted={creditsExhausted} 
       />
 
-      {/* ── Search HUD ─── */}
-      <div className="flex flex-col gap-8">
+      {/* ── Functional Control HUD ─── */}
+      <div className="flex flex-col gap-6">
          {creditsExhausted && (
-           <Alert variant="destructive" className="bg-destructive/5 border-destructive/10 text-destructive rounded-2xl">
+           <Alert variant="destructive" className="bg-red-500/5 border-red-500/10 text-red-500 rounded-2xl">
              <AlertCircle className="h-4 w-4" />
-             <AlertDescription className="text-[10px] font-bold uppercase tracking-widest px-2">
+             <AlertDescription className="text-[10px] font-black uppercase tracking-widest">
                Resource Exhaustion: Discovery Cycle Restricted.
              </AlertDescription>
            </Alert>
@@ -210,36 +210,37 @@ export default function SearchPage() {
            loading={loading} 
          />
 
-         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <QuickFilters 
-              selectedPlatforms={selectedPlatforms}
-              togglePlatform={togglePlatform}
-              selectedCity={selectedCity}
-              setSelectedCity={setSelectedCity}
-              followerRange={followerRange}
-              setFollowerRange={setFollowerRange}
-              onAdvancedClick={() => setShowFilters(true)}
-              hasAdvancedActive={selectedNiches.length > 0 || tagFilter !== ""}
-            />
+         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex-1 w-full min-w-0">
+               <QuickFilters 
+                 selectedPlatforms={selectedPlatforms}
+                 togglePlatform={togglePlatform}
+                 selectedCity={selectedCity}
+                 setSelectedCity={setSelectedCity}
+                 followerRange={followerRange}
+                 setFollowerRange={setFollowerRange}
+                 onAdvancedClick={() => setShowFilters(true)}
+                 hasAdvancedActive={selectedNiches.length > 0 || tagFilter !== ""}
+               />
+            </div>
             {searched && results.length > 0 && (
               <Button 
                 variant="ghost" 
-                size="sm"
                 onClick={() => setShowSaveSearch(true)}
-                className="h-10 text-[10px] font-bold uppercase tracking-widest text-white/30 hover:text-white transition-all bg-white/[0.02] hover:bg-white/[0.05] border border-transparent hover:border-white/10 rounded-xl px-6"
+                className="h-10 text-[9px] font-black uppercase tracking-widest text-white/20 hover:text-white transition-all self-start lg:self-auto shrink-0"
               >
-                Save Search Vector
+                Calibration Marker
               </Button>
             )}
          </div>
       </div>
 
-      {/* ── Advanced Refinement Sheet ─── */}
+      {/* ── Advanced Spectrum Sheet ─── */}
       <Sheet open={showFilters} onOpenChange={setShowFilters}>
-        <SheetContent side="right" className="w-full sm:max-w-md bg-background/95 border-l border-white/10 backdrop-blur-3xl p-0 flex flex-col shadow-2xl">
-          <SheetHeader className="p-8 border-b border-white/[0.05]">
-            <SheetTitle className="text-2xl font-black text-white uppercase tracking-tight" style={{ fontFamily: "'Syne', sans-serif" }}>Refinement Spectrum</SheetTitle>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-white/30 mt-1">Deep precision discovery metrics</p>
+        <SheetContent side="right" className="w-full sm:max-w-md bg-[#06060c]/90 border-l border-white/5 backdrop-blur-3xl p-0 flex flex-col">
+          <SheetHeader className="p-8 border-b border-white/[0.03]">
+            <SheetTitle className="text-xl font-black text-white uppercase tracking-tighter" style={{ fontFamily: "'Syne', sans-serif" }}>Spectrum Calibration</SheetTitle>
+            <p className="text-[10px] font-black uppercase tracking-widest text-white/20 mt-1">Refine discovery vector metrics</p>
           </SheetHeader>
           <div className="flex-1 overflow-y-auto p-8">
             <FilterPanel 
@@ -253,9 +254,9 @@ export default function SearchPage() {
               MAX_NICHES={MAX_NICHES} PLATFORMS={PLATFORMS} PK_CITIES={PK_CITIES} PK_NICHES={PK_NICHES} FOLLOWER_RANGES={FOLLOWER_RANGES}
             />
           </div>
-          <SheetFooter className="p-8 border-t border-white/[0.05] bg-white/[0.02]">
-            <Button className="w-full h-14 btn-primary-alive text-[10px] font-black uppercase tracking-widest shadow-2xl" onClick={() => { setShowFilters(false); handleSearch(); }}>
-              Update Results
+          <SheetFooter className="p-8 border-t border-white/[0.03] bg-white/[0.01]">
+            <Button className="w-full h-14 bg-purple-600 hover:bg-purple-500 text-[10px] font-black uppercase tracking-widest shadow-xl shadow-purple-500/20" onClick={() => { setShowFilters(false); handleSearch(); }}>
+              Recalibrate Results
             </Button>
           </SheetFooter>
         </SheetContent>
