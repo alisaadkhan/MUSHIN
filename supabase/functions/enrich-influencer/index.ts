@@ -308,7 +308,8 @@ Deno.serve(async (req: Request) => {
 
         const callerIsSuperAdmin = await isSuperAdmin(user.id);
         if (!callerIsSuperAdmin) {
-            const { allowed } = await checkRateLimit(ip, 'enrich');
+            const { data: wsIdForRateLimit } = await supabase.rpc("get_user_workspace_id");
+            const { allowed } = await checkRateLimit(wsIdForRateLimit as string, 'enrich');
             if (!allowed) {
                 return new Response(JSON.stringify({ error: 'Rate limit exceeded' }),
                     { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -442,7 +443,6 @@ Deno.serve(async (req: Request) => {
 
             return new Response(JSON.stringify({
                 error: "Enrichment temporarily unavailable. Credits were not deducted. Please try again in a few minutes.",
-                technical_detail: errorMsg,
             }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 

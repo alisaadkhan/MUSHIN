@@ -47,6 +47,12 @@ export default function BillingPage() {
         .eq("workspace_id", ws)
         .order("created_at", { ascending: false });
 
+      if (error) {
+        if (error.code === "42P01") return; // table doesn't exist
+        console.warn("Failed to fetch payments:", error);
+        return;
+      }
+
       if (data) {
         const mapped = data.map(d => ({
           id: d.id,
@@ -76,16 +82,18 @@ export default function BillingPage() {
   const handleCheckout = async (priceId: string) => {
     try {
       await checkout(priceId);
-    } catch (err: any) {
-      toast({ title: "Checkout failed", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Something went wrong";
+      toast({ title: "Checkout failed", description: message, variant: "destructive" });
     }
   };
 
   const handlePortal = async () => {
     try {
       await openPortal();
-    } catch (err: any) {
-      toast({ title: "Portal error", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Something went wrong";
+      toast({ title: "Portal error", description: message, variant: "destructive" });
     }
   };
 

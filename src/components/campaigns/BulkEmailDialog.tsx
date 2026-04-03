@@ -55,6 +55,7 @@ export function BulkEmailDialog({
 
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [emails, setEmails] = useState<Record<string, string>>({});
+  const [emailErrors, setEmailErrors] = useState<Record<string, string>>({});
   const [sending, setSending] = useState(false);
   const [progress, setProgress] = useState({ sent: 0, total: 0 });
 
@@ -72,6 +73,13 @@ export function BulkEmailDialog({
 
     const template = templates?.find((t) => t.id === selectedTemplateId);
     if (!template) return;
+
+    const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalidEmails = cardsWithEmail.filter(card => !EMAIL_REGEX.test(emails[card.id]?.trim()));
+    if (invalidEmails.length > 0) {
+      toast({ title: "Invalid emails", description: `${invalidEmails.length} email address(es) are invalid.`, variant: "destructive" });
+      return;
+    }
 
     setSending(true);
     setProgress({ sent: 0, total: cardsWithEmail.length });

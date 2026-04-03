@@ -378,11 +378,11 @@ export default function Settings() {
               <div className="grid sm:grid-cols-2 gap-5">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground block">First name</label>
-                  <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="John" className="w-full h-10 px-3 rounded-lg border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow" />
+                  <Input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="John" className="h-10" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground block">Last name</label>
-                  <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Doe" className="w-full h-10 px-3 rounded-lg border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow" />
+                  <Input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Doe" className="h-10" />
                 </div>
               </div>
 
@@ -390,7 +390,7 @@ export default function Settings() {
                 <label className="text-sm font-medium text-foreground block">Email address</label>
                 <div className="relative opacity-70">
                   <Mail size={16} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input type="email" value={user?.email || ""} disabled className="w-full h-10 pl-9 pr-3 rounded-lg border border-border bg-muted/50 text-sm text-foreground cursor-not-allowed" />
+                  <Input type="email" value={user?.email || ""} disabled className="h-10 pl-9 bg-muted/50 cursor-not-allowed" />
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">To change your email address, contact support.</p>
               </div>
@@ -477,7 +477,7 @@ export default function Settings() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 -mr-2"
-                                  onClick={() => handleRemoveMember(member.user_id)}
+                                  onClick={() => { if (window.confirm("Remove this member from the workspace?")) handleRemoveMember(member.user_id); }}
                                 >
                                   <Trash2 size={14} strokeWidth={1.5} />
                                 </Button>
@@ -500,13 +500,13 @@ export default function Settings() {
                 <div className="grid sm:grid-cols-2 gap-5">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground block">Default sender name</label>
-                    <input type="text" value={defaultFromName} onChange={(e) => setDefaultFromName(e.target.value)} placeholder="Company Name" className="w-full h-10 px-3 rounded-lg border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow" />
+                    <Input type="text" value={defaultFromName} onChange={(e) => setDefaultFromName(e.target.value)} placeholder="Company Name" className="h-10" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground block">Default reply-to email</label>
                     <div className="relative">
                       <Mail size={16} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <input type="email" value={defaultReplyTo} onChange={(e) => setDefaultReplyTo(e.target.value)} placeholder="hello@company.com" className="w-full h-10 pl-9 pr-3 rounded-lg border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow" />
+                      <Input type="email" value={defaultReplyTo} onChange={(e) => setDefaultReplyTo(e.target.value)} placeholder="hello@company.com" className="h-10 pl-9" />
                     </div>
                   </div>
                 </div>
@@ -544,11 +544,11 @@ export default function Settings() {
                 <div className="grid sm:grid-cols-2 gap-5">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground block">New password</label>
-                    <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="At least 8 characters" className="w-full h-10 px-3 rounded-lg border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow" />
+                    <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="At least 8 characters" className="h-10" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground block">Confirm new password</label>
-                    <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repeat password" className="w-full h-10 px-3 rounded-lg border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow" />
+                    <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repeat password" className="h-10" />
                   </div>
                 </div>
                 <div className="pt-2 border-t border-border/50">
@@ -693,7 +693,7 @@ export default function Settings() {
                 <select
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full h-10 px-3 rounded-lg border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-ring focus:ring-2"
                 >
                   <option value="member">Member</option>
                   <option value="admin">Admin</option>

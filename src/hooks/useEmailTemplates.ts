@@ -37,6 +37,7 @@ export function useEmailTemplates() {
       return data as EmailTemplate[];
     },
     enabled: !!workspaceId,
+    staleTime: 5 * 60_000,
   });
 
   const createTemplate = useMutation({

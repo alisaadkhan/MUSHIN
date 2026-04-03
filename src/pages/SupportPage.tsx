@@ -73,12 +73,16 @@ export default function SupportPage() {
   const { data: tickets = [], isLoading } = useQuery<Ticket[]>({
     queryKey: ["support-tickets", user?.id],
     queryFn: async () => {
+      if (!user) throw new Error("No user");
       const { data, error } = await supabase
         .from("support_tickets")
         .select("*")
-        .eq("user_id", user!.id)
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
-      if (error) throw error;
+      if (error) {
+        if (error.code === "42P01") return [];
+        throw error;
+      }
       return data as Ticket[];
     },
     enabled: !!user,
@@ -87,12 +91,16 @@ export default function SupportPage() {
   const { data: replies = [] } = useQuery<TicketReply[]>({
     queryKey: ["ticket-replies", expandedTicket],
     queryFn: async () => {
+      if (!expandedTicket) return [];
       const { data, error } = await supabase
         .from("support_ticket_replies")
         .select("*")
-        .eq("ticket_id", expandedTicket!)
+        .eq("ticket_id", expandedTicket)
         .order("created_at", { ascending: true });
-      if (error) throw error;
+      if (error) {
+        if (error.code === "42P01") return [];
+        throw error;
+      }
       return data as TicketReply[];
     },
     enabled: !!expandedTicket,
@@ -120,8 +128,9 @@ export default function SupportPage() {
       setNewCategory("general");
       setShowCreateForm(false);
       qc.invalidateQueries({ queryKey: ["support-tickets"] });
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Something went wrong";
+      toast({ title: "Error", description: message, variant: "destructive" });
     } finally {
       setCreating(false);
     }
@@ -140,8 +149,9 @@ export default function SupportPage() {
       if (error) throw error;
       setReplyText("");
       qc.invalidateQueries({ queryKey: ["ticket-replies", expandedTicket] });
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Something went wrong";
+      toast({ title: "Error", description: message, variant: "destructive" });
     } finally {
       setSendingReply(false);
     }
@@ -310,7 +320,7 @@ export default function SupportPage() {
                                 {reply.is_admin ? "Support Team" : "You"}
                               </span>
                               {reply.is_admin && (
-                                <Badge className="text-[9px] bg-primary/10 text-primary border-primary/20 font-normal px-1.5 py-0">Admin</Badge>
+                                <Badge className="text-[10px] bg-primary/10 text-primary border-primary/20 font-normal px-1.5 py-0">Admin</Badge>
                               )}
                               <span className="text-[10px] text-muted-foreground ml-auto">{formatDate(reply.created_at)}</span>
                             </div>

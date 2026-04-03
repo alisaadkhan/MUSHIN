@@ -19,12 +19,23 @@ export function NotificationCenter() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
 
+  const ALLOWED_EXTERNAL_DOMAINS = ["stripe.com", "mushin.com", "mushin.ai"];
+
   const handleClick = (id: string, link?: string | null, isRead?: boolean) => {
     if (!isRead) markRead(id);
     if (link) {
       setOpen(false);
       if (link.startsWith("http")) {
-        window.open(link, "_blank");
+        try {
+          const url = new URL(link);
+          if (!ALLOWED_EXTERNAL_DOMAINS.some(d => url.hostname.endsWith(d))) {
+            console.warn("Blocked untrusted notification link:", link);
+            return;
+          }
+          window.open(link, "_blank", "noopener,noreferrer");
+        } catch {
+          console.warn("Invalid notification link:", link);
+        }
       } else {
         navigate(link);
       }
@@ -45,7 +56,7 @@ export function NotificationCenter() {
         <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
           <Bell size={17} strokeWidth={1.5} />
           {unreadCount > 0 && (
-            <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 rounded-full bg-violet-500 border-2 border-background text-[9px] font-bold text-white flex items-center justify-center px-0.5">
+            <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 rounded-full bg-violet-500 border-2 border-background text-[10px] font-bold text-white flex items-center justify-center px-0.5">
               {unreadCount > 99 ? "99+" : unreadCount}
             </span>
           )}
@@ -63,7 +74,7 @@ export function NotificationCenter() {
             <Bell size={14} className="text-muted-foreground" />
             <span className="text-sm font-semibold text-foreground">Notifications</span>
             {unreadCount > 0 && (
-              <Badge className="text-[9px] bg-violet-500/10 text-violet-300 border-violet-500/20 font-normal px-1.5 rounded-full">
+              <Badge className="text-[10px] bg-violet-500/10 text-violet-300 border-violet-500/20 font-normal px-1.5 rounded-full">
                 {unreadCount}
               </Badge>
             )}
@@ -117,7 +128,7 @@ export function NotificationCenter() {
                       <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">{n.body}</p>
                     )}
                     <div className="flex items-center gap-2 mt-1">
-                      <span className={cn("text-[9px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wide", typeColors[n.type] || typeColors.info)}>
+                      <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wide", typeColors[n.type] || typeColors.info)}>
                         {n.type}
                       </span>
                       <span className="text-[10px] text-muted-foreground/70">{formatTime(n.created_at)}</span>

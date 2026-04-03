@@ -19,6 +19,7 @@ export function useInfluencerLists() {
       return data;
     },
     enabled: !!workspace,
+    staleTime: 5 * 60_000,
   });
 
   const createList = useMutation({

@@ -93,7 +93,7 @@ function FilterPanel({
                 key={p}
                 data-testid={`platform-${p.toLowerCase()}`}
                 onClick={() => togglePlatform(p)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors touch-manipulation ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                   active
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
@@ -242,7 +242,11 @@ export default function SearchPage() {
   const queryClient = useQueryClient();
 
   // State — hydrated from URL params to preserve across back-nav
-  const [query, setQuery] = useState(searchParams.get("q") || "");
+  const sanitizeInput = (input: string | null, maxLength: number = 200): string => {
+    if (!input) return "";
+    return input.replace(/[<>]/g, "").slice(0, maxLength);
+  };
+  const [query, setQuery] = useState(() => sanitizeInput(searchParams.get("q")));
   const [isAiSearch, setIsAiSearch] = useState(searchParams.get("ai") === "1");
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(
     searchParams.get("platform") ? [searchParams.get("platform")!] : []
@@ -253,6 +257,7 @@ export default function SearchPage() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null);
   const [tagFilter, setTagFilter] = useState("");
   const [showMobileFilters, setShowMobileFilters] = useState(false);
@@ -318,7 +323,7 @@ export default function SearchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSearch = async () => {
+  const handleSearch = useCallback(async () => {
     if (!query.trim()) return;
     if (selectedPlatforms.length === 0) {
       toast({
@@ -332,6 +337,7 @@ export default function SearchPage() {
 
     setLoading(true);
     setSearched(true);
+    setSearchError(null);
     setVisibleCount(12);
     syncParams();
 
@@ -344,7 +350,6 @@ export default function SearchPage() {
       let creditsLeft: number | null = null;
 
       if (platforms.length === 1) {
-        // ── Single-platform (or AI search which is always single-platform) ──────
         const endpoint = isAiSearch ? "search-natural" : "search-influencers";
         const body = isAiSearch
           ? { query: query.trim(), platform: platforms[0], location: selectedCity }
@@ -362,7 +367,6 @@ export default function SearchPage() {
         sortedResults = dedupeSearchResults(data.results || []);
         creditsLeft = data.credits_remaining ?? null;
       } else {
-        // ── Multi-platform: parallel calls per platform, merge & deduplicate ───
         const responses = await Promise.allSettled(
           platforms.map(p =>
             supabase.functions.invoke("search-influencers", {
@@ -383,7 +387,6 @@ export default function SearchPage() {
       setResults(sortedResults);
       setCreditsRemaining(creditsLeft);
 
-      // ── Cache for back-navigation (avoids credit spend on re-visit) ────────
       const cacheKey = buildCacheKey(query.trim(), platforms, selectedCity, followerRange);
       try {
         sessionStorage.setItem(cacheKey, JSON.stringify({
@@ -405,12 +408,13 @@ export default function SearchPage() {
         toast({ title: "No results", description: "Try a different keyword, city, or platform." });
       }
     } catch (err: any) {
+      setSearchError(err.message || "Something went wrong");
       toast({ title: "Search failed", description: err.message || "Something went wrong", variant: "destructive" });
       setResults([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [query, selectedPlatforms, creditsExhausted, isAiSearch, selectedCity, followerRange, toast, syncParams, queryClient]);
 
   const handleAddToList = async (listId: string, result: SearchResult) => {
     try {
@@ -574,7 +578,7 @@ export default function SearchPage() {
             >
               <Filter size={16} strokeWidth={1.5} />
               {(selectedPlatforms.length > 0 || selectedCity !== "All Pakistan" || followerRange !== "any") && (
-                <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-primary text-[9px] text-white flex items-center justify-center font-bold leading-none">
+                <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-primary text-[10px] text-white flex items-center justify-center font-bold leading-none">
                   {selectedPlatforms.length + (selectedCity !== "All Pakistan" ? 1 : 0) + (followerRange !== "any" ? 1 : 0)}
                 </span>
               )}
@@ -701,7 +705,7 @@ export default function SearchPage() {
                 <div data-testid="results-grid" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                   {visible.map((c, i) => (
                     <ResultCard
-                      key={`${c.platform}-${c.username}-${i}`}
+                      key={`${c.platform}-${c.username}-${c.link || i}`}
                       c={c}
                       isFreePlan={isFreePlan}
                       lists={lists}
@@ -753,8 +757,17 @@ export default function SearchPage() {
             </motion.div>
           )}
 
+          {/* Error state */}
+          {!loading && searchError && (
+            <div className="flex flex-col items-center justify-center py-20 text-center bg-destructive/5 border border-destructive/20 rounded-2xl">
+              <AlertCircle className="h-10 w-10 text-destructive mb-3" />
+              <h3 className="font-serif text-lg font-semibold text-foreground mb-1">Search Error</h3>
+              <p className="text-sm text-muted-foreground max-w-md">{searchError}</p>
+            </div>
+          )}
+
           {/* No results */}
-          {!loading && searched && results.length === 0 && (
+          {!loading && searched && results.length === 0 && !searchError && (
             <div data-testid="no-results" className="flex flex-col items-center justify-center py-20 text-center bg-card/50 backdrop-blur-sm border border-white/50 shadow-sm rounded-2xl">
               <SearchIcon className="h-10 w-10 text-muted-foreground mb-3" />
               <h3 className="font-serif text-lg font-semibold text-foreground mb-1">No Results Found</h3>
@@ -982,7 +995,7 @@ function ResultCard({ c, isFreePlan, lists, cachedScores, evaluatingUsername, ev
         {c.contact_email && (
           <span
             data-testid="card-verified-contact"
-            className="text-[10px] font-semibold rounded-full px-2 py-0.5 border bg-violet-50 text-violet-700 border-violet-200"
+            className="text-[10px] font-semibold rounded-full px-2 py-0.5 border bg-violet-500/10 text-violet-400 border-violet-500/20"
             title="Verified contact email found in profile"
           >
             ✉ Contact
@@ -1081,8 +1094,8 @@ function ResultCard({ c, isFreePlan, lists, cachedScores, evaluatingUsername, ev
                 }
                 className={`text-[9px] font-bold px-1.5 py-0.5 rounded cursor-help ${
                   c.is_stale
-                    ? "bg-amber-100 text-amber-700"
-                    : "bg-emerald-100 text-emerald-700"
+                    ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                    : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                 }`}
               >
                 {c.is_stale ? "STALE" : "REAL"}
@@ -1091,13 +1104,13 @@ function ResultCard({ c, isFreePlan, lists, cachedScores, evaluatingUsername, ev
             {!c.is_enriched && c.engagement_source === "benchmark_estimate" && (
               <span
                 title={`Industry benchmark for ${c.engagement_benchmark_bucket ?? "this"}-tier ${c.platform} accounts. Enrich for real data.`}
-                className="text-[9px] font-bold bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded cursor-help"
+                className="text-[9px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 rounded cursor-help"
               >
                 BENCHMARK
               </span>
             )}
             {!c.is_enriched && c.engagement_source !== "benchmark_estimate" && (
-              <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+              <span className="text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded">
                 EST
               </span>
             )}

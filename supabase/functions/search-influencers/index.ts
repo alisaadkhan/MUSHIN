@@ -35,7 +35,7 @@ function buildCorsHeaders(req: Request) {
   ]);
   return {
     ...corsHeaders,
-    "Access-Control-Allow-Origin": allowed.has(origin) ? origin : appUrl,
+    "Access-Control-Allow-Origin": allowed.has(origin) ? origin : "",
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
   };
 }
@@ -45,6 +45,11 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    const contentLength = parseInt(req.headers.get("content-length") || "0", 10);
+    if (contentLength > 100_000) {
+      return new Response(JSON.stringify({ error: "Request body too large" }),
+        { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const requestBody = await req.json();
     const rawQuery = requestBody?.query ?? "";
     const rawPlatform = requestBody?.platform ?? "";
@@ -334,7 +339,7 @@ Deno.serve(async (req) => {
 
     const SERPER_API_KEY = Deno.env.get("SERPER_API_KEY");
     if (!SERPER_API_KEY) {
-      return new Response(JSON.stringify({ error: "Serper API key not configured" }),
+      return new Response(JSON.stringify({ error: "Search service temporarily unavailable" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 

@@ -179,8 +179,9 @@ export default function Auth() {
         toast({ title: "Invalid code", description: error.message, variant: "destructive" });
       }
       // On success, onAuthStateChange will fire and navigate to dashboard
-    } catch (err: any) {
-      toast({ title: "Verification failed", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Something went wrong";
+      toast({ title: "Verification failed", description: message, variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
@@ -240,7 +241,7 @@ export default function Auth() {
 
           {mode === "mfa-challenge" && (
             <form onSubmit={handleMfaVerify} className="glass-card p-6 space-y-5">
-              <button type="button" onClick={() => { setMode("sign-in"); supabase.auth.signOut(); }} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+              <button type="button" onClick={async () => { await supabase.auth.signOut(); setMode("sign-in"); }} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
                 <ArrowLeft size={12} /> Back to sign in
               </button>
               <div className="flex items-center gap-3">

@@ -17,7 +17,7 @@ export default function AnalyticsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("campaigns")
-        .select("*, pipeline_cards(id, platform, primary_niche, data), pipeline_stages(*)")
+        .select("*, pipeline_cards(id, platform, primary_niche, data), pipeline_stages(id, name, position)")
         .eq("workspace_id", wid!);
       if (error) throw error;
       return data;
@@ -28,11 +28,14 @@ export default function AnalyticsPage() {
   const { data: creditsUsage } = useQuery({
     queryKey: ["analytics-credits", wid],
     queryFn: async () => {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from("credits_usage")
         .select("*")
         .eq("workspace_id", wid!)
-        .order("created_at", { ascending: true });
+        .gte("created_at", thirtyDaysAgo)
+        .order("created_at", { ascending: true })
+        .limit(500);
       if (error) throw error;
       return data;
     },
@@ -92,7 +95,7 @@ export default function AnalyticsPage() {
     return campaigns.map((c) => {
       const cards = c.pipeline_cards || [];
       const stages = c.pipeline_stages || [];
-      const lastStage = stages.sort((a: any, b: any) => b.position - a.position)[0];
+      const lastStage = [...stages].sort((a: any, b: any) => b.position - a.position)[0];
       const confirmed = lastStage ? cards.filter((card: any) => card.stage_id === lastStage.id).length : 0;
       const rate = cards.length > 0 ? Math.round((confirmed / cards.length) * 100) : 0;
       return { name: c.name.length > 15 ? c.name.slice(0, 15) + "…" : c.name, rate, total: cards.length, confirmed };

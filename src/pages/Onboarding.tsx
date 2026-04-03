@@ -35,12 +35,16 @@ export default function Onboarding() {
       setStep(1);
       return;
     }
+    if (!profile?.id) {
+      toast({ title: "Profile not ready", description: "Please wait a moment and try again.", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
       const { error: profileErr } = await supabase
         .from("profiles")
         .update({ full_name: fullName.trim(), onboarding_completed: true, consent_given_at: new Date().toISOString() })
-        .eq("id", profile!.id);
+        .eq("id", profile.id);
       if (profileErr) throw profileErr;
 
       if (workspace && (platform || useCase)) {

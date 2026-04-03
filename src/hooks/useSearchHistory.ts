@@ -19,5 +19,6 @@ export function useSearchHistory(limit = 50) {
       return data;
     },
     enabled: !!workspace,
+    staleTime: 5 * 60_000,
   });
 }

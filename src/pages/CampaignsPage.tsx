@@ -61,6 +61,10 @@ export default function CampaignsPage() {
 
   const handleCreate = async () => {
     if (!name.trim()) return;
+    if (startDate && endDate && endDate < startDate) {
+      toast({ title: "Invalid dates", description: "End date must be after start date.", variant: "destructive" });
+      return;
+    }
     try {
       await createCampaign.mutateAsync({
         name: name.trim(),

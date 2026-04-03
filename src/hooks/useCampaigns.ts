@@ -20,6 +20,7 @@ export function useCampaigns() {
       return data;
     },
     enabled: !!workspace,
+    staleTime: 5 * 60_000,
   });
 
   const createCampaign = useMutation({
@@ -37,7 +38,7 @@ export function useCampaigns() {
   });
 
   const updateCampaign = useMutation({
-    mutationFn: async ({ id, values }: { id: string; values: Record<string, unknown> }) => {
+    mutationFn: async ({ id, ...values }: { id: string } & Record<string, unknown>) => {
       if (!workspace) throw new Error("No workspace");
       const { error } = await supabase
         .from("campaigns")

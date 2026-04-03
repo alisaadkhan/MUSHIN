@@ -19,6 +19,7 @@ export function useSavedSearches() {
       return data;
     },
     enabled: !!workspace,
+    staleTime: 5 * 60_000,
   });
 
   const saveSearch = useMutation({

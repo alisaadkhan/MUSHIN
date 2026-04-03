@@ -21,14 +21,18 @@ export function useNotifications() {
   const { data: notifications = [], isLoading } = useQuery<Notification[]>({
     queryKey: ["notifications", user?.id],
     queryFn: async () => {
+      if (!user) throw new Error("No user");
       const { data, error } = await supabase
         .from("notifications")
         .select("*")
-        .eq("user_id", user!.id)
+        .eq("user_id", user.id)
         .eq("is_archived", false)
         .order("created_at", { ascending: false })
         .limit(50);
-      if (error) throw error;
+      if (error) {
+        if (error.code === "42P01") return [];
+        throw error;
+      }
       return data as Notification[];
     },
     enabled: !!user,

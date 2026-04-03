@@ -38,7 +38,7 @@ export default function SavedSearchesPage() {
     const params = new URLSearchParams();
     if (filters.query) params.set("q", filters.query);
     if (filters.platform) params.set("platform", filters.platform);
-    if (filters.location) params.set("location", filters.location);
+    if (filters.location) params.set("city", filters.location);
     navigate(`/search?${params.toString()}`);
   };
 

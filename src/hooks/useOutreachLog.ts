@@ -31,6 +31,7 @@ export function useOutreachLog(campaignId: string | undefined) {
       return data as OutreachEntry[];
     },
     enabled: !!campaignId,
+    staleTime: 2 * 60_000,
   });
 
   const logOutreach = useMutation({

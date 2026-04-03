@@ -55,7 +55,7 @@ export function AppSidebar({ isOpen = true, onClose }: AppSidebarProps) {
 
   const totalCredits = credits?.search_credits_remaining ?? planConfig.search_credits;
   const maxCredits = planConfig.search_credits;
-  const pct = Math.min((totalCredits / maxCredits) * 100, 100);
+  const pct = maxCredits === 0 ? 0 : Math.min((totalCredits / maxCredits) * 100, 100);
 
   return (
     <aside
@@ -72,7 +72,7 @@ export function AppSidebar({ isOpen = true, onClose }: AppSidebarProps) {
         {/* Admin link */}
         {isAnyAdmin && (
           <div>
-            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.12em] px-3 mb-2">Admin</p>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.12em] px-3 mb-2">Admin</p>
             <ul className="space-y-0.5">
               <li>
                 <Link
@@ -80,7 +80,7 @@ export function AppSidebar({ isOpen = true, onClose }: AppSidebarProps) {
                   onClick={onClose}
                   className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
                     location.pathname.startsWith("/admin")
-                      ? "bg-primary/10 text-primary font-semibold border border-primary/20 border border-primary/20"
+                      ? "bg-primary/10 text-primary font-semibold border border-primary/20"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   }`}
                 >
@@ -94,7 +94,7 @@ export function AppSidebar({ isOpen = true, onClose }: AppSidebarProps) {
 
         {navGroups.map((group) => (
           <div key={group.label}>
-            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.12em] px-3 mb-2">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.12em] px-3 mb-2">
               {group.label}
             </p>
             <ul className="space-y-0.5">

@@ -93,7 +93,7 @@ export default function HistoryPage() {
     const params = new URLSearchParams();
     if (item.meta.query) params.set("q", item.meta.query);
     if (item.meta.platform) params.set("platform", item.meta.platform);
-    if (item.meta.location) params.set("location", item.meta.location);
+    if (item.meta.location) params.set("city", item.meta.location);
     navigate(`/search?${params.toString()}`);
   };
 

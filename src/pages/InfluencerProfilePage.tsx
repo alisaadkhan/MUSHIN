@@ -363,7 +363,7 @@ export default function InfluencerProfilePage() {
     setAddingToList(true);
     try {
       const { error } = await supabase.from("list_items").upsert(
-        { list_id: listId, platform: profile.platform, username: profile.username, profile_id: profile.id },
+        { list_id: listId, platform: profile.platform, username: profile.username },
         { onConflict: "list_id,username,platform" }
       );
       if (error) throw error;
@@ -376,27 +376,32 @@ export default function InfluencerProfilePage() {
     }
   };
 
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href);
-    toast({ title: "Link copied!", description: "Profile link copied to clipboard." });
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast({ title: "Link copied!", description: "Profile link copied to clipboard." });
+    } catch {
+      toast({ title: "Copy failed", description: "Unable to copy link. Please copy manually from your browser.", variant: "destructive" });
+    }
   };
 
   const handleRunAnalytics = async () => {
     if (!platform || !username) return;
+    if (!profile) return;
     setAnalyticsLoading(true);
     try {
       const metrics = {
-        follower_count: profile?.metrics?.followers ?? profile?.metrics?.subscriber_count ?? profile?.follower_count ?? null,
-        following_count: profile?.metrics?.following_count ?? profile?.following_count ?? null,
-        posts_count: profile?.metrics?.posts_count ?? null,
-        engagement_rate: profile?.metrics?.engagement_rate ?? profile?.engagement_rate ?? null,
-        avg_likes: profile?.metrics?.avg_likes ?? null,
-        avg_comments: profile?.metrics?.avg_comments ?? null,
-        avg_views: profile?.metrics?.avg_views ?? null,
+        follower_count: profile.metrics?.followers ?? profile.metrics?.subscriber_count ?? profile.follower_count ?? null,
+        following_count: profile.metrics?.following_count ?? profile.following_count ?? null,
+        posts_count: profile.metrics?.posts_count ?? null,
+        engagement_rate: profile.metrics?.engagement_rate ?? profile.engagement_rate ?? null,
+        avg_likes: profile.metrics?.avg_likes ?? null,
+        avg_comments: profile.metrics?.avg_comments ?? null,
+        avg_views: (profile.metrics as any)?.avg_views ?? null,
       };
-      const { data: wsData } = await supabase.from("workspace_members").select("workspace_id").limit(1).maybeSingle();
+      const { data: ws } = await supabase.rpc("get_user_workspace_id");
       const { data, error } = await supabase.functions.invoke("ai-analytics", {
-        body: { platform, username, metrics, workspace_id: wsData?.workspace_id },
+        body: { platform, username, metrics, workspace_id: ws },
       });
       if (error) throw error;
       setAnalyticsData(data as PythonAnalyticsData);
@@ -504,7 +509,7 @@ export default function InfluencerProfilePage() {
         followers: profile?.metrics?.followers,
         engagement_rate: profile?.metrics?.engagement_rate,
         bio: profile?.bio,
-      }, !!evaluation).catch(() => { });
+      }, !!evaluation).catch((err) => { if (import.meta.env.DEV) console.warn("[profile] evaluate fallback failed:", err); });
     } finally {
       setEnriching(false);
     }
