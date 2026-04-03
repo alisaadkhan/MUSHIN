@@ -171,8 +171,7 @@ Deno.serve(async (req) => {
     );
   } catch (error) {
     console.error("Error in send-outreach-email:", error);
-    const msg = error instanceof Error ? error.message : "Unknown error";
-    return new Response(JSON.stringify({ error: msg }), {
+    return new Response(JSON.stringify({ error: "Failed to send email. Please try again." }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

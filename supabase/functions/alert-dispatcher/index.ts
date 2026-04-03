@@ -24,26 +24,39 @@ function isInternalRequest(req: Request): boolean {
 }
 
 async function dispatchWebhook(url: string, alert: AlertRow) {
-  await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      source: "mushin-security",
-      alert,
-    }),
-  });
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: "mushin-security", alert }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+  } catch (e) {
+    console.error("[alert-dispatcher] Webhook dispatch failed:", e);
+  }
 }
 
 async function dispatchEmail(alertEmailWebhook: string, alert: AlertRow) {
-  await fetch(alertEmailWebhook, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      to: "security@mushin.app",
-      subject: `[Mushin Alert] ${alert.severity.toUpperCase()} - ${alert.alert_type}`,
-      text: JSON.stringify(alert, null, 2),
-    }),
-  });
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    await fetch(alertEmailWebhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to: "security@mushin.app",
+        subject: `[Mushin Alert] ${alert.severity.toUpperCase()} - ${alert.alert_type}`,
+        text: JSON.stringify(alert, null, 2),
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+  } catch (e) {
+    console.error("[alert-dispatcher] Email dispatch failed:", e);
+  }
 }
 
 Deno.serve(async (req: Request) => {

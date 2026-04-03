@@ -47,11 +47,24 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Verify the caller is a member of the workspace they're requesting
+        // Verify the caller owns the payment they're requesting.
+        // Query the payments table to find the workspace_id, then confirm membership.
+        const { data: paymentRecord } = await serviceClient
+            .from("payments")
+            .select("workspace_id")
+            .eq("id", payment_id)
+            .maybeSingle();
+
+        if (!paymentRecord) {
+            return new Response(JSON.stringify({ error: "Payment not found" }), {
+                status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
+
         const { data: memberCheck } = await serviceClient
             .from("workspace_members")
             .select("workspace_id")
-            .eq("workspace_id", payment_id)
+            .eq("workspace_id", paymentRecord.workspace_id)
             .eq("user_id", user.id)
             .maybeSingle();
 
@@ -61,11 +74,11 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Fetch subscription scoped to the caller's workspace
+        // Fetch subscription scoped to the payment's workspace
         const { data: subscription } = await serviceClient
             .from("subscriptions")
             .select("*, workspaces(name)")
-            .eq("workspace_id", payment_id)
+            .eq("workspace_id", paymentRecord.workspace_id)
             .single();
 
         if (!subscription) {

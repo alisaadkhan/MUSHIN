@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createPrivilegedClient } from "../_shared/privileged_gateway.ts";
 import { safeErrorResponse } from "../_shared/errors.ts";
 import { checkRateLimit, extractClientIp, isDuplicateWithinWindow, isValidTrackingCode } from "../_shared/security.ts";
 // track-click is embedded in outbound emails and clicked by external recipients.

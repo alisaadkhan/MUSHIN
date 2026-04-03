@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
     }
 
     // ── Full Stripe path ───────────────────────────────────────────────────────
-    const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
+    const stripe = new Stripe(stripeKey, { apiVersion: "2024-12-18.acacia" });
 
     // Prefer stripe_customer_id lookup (O(1)) over email scan (O(n))
     let stripeCustomer: any = null;

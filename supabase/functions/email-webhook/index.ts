@@ -1,4 +1,3 @@
-import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { crypto } from "https://deno.land/std@0.177.0/crypto/mod.ts";
 // email-webhook receives server-to-server calls from Resend. CORS headers are
@@ -81,11 +80,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const adminClient = await performPrivilegedWrite({
-        authHeader: req.headers.get("Authorization"),
-        action: "gateway:privileged-client-bootstrap",
-        execute: async (_ctx, client) => client,
-    });
+    const adminClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
 
     const payload = JSON.parse(rawBody);
     const eventType = payload?.type;

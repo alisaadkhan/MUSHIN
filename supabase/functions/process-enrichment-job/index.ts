@@ -1,7 +1,5 @@
 import { getServiceRoleKey } from "../_shared/privileged_gateway.ts";
-import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { recordCircuitResult } from "../_shared/rate_limit.ts";
 import { safeErrorResponse } from "../_shared/errors.ts";
 import { consumeNonceOnce, isRecentTimestamp } from "../_shared/security.ts";
 const APP_URL = Deno.env.get("APP_URL") || "https://mushin.app";
@@ -50,11 +48,11 @@ Deno.serve(async (req: Request) => {
             });
         }
 
-        const serviceClient = await performPrivilegedWrite({
-        authHeader: req.headers.get("Authorization"),
-        action: "gateway:privileged-client-bootstrap",
-        execute: async (_ctx, client) => client,
-    });
+        // Webhook handlers use service role key directly — not JWT-based privileged gateway
+        const serviceClient = createClient(
+            Deno.env.get("SUPABASE_URL")!,
+            getServiceRoleKey(),
+        );
 
         // Claim up to 3 jobs atomically using raw SQL (FOR UPDATE SKIP LOCKED)
         const { data: jobs, error: claimError } = await serviceClient.rpc("claim_enrichment_jobs", { batch_size: 3 });
@@ -126,7 +124,6 @@ async function processJob(job: any, serviceClient: any): Promise<void> {
             updated_at: new Date().toISOString(),
         }).eq("id", job.id);
 
-        await recordCircuitResult("apify", true);
         console.log(`[queue-worker] Job ${job.id} completed`);
 
     } catch (err: any) {
@@ -151,10 +148,6 @@ async function processJob(job: any, serviceClient: any): Promise<void> {
             enrichment_status: isDead ? "failed" : "queued",
             enrichment_error: err.message,
         }).eq("platform", job.platform).eq("username", job.username);
-
-        if (err.message?.includes("Apify") || err.message?.includes("503")) {
-            await recordCircuitResult("apify", false);
-        }
 
         console.error(`[queue-worker] Job ${job.id} failed (attempt ${nextAttempt}/${job.max_attempts}):`, err.message);
         throw err;

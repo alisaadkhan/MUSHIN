@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createPrivilegedClient } from "../_shared/privileged_gateway.ts";
 import { checkRateLimit } from "../_shared/rate_limit.ts";
 /** Prevent XSS by escaping all HTML special characters before injecting into templates. */
 function escHtml(s: unknown): string {

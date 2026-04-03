@@ -75,8 +75,8 @@ Deno.serve(async (req) => {
 
     const HUGGINGFACE_API_KEY = Deno.env.get("HUGGINGFACE_API_KEY");
     if (!HUGGINGFACE_API_KEY) {
-      return new Response(JSON.stringify({ error: "AI features are temporarily unavailable. Please try again later.", code: "AI_KEY_MISSING", status: 503 }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: "AI features are temporarily unavailable. Please try again later.", code: "AI_KEY_MISSING" }), {
+        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -100,8 +100,8 @@ Deno.serve(async (req) => {
       .single();
 
     if (!membership) {
-      return new Response(JSON.stringify({ error: "No workspace found", code: "NO_WORKSPACE", status: 400 }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: "No workspace found", code: "NO_WORKSPACE" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -112,8 +112,8 @@ Deno.serve(async (req) => {
       .single();
 
     if (!callerIsSuperAdmin && (!ws || ws.ai_credits_remaining <= 0)) {
-      return new Response(JSON.stringify({ error: "AI credits exhausted. Upgrade your plan to continue using AI features.", code: "CREDITS_EXHAUSTED", status: 402 }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: "AI credits exhausted. Upgrade your plan to continue using AI features.", code: "CREDITS_EXHAUSTED" }), {
+        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -142,8 +142,8 @@ Deno.serve(async (req) => {
       const { error: creditErr } = await adminClient.rpc("consume_ai_credit", { ws_id: membership.workspace_id });
       if (creditErr) {
         console.error("[ai-insights] Pre-deduction failed:", creditErr);
-        return new Response(JSON.stringify({ error: "Credit deduction failed. Please try again.", code: "CREDIT_DEDUCT_FAILED", status: 500 }), {
-          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return new Response(JSON.stringify({ error: "Credit deduction failed. Please try again.", code: "CREDIT_DEDUCT_FAILED" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     }
@@ -179,9 +179,8 @@ Deno.serve(async (req) => {
           ? "Rate limit exceeded. Please try again in a moment."
           : "AI service error. Please try again shortly.",
         code: isRateLimit ? "RATE_LIMIT" : "AI_ERROR",
-        status: isRateLimit ? 429 : 502,
       }), {
-        status: 200,
+        status: isRateLimit ? 429 : 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

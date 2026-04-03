@@ -3,6 +3,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Redis } from "https://esm.sh/@upstash/redis";
 import { generateEmbedding } from "../_shared/huggingface.ts";
 const APP_URL = Deno.env.get("APP_URL") || "https://mushin.app";
+const PREVIEW_ORIGINS_SN: Set<string> = new Set(
+    (Deno.env.get("ALLOWED_PREVIEW_ORIGINS") ?? "")
+        .split(",").map((s: string) => s.trim()).filter(Boolean)
+);
 
 function buildCorsHeaders(req: Request) {
     const origin = req.headers.get("Origin") ?? "";
@@ -10,10 +14,8 @@ function buildCorsHeaders(req: Request) {
         APP_URL,
         "http://localhost:5173",
         "http://localhost:3000",
+        ...PREVIEW_ORIGINS_SN,
     ]);
-    if (origin.endsWith(".vercel.app")) {
-        allowed.add(origin);
-    }
     return {
         "Access-Control-Allow-Origin": allowed.has(origin) ? origin : APP_URL,
         "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -28,7 +30,7 @@ function isOriginAllowed(req: Request): boolean {
     return origin === APP_URL
         || origin === "http://localhost:5173"
         || origin === "http://localhost:3000"
-        || origin.endsWith(".vercel.app");
+        || PREVIEW_ORIGINS_SN.has(origin);
 }
 
 // Initialize Redis client if env vars are present (fallback to none if missing)

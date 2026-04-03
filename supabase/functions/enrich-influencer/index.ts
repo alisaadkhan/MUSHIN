@@ -387,7 +387,7 @@ Deno.serve(async (req: Request) => {
                 if (!apifyKey) {
                     console.warn("[enrich] APIFY_API_KEY not configured — Instagram/TikTok enrichment is unavailable");
                     return new Response(JSON.stringify({ error: "Enrichment is temporarily unavailable. Please contact support." }), {
-                        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" }
+                        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" }
                     });
                 }
                 enriched = await fetchApifyDataWithRetries(platform, username, apifyKey);

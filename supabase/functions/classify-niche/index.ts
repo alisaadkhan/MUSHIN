@@ -120,14 +120,13 @@ Brand safety rating: safe, caution, or risk. Return ONLY the JSON, no explanatio
             await serviceClient.from("brand_mentions").insert(mentionsToInsert);
         }
 
-        // 3. Update the posts with aesthetic tags (apply generally to the recent batch)
-        // In a full production system this would be per-post image vision analysis, 
-        // but for text-based batching we apply aesthetic keywords.
-        for (const post of posts) {
+        // 3. Batch update posts with aesthetic tags
+        if (posts.length > 0) {
+            const postIds = posts.map((p: any) => p.id);
             await serviceClient
                 .from("influencer_posts")
                 .update({ ai_tags: analysis.aesthetics })
-                .eq("id", post.id);
+                .in("id", postIds);
         }
 
         return new Response(JSON.stringify({ success: true, analysis }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });

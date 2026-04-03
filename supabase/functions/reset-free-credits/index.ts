@@ -31,6 +31,10 @@ Deno.serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
+    // Only reset workspaces that haven't been reset in the last 23 hours
+    // (prevents double-reset from cron misfires or overlapping schedules)
+    const twentyThreeHoursAgo = new Date(Date.now() - 23 * 60 * 60 * 1000).toISOString();
+
     const { data, error } = await supabase
       .from("workspaces")
       .update({
@@ -41,6 +45,7 @@ Deno.serve(async (req) => {
         credits_reset_at: new Date().toISOString(),
       })
       .eq("plan", "free")
+      .or(`credits_reset_at.is.null,credits_reset_at.lt.${twentyThreeHoursAgo}`)
       .select("id");
 
     if (error) throw error;

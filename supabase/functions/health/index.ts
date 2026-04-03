@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createPrivilegedClient } from "../_shared/privileged_gateway.ts";
 // No auth required — public health endpoint for monitoring tools (UptimeRobot, BetterUptime).
 // Returns: database connectivity, Redis connectivity, function status.
 

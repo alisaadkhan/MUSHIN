@@ -189,11 +189,18 @@ Deno.serve(async (req) => {
             }
 
             const { data: nicheRows } = await nicheQuery;
-            nicheResults = (nicheRows ?? []).map((p: any) => ({
-                ...p,
-                similarity: 0.3 + Math.random() * 0.1, // low-confidence fallback
-                match_method: "niche",
-            }));
+            nicheResults = (nicheRows ?? []).map((p: any) => {
+                // Deterministic similarity based on follower count proximity and niche match
+                const fcDiff = target.follower_count && p.follower_count
+                    ? 1 - Math.abs(Math.log10(target.follower_count) - Math.log10(p.follower_count)) / 4
+                    : 0.5;
+                const nicheMatch = p.primary_niche === target.primary_niche ? 0.2 : 0;
+                return {
+                    ...p,
+                    similarity: Math.max(0.1, Math.min(0.4, fcDiff + nicheMatch)),
+                    match_method: "niche",
+                };
+            });
         }
 
         // ── 5. Merge + deduplicate by profile id ──────────────────────────────
