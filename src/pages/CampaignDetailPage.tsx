@@ -66,18 +66,20 @@ export default function CampaignDetailPage() {
   const [editStartDate, setEditStartDate] = useState<Date | undefined>();
   const [editEndDate, setEditEndDate] = useState<Date | undefined>();
 
-  const { data: campaign } = useQuery({
+  const { data: campaign, error: campaignError } = useQuery({
     queryKey: ["campaign-detail", id],
     queryFn: async () => {
+      if (!id || !workspace?.workspace_id) throw new Error("No workspace");
       const { data, error } = await supabase
         .from("campaigns")
         .select("*")
-        .eq("id", id!)
+        .eq("id", id)
+        .eq("workspace_id", workspace.workspace_id)
         .single();
-      if (error) throw error;
+      if (error || !data) throw new Error("Campaign not found or access denied");
       return data;
     },
-    enabled: !!id,
+    enabled: !!id && !!workspace?.workspace_id,
   });
 
   const { data: lists } = useInfluencerLists();

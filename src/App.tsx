@@ -36,6 +36,7 @@ const CookiePolicyPage     = lazy(() => import("./pages/CookiePolicyPage"));
 const BlogPage             = lazy(() => import("./pages/BlogPage"));
 const InfluencerProfilePage = lazy(() => import("./pages/InfluencerProfilePage"));
 const NotFound             = lazy(() => import("./pages/NotFound"));
+const ServerError          = lazy(() => import("./pages/ServerError"));
 const SupportPage          = lazy(() => import("./pages/SupportPage"));
 
 // Admin pages — heavy, rarely accessed, loaded on demand
@@ -110,6 +111,7 @@ const App = () => {
                   <Route path="/cookies" element={<CookiePolicyPage />} />
                   <Route path="/influencer/:platform/:username" element={<ProtectedPage><InfluencerProfilePage /></ProtectedPage>} />
                   <Route path="/blog" element={<BlogPage />} />
+                  <Route path="/500" element={<ServerError />} />
                   <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
                   <Route path="/admin/users" element={<AdminRoute requiredPermission="canManageUsers"><AdminUsers /></AdminRoute>} />
                   <Route path="/admin/subscriptions" element={<AdminRoute requiredPermission="canManageUsers"><AdminSubscriptions /></AdminRoute>} />

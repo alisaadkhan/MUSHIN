@@ -65,15 +65,12 @@ interface FilterPanelProps {
   setSelectedCity: (v: string) => void;
   followerRange: string;
   setFollowerRange: (v: string) => void;
-  tagFilter: string;
-  setTagFilter: (v: string) => void;
 }
 
 function FilterPanel({
   selectedPlatforms, togglePlatform,
   selectedCity, setSelectedCity,
   followerRange, setFollowerRange,
-  tagFilter, setTagFilter,
 }: FilterPanelProps) {
   return (
     <div className="bg-background/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-5 space-y-5">
@@ -132,19 +129,7 @@ function FilterPanel({
           className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
         >
           {FOLLOWER_RANGES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-        </select>
-      </div>
-
-      {/* Tag filter */}
-      <div>
-        <p className="text-xs font-medium text-foreground mb-2">Tag Filter</p>
-        <input
-          type="text"
-          value={tagFilter}
-          onChange={(e) => setTagFilter(e.target.value)}
-          placeholder="#tech, #beauty..."
-          className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-        />
+      </select>
       </div>
     </div>
   );
@@ -259,7 +244,6 @@ export default function SearchPage() {
   const [searched, setSearched] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null);
-  const [tagFilter, setTagFilter] = useState("");
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [visibleCount, setVisibleCount] = useState(12);
 
@@ -513,8 +497,6 @@ export default function SearchPage() {
             setSelectedCity={setSelectedCity}
             followerRange={followerRange}
             setFollowerRange={setFollowerRange}
-            tagFilter={tagFilter}
-            setTagFilter={setTagFilter}
           />
         </aside>
 
@@ -533,8 +515,6 @@ export default function SearchPage() {
               setSelectedCity={setSelectedCity}
               followerRange={followerRange}
               setFollowerRange={setFollowerRange}
-              tagFilter={tagFilter}
-              setTagFilter={setTagFilter}
             />
             <SheetFooter className="mt-6 gap-2 flex-col">
               <Button className="w-full btn-shine" onClick={() => { setShowMobileFilters(false); handleSearch(); }}>
@@ -633,7 +613,7 @@ export default function SearchPage() {
           </div>
 
           {/* Active filter badges row (mobile) */}
-          {(selectedCity !== "All Pakistan" || tagFilter.trim()) && (
+          {selectedCity !== "All Pakistan" && (
             <div className="flex flex-wrap gap-2 lg:hidden">
               {selectedCity !== "All Pakistan" && (
                 <button onClick={() => setSelectedCity("All Pakistan")}
@@ -641,34 +621,17 @@ export default function SearchPage() {
                   <MapPin size={10} /> {selectedCity} <XIcon size={10} />
                 </button>
               )}
-              {tagFilter.trim() && (
-                <button onClick={() => setTagFilter("")}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-muted text-muted-foreground border border-border">
-                  #{tagFilter} <XIcon size={10} />
-                </button>
-              )}
             </div>
           )}
 
           {/* Results meta row */}
           <div className="flex items-center justify-between min-h-[28px]">
-            {searched && results.length > 0 && (() => {
-              // Compute the effective count after client-side niche + tag filters
-              let visibleResults = results;
-              if (tagFilter.trim()) {
-                const tf = tagFilter.toLowerCase().replace(/^#/, "");
-                visibleResults = visibleResults.filter(r => r.tags?.some(t => t.includes(tf)));
-              }
-              return (
-                <p data-testid="result-count" className="text-sm text-muted-foreground">
-                  {visibleResults.length} result{visibleResults.length !== 1 ? "s" : ""} found
-                  {tagFilter.trim() && results.length !== visibleResults.length && (
-                    <span className="text-xs ml-1 opacity-60">({results.length} total)</span>
-                  )}
-                  {selectedCity !== "All Pakistan" && <span> · <MapPin className="inline h-3 w-3 mb-0.5" /> {selectedCity}</span>}
-                </p>
-              );
-            })()}
+            {searched && results.length > 0 && (
+              <p data-testid="result-count" className="text-sm text-muted-foreground">
+                {results.length} result{results.length !== 1 ? "s" : ""} found
+                {selectedCity !== "All Pakistan" && <span> · <MapPin className="inline h-3 w-3 mb-0.5" /> {selectedCity}</span>}
+              </p>
+            )}
             {searched && results.length > 0 && (
               <Button variant="outline" size="sm" className="text-xs gap-1.5 rounded-lg border-border" onClick={() => setShowSaveSearch(true)}>
                 <Bookmark className="h-3 w-3" /> Save Search
@@ -693,13 +656,8 @@ export default function SearchPage() {
 
           {/* Results */}
           {!loading && searched && results.length > 0 && (() => {
-            let filtered = results;
-            if (tagFilter.trim()) {
-              const tf = tagFilter.toLowerCase().replace(/^#/, "");
-              filtered = filtered.filter(r => r.tags?.some(t => t.includes(tf)));
-            }
-            const visible = filtered.slice(0, visibleCount);
-            const hasMore = filtered.length > visibleCount;
+            const visible = results.slice(0, visibleCount);
+            const hasMore = results.length > visibleCount;
             return (
               <>
                 <div data-testid="results-grid" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -731,12 +689,12 @@ export default function SearchPage() {
                       onClick={() => setVisibleCount(v => v + 12)}
                     >
                       <Plus className="h-4 w-4" />
-                      Load more ({filtered.length - visibleCount} remaining)
+                      Load more ({results.length - visibleCount} remaining)
                     </Button>
                   </div>
                 )}
-                {!hasMore && filtered.length > 12 && (
-                  <p className="text-center text-xs text-muted-foreground pt-2">All {filtered.length} results shown</p>
+                {!hasMore && results.length > 12 && (
+                  <p className="text-center text-xs text-muted-foreground pt-2">All {results.length} results shown</p>
                 )}
               </>
             );
@@ -828,8 +786,8 @@ export default function SearchPage() {
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            You've used all {isFreePlan ? "3" : "your"} daily search credits.
-            {isFreePlan ? " Upgrade to Pro for 500 credits/month — pay in PKR via JazzCash." : " Credits reset daily."}
+            You've used all your search credits.
+            {isFreePlan ? " Upgrade to Pro for more credits." : ""}
           </p>
           {workspaceCredits?.credits_reset_at && (
             <p className="text-xs text-muted-foreground">

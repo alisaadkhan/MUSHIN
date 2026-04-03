@@ -149,11 +149,36 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  v_current int;
+  v_plan text;
+  v_max int;
 BEGIN
-  -- No ceiling enforcement here — restore is +1 only and is idempotent.
-  -- The non-negative constraint on the column prevents going below 0.
+  SELECT ai_credits_remaining, plan
+  INTO   v_current, v_plan
+  FROM   workspaces
+  WHERE  id = ws_id;
+
+  IF v_current IS NULL THEN
+    RETURN; -- workspace not found, silently skip
+  END IF;
+
+  -- Cap restoration at the plan's AI credit maximum to prevent farming
+  v_max := CASE v_plan
+    WHEN 'free'       THEN 3
+    WHEN 'starter'    THEN 25
+    WHEN 'pro'        THEN 100
+    WHEN 'business'   THEN 250
+    WHEN 'enterprise' THEN 999
+    ELSE 3
+  END;
+
+  IF v_current >= v_max THEN
+    RETURN; -- already at or above max, don't restore further
+  END IF;
+
   UPDATE workspaces
-  SET    ai_credits_remaining = ai_credits_remaining + 1
+  SET    ai_credits_remaining = LEAST(v_current + 1, v_max)
   WHERE  id = ws_id;
 END;
 $$;

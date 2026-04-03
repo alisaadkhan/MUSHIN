@@ -34,10 +34,10 @@ Deno.serve(async (req) => {
     const { data, error } = await supabase
       .from("workspaces")
       .update({
-        search_credits_remaining: 3,
-        enrichment_credits_remaining: 2,
-        email_sends_remaining: 5,
-        ai_credits_remaining: 0,
+        search_credits_remaining: 30,
+        enrichment_credits_remaining: 3,
+        email_sends_remaining: 10,
+        ai_credits_remaining: 3,
         credits_reset_at: new Date().toISOString(),
       })
       .eq("plan", "free")

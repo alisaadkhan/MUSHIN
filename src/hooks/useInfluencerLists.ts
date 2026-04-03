@@ -38,7 +38,15 @@ export function useInfluencerLists() {
 
   const deleteList = useMutation({
     mutationFn: async (id: string) => {
-      // Delete items first, then the list
+      if (!workspace) throw new Error("No workspace");
+      const { data: list } = await supabase
+        .from("influencer_lists")
+        .select("workspace_id")
+        .eq("id", id)
+        .single();
+      if (!list || list.workspace_id !== workspace.workspace_id) {
+        throw new Error("List not found or access denied");
+      }
       await supabase.from("list_items").delete().eq("list_id", id);
       const { error } = await supabase.from("influencer_lists").delete().eq("id", id);
       if (error) throw error;
@@ -50,12 +58,21 @@ export function useInfluencerLists() {
 }
 
 export function useListItems(listId: string | undefined) {
+  const { workspace } = useAuth();
   const qc = useQueryClient();
 
   const itemsQuery = useQuery({
     queryKey: ["list-items", listId],
     queryFn: async () => {
-      if (!listId) throw new Error("No list id");
+      if (!listId || !workspace?.workspace_id) throw new Error("No workspace");
+      const { data: list } = await supabase
+        .from("influencer_lists")
+        .select("workspace_id")
+        .eq("id", listId)
+        .single();
+      if (!list || list.workspace_id !== workspace.workspace_id) {
+        throw new Error("List not found or access denied");
+      }
       const { data, error } = await supabase
         .from("list_items")
         .select("*")
@@ -64,11 +81,20 @@ export function useListItems(listId: string | undefined) {
       if (error) throw error;
       return data;
     },
-    enabled: !!listId,
+    enabled: !!listId && !!workspace?.workspace_id,
   });
 
   const addItem = useMutation({
     mutationFn: async (item: { list_id: string; username: string; platform: string; data: any }) => {
+      if (!workspace?.workspace_id) throw new Error("No workspace");
+      const { data: list } = await supabase
+        .from("influencer_lists")
+        .select("workspace_id")
+        .eq("id", item.list_id)
+        .single();
+      if (!list || list.workspace_id !== workspace.workspace_id) {
+        throw new Error("List not found or access denied");
+      }
       const { data, error } = await supabase.from("list_items").insert(item).select().single();
       if (error) throw error;
       return data;
@@ -81,6 +107,15 @@ export function useListItems(listId: string | undefined) {
 
   const removeItem = useMutation({
     mutationFn: async (id: string) => {
+      if (!workspace?.workspace_id) throw new Error("No workspace");
+      const { data: item } = await supabase
+        .from("list_items")
+        .select("influencer_lists!inner(workspace_id)")
+        .eq("id", id)
+        .single();
+      if (!item || item.influencer_lists?.workspace_id !== workspace.workspace_id) {
+        throw new Error("Item not found or access denied");
+      }
       const { error } = await supabase.from("list_items").delete().eq("id", id);
       if (error) throw error;
     },
@@ -92,6 +127,17 @@ export function useListItems(listId: string | undefined) {
 
   const removeItems = useMutation({
     mutationFn: async (ids: string[]) => {
+      if (!workspace?.workspace_id) throw new Error("No workspace");
+      for (const id of ids) {
+        const { data: item } = await supabase
+          .from("list_items")
+          .select("influencer_lists!inner(workspace_id)")
+          .eq("id", id)
+          .single();
+        if (!item || item.influencer_lists?.workspace_id !== workspace.workspace_id) {
+          throw new Error("Item not found or access denied");
+        }
+      }
       const { error } = await supabase.from("list_items").delete().in("id", ids);
       if (error) throw error;
     },
@@ -103,6 +149,15 @@ export function useListItems(listId: string | undefined) {
 
   const updateNotes = useMutation({
     mutationFn: async ({ id, notes }: { id: string; notes: string }) => {
+      if (!workspace?.workspace_id) throw new Error("No workspace");
+      const { data: item } = await supabase
+        .from("list_items")
+        .select("influencer_lists!inner(workspace_id)")
+        .eq("id", id)
+        .single();
+      if (!item || item.influencer_lists?.workspace_id !== workspace.workspace_id) {
+        throw new Error("Item not found or access denied");
+      }
       const { error } = await supabase.from("list_items").update({ notes }).eq("id", id);
       if (error) throw error;
     },

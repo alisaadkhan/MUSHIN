@@ -17,6 +17,7 @@ import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/rate_limit.ts";
 import { resolveAuthorizedWorkspace } from "../_shared/security.ts";
+import { isSuperAdmin } from "../_shared/privileged_gateway.ts";
 const ANALYTICS_CREDIT_COST = 3;
 const CACHE_TTL_HOURS = 24 * 7; // 7 days
 Deno.serve(async (req) => {
@@ -51,6 +52,8 @@ Deno.serve(async (req) => {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const callerIsSuperAdmin = await isSuperAdmin(user.id);
 
     // ── Parse body ────────────────────────────────────────────────────────────
     const body = await req.json();
@@ -189,6 +192,25 @@ Deno.serve(async (req) => {
         return new Response(
           JSON.stringify({ ...cached.python_analytics, cached: true }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // ── Deduct credits BEFORE computation (atomic, FOR UPDATE) ──────────────
+    if (!callerIsSuperAdmin) {
+      try {
+        await serviceClient.rpc("consume_ai_credit", { ws_id: targetWorkspace });
+      } catch (creditErr: any) {
+        if (creditErr.code === "P0001") {
+          return new Response(
+            JSON.stringify({ error: "Insufficient AI credits. Please upgrade your plan.", code: "CREDITS_EXHAUSTED" }),
+            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        console.error("[ai-analytics] Credit deduction failed:", creditErr);
+        return new Response(
+          JSON.stringify({ error: "Credit deduction failed. Please try again.", code: "CREDIT_DEDUCT_FAILED" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
     }

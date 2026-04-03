@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface OutreachEntry {
   id: string;
@@ -16,21 +17,24 @@ export interface OutreachEntry {
 }
 
 export function useOutreachLog(campaignId: string | undefined) {
+  const { workspace } = useAuth();
   const queryClient = useQueryClient();
   const queryKey = ["outreach-log", campaignId];
 
   const { data: outreachEntries, isLoading } = useQuery({
     queryKey,
     queryFn: async () => {
+      if (!campaignId || !workspace?.workspace_id) throw new Error("No workspace");
       const { data, error } = await supabase
         .from("outreach_log")
-        .select("*")
-        .eq("campaign_id", campaignId!)
+        .select("*, campaigns!inner(workspace_id)")
+        .eq("campaign_id", campaignId)
+        .eq("campaigns.workspace_id", workspace.workspace_id)
         .order("contacted_at", { ascending: false });
       if (error) throw error;
       return data as OutreachEntry[];
     },
-    enabled: !!campaignId,
+    enabled: !!campaignId && !!workspace?.workspace_id,
     staleTime: 2 * 60_000,
   });
 
@@ -43,6 +47,14 @@ export function useOutreachLog(campaignId: string | undefined) {
       method?: string;
       notes?: string;
     }) => {
+      if (!workspace?.workspace_id) throw new Error("No workspace");
+      const { data: campaign } = await supabase
+        .from("campaigns")
+        .select("id")
+        .eq("id", entry.campaign_id)
+        .eq("workspace_id", workspace.workspace_id)
+        .single();
+      if (!campaign) throw new Error("Campaign not found or access denied");
       const { error } = await supabase.from("outreach_log").insert({
         campaign_id: entry.campaign_id,
         card_id: entry.card_id,

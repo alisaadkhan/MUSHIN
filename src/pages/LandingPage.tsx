@@ -558,9 +558,11 @@ export default function LandingPage() {
 
       {/* -- NAV -- */}
       <nav aria-label="Main navigation" className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] transition-all duration-300">
-        <div role="menubar" className={`flex items-center gap-1.5 border rounded-full transition-all duration-300 ${
-          navScrolled ? 'bg-[#0a0314]/95 border-white/15 shadow-[0_8px_48px_rgba(0,0,0,0.7)]' : 'bg-[#0a0314]/85 border-white/8 shadow-[0_4px_24px_rgba(0,0,0,0.3)]'
-        }`} style={{ padding: '8px 12px', gap: '8px' }}>
+        <div role="menubar" className="flex items-center gap-3 border rounded-full bg-[#0a0314] border-white/15 shadow-[0_8px_48px_rgba(0,0,0,0.7)]" style={{ padding: '6px 16px' }}>
+          <Link to="/" aria-label="MUSHIN Home" className="flex items-center gap-2 mr-2">
+            <MushInIcon size={28} className="text-primary" />
+            <span className="text-sm font-bold tracking-[0.15em] text-white" style={{ fontFamily: "'Syne',sans-serif" }}>MUSHIN</span>
+          </Link>
           {navItems.map(item => {
             const active = activeNav === item.id;
             return (

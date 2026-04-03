@@ -506,8 +506,22 @@ Deno.serve(async (req: Request) => {
                 await serviceClient.rpc('consume_enrichment_credit', { ws_id: workspaceId });
             } catch (error: any) {
                 if (error.code === 'P0001') {
+                    // Credit deduction failed AFTER data was saved — mark as partial
+                    // so user can see the data but knows credits weren't consumed
+                    await serviceClient.from("influencer_profiles").update({
+                        enrichment_status: "partial",
+                        enrichment_error: "Enrichment completed but credits could not be deducted. Profile data is available.",
+                    }).eq("platform", platform).eq("username", username);
+
                     return new Response(
-                        JSON.stringify({ error: 'Insufficient credits', code: "CREDITS_EXHAUSTED" }),
+                        JSON.stringify({
+                            success: true,
+                            profile,
+                            data_source: dataSource,
+                            is_stale: false,
+                            credits_remaining: workspace?.enrichment_credits_remaining ?? 0,
+                            warning: "Profile enriched successfully but credit deduction failed. Please contact support if this persists.",
+                        }),
                         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                     );
                 }

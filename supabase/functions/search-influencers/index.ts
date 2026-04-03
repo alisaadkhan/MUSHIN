@@ -305,9 +305,18 @@ Deno.serve(async (req) => {
           serviceClient.from("credits_usage").insert({ workspace_id: workspaceId, action_type: "search", amount: 1 }),
         ];
         if (!callerIsSuperAdmin) {
-          writeOps.push(serviceClient.rpc("consume_search_credit", { ws_id: workspaceId }).catch(() => null));
+          writeOps.push(serviceClient.rpc("consume_search_credit", { ws_id: workspaceId }));
         }
-        await Promise.all(writeOps);
+        try {
+          await Promise.all(writeOps);
+        } catch (creditErr: any) {
+          if (creditErr.code === "P0001") {
+            console.warn("[search-influencers] DB-first credit deduction failed — returning results without deduction");
+            await Promise.all(writeOps.filter((_, i) => i < writeOps.length - 1));
+          } else {
+            throw creditErr;
+          }
+        }
 
         if (redis && scoredDbResults.length > 0) {
           redis.set(cacheKey, JSON.stringify(scoredDbResults), { ex: 1800 }).catch(() => null);
