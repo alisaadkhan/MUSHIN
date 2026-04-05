@@ -50,7 +50,7 @@ const posts: Post[] = [
     id: 'strategy-nano-influencers',
     title: 'Why Nano-Influencers Drive Higher ROAS in Pakistan',
     excerpt:
-      "Data from 400+ Pakistani campaigns shows nano-creators (10K\u201350K followers) consistently outperform mega-influencers on cost-per-acquisition. Here\u2019s why.",
+      'Data from 400+ Pakistani campaigns shows nano-creators (10K–50K followers) consistently outperform mega-influencers on cost-per-acquisition. Here's why.',
     category: 'Strategy',
     readTime: 6,
     date: 'Mar 14, 2026',
@@ -80,7 +80,7 @@ const posts: Post[] = [
     id: 'strategy-eid-campaigns',
     title: 'Running Influencer Campaigns During Eid: A Playbook',
     excerpt:
-      "Eid is Pakistan\u2019s highest-spending period. This guide covers creator selection timing, content brief structure, and budget allocation for Eid campaigns.",
+      'Eid is Pakistan's highest-spending period. This guide covers creator selection timing, content brief structure, and budget allocation for Eid campaigns.',
     category: 'Strategy',
     readTime: 7,
     date: 'Jan 22, 2026',
@@ -90,7 +90,7 @@ const posts: Post[] = [
     id: 'guide-instagram-metrics',
     title: 'The 7 Instagram Metrics That Actually Predict Campaign Success',
     excerpt:
-      "Follower count is a vanity metric. Here are the seven signals in MUSHIN\u2019s scoring model that correlate with real audience action and brand lift.",
+      'Follower count is a vanity metric. Here are the seven signals in MUSHIN's scoring model that correlate with real audience action and brand lift.',
     category: 'Guides',
     readTime: 6,
     date: 'Jan 8, 2026',

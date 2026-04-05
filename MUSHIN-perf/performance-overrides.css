@@ -1,0 +1,180 @@
+/**
+ * performance-overrides.css  —  MUSHIN  ·  System-Wide Performance Fix
+ *
+ * ADD THIS FILE to your global CSS pipeline (import in index.css or main.tsx).
+ *
+ * PURPOSE:
+ * The pattern `bg-background/80 backdrop-blur-md border border-white/50 shadow-sm`
+ * appears 70 times across the codebase. Each instance creates a GPU compositing
+ * layer with a full blur pass. On a 20-card results page, this is 20 simultaneous
+ * GPU blur operations — rendering the page sluggish on any device without a
+ * dedicated GPU (i.e., most phones).
+ *
+ * This file:
+ * 1. Adds the .app-card utility class as the ONE correct way to style cards
+ * 2. Overrides .glass-card and .glass-card-hover to remove backdrop-filter
+ * 3. Adds lightweight CSS-only fade-in animation (replaces framer-motion usage)
+ * 4. Adds .app-section for consistent section padding
+ *
+ * IMPORTANT: backdrop-blur IS kept on:
+ *  - Navigation bars (one element, always visible, worth the cost)
+ *  - Modal overlays (one element, replaces heavy backdrop)
+ *  - Dialogs (one element)
+ * It is REMOVED from all card/panel repetitive patterns.
+ */
+
+/* ─── Core Card Pattern ──────────────────────────────────────────────────── */
+.app-card {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 1rem; /* rounded-2xl */
+}
+
+.app-card-hover {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 1rem;
+  transition: border-color 150ms ease;
+}
+
+.app-card-hover:hover {
+  border-color: hsl(var(--primary) / 0.3);
+}
+
+/* ─── Override glass-card (removes backdrop-blur) ────────────────────────── */
+/*
+ * glass-card is used across ~30 components. Rather than finding and replacing
+ * each usage, we override the class system-wide. The visual difference is
+ * imperceptible in the dark theme — the "frosted" effect was nearly invisible
+ * against a dark background anyway.
+ */
+.glass-card {
+  background-color: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 1rem !important;
+  /* backdrop-filter: removed */
+  box-shadow: none !important;
+}
+
+.glass-card-hover {
+  transition: border-color 150ms ease !important;
+}
+
+.glass-card-hover:hover {
+  border-color: hsl(var(--primary) / 0.3) !important;
+  box-shadow: none !important;
+}
+
+/* ─── CSS Fade-In Animation (replaces framer-motion on simple fades) ─────── */
+@keyframes mushin-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes mushin-fade-in-fast {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: mushin-fade-in 0.22s ease forwards;
+}
+
+.animate-fade-in-delay {
+  opacity: 0;
+  animation: mushin-fade-in 0.22s ease 0.08s forwards;
+}
+
+.animate-fade-in-slow {
+  opacity: 0;
+  animation: mushin-fade-in 0.35s ease 0.15s forwards;
+}
+
+/* ─── App Section Layout ─────────────────────────────────────────────────── */
+.app-section {
+  padding: 1.5rem; /* p-6 */
+}
+
+.app-section + .app-section {
+  border-top: 1px solid hsl(var(--border));
+}
+
+/* ─── Safe Backdrop Blur (nav/modal only) ────────────────────────────────── */
+/*
+ * These are the ONLY elements where backdrop-blur is acceptable:
+ * - Sticky nav bar (1 element, always composited, necessary for legibility)
+ * - Modal/dialog overlays (1 element at a time)
+ * - Sheet overlays
+ *
+ * All other backdrop-blur usage is eliminated.
+ */
+.nav-blur {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.modal-overlay-blur {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* ─── Performance: Reduce will-change proliferation ─────────────────────── */
+/*
+ * Many components add will-change: transform via Tailwind's motion utilities.
+ * This instructs the browser to pre-composite the element even when not animating.
+ * We scope it to actual animation targets only.
+ */
+.motion-safe-only {
+  will-change: auto;
+}
+
+/* ─── Fix: Free-plan locked card (was blur-sm, now opacity) ──────────────── */
+/*
+ * `blur-sm` on individual result cards causes a nested compositor layer inside
+ * an already-composited scroll container — worst-case GPU scenario.
+ * Replace with opacity reduction which is free (composited at parent level).
+ */
+.plan-locked {
+  opacity: 0.45;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ─── Animated mesh bg — DISABLE GLOBALLY ────────────────────────────────── */
+/*
+ * animated-mesh-bg uses a CSS animation that repaints background-position
+ * every frame. This forces a full background repaint on every animation tick.
+ * Auth page (right panel) and old legal pages use this class.
+ * We strip the animation but keep a static gradient for visual consistency.
+ */
+.animated-mesh-bg {
+  /* animation: removed */
+  background: radial-gradient(
+    ellipse 70% 60% at 30% 40%,
+    hsl(var(--primary) / 0.08) 0%,
+    transparent 65%
+  ) !important;
+}
+
+/* ─── dot-grid-overlay — CONVERT TO STATIC ───────────────────────────────── */
+/*
+ * dot-grid-overlay sometimes animates (background-position tweening).
+ * Convert to static — identical visual, zero animation cost.
+ */
+.dot-grid-overlay {
+  /* If this class had an animation property, strip it */
+  animation: none !important;
+  /* Keep the visual dot grid as static */
+  background-image: radial-gradient(
+    circle,
+    hsl(var(--primary) / 0.12) 1px,
+    transparent 1px
+  );
+  background-size: 28px 28px;
+}

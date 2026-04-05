@@ -1,4 +1,4 @@
-# InfluenceIQ Pro — Full System Fix Plan
+# MUSHIN — Full System Fix Plan
 
 ## Phase 1: Critical Bug Fixes (C1-C6)
 
