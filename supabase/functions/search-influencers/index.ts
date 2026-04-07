@@ -274,14 +274,14 @@ Deno.serve(async (req) => {
           return {
             title:            r.full_name ?? r.username,
             link:             `https://www.${platform === "youtube" ? "youtube.com/@" : platform === "instagram" ? "instagram.com/" : platform === "tiktok" ? "tiktok.com/@" : "twitch.tv/"}${r.username}`,
-            snippet:          r.bio ?? "",
+            snippet:          r.bio ? r.bio.split(/\s+/).slice(0, 20).join(" ") + (r.bio.split(/\s+/).length > 20 ? "..." : "") : "",
             username:         r.username,
             platform,
             imageUrl:         r.avatar_url ?? null,
             bio:              r.bio ?? null,
             full_name:        r.full_name ?? null,
             extracted_followers: r.follower_count ?? null,
-            engagement_rate:  r.engagement_rate ?? null,
+            engagement_rate:  r.engagement_rate ?? 0,
             engagement_source: "real_enriched" as const,
             city_extracted:   r.city ?? null,
             niche:            r.primary_niche ?? null,
@@ -718,8 +718,9 @@ Deno.serve(async (req) => {
       if (!range || range === "any" || !rangeMap[range]) return candidates;
       const [min, max] = rangeMap[range];
       return candidates.filter((r: any) => {
-        if (r.extracted_followers == null) return true; // unknown FC: keep, score penalised
-        return r.extracted_followers >= min && (max === Infinity || r.extracted_followers <= max);
+        const fc = r.extracted_followers ?? r._follower_count_raw;
+        if (fc == null) return false; // STRICT: if range is selected, and count is unknown, drop it
+        return fc >= min && (max === Infinity || fc <= max);
       });
     };
 
@@ -752,7 +753,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Tier 2 — relax engagement only (keep follower filter)
+    // Tier 2 — relax engagement only (strict follower + language)
     if (!activeTier.tier && hasEngagementFilter) {
       let t = applyFollowerFilter(uniqueResults, followerRange);
       t = applyLangFilter(t);
@@ -760,25 +761,24 @@ Deno.serve(async (req) => {
       if (t.length >= TIER_MIN) activeTier = { tier: 2, label: "relax_engagement", result: t };
     }
 
-    // Tier 3 — relax follower only (keep engagement filter)
+    // Tier 3 — relax follower only? NO — user wants strictness. 
+    // If we can't find enough in the range, we'd rather show fewer than wrong ones.
+    // However, for platform survival, we relax it ONLY if the user didn't specify a range.
     if (!activeTier.tier && hasFollowerFilter) {
-      let t = applyEngagementFilter(uniqueResults, engagementRange);
-      t = applyLangFilter(t);
-      console.log(`[search] T3 relax-follower: ${t.length} results`);
-      if (t.length >= TIER_MIN) activeTier = { tier: 3, label: "relax_follower", result: t };
+      // User requested a range, but we found nothing. We will NOT relax the range.
+      // We stop here or move to a very high relevance set that STILL respects the range.
     }
 
-    // Tier 4 — relax both follower + engagement (language only)
-    if (!activeTier.tier && (hasFollowerFilter || hasEngagementFilter)) {
-      const t = applyLangFilter(uniqueResults);
-      console.log(`[search] T4 relax-both: ${t.length} results`);
-      if (t.length >= TIER_MIN) activeTier = { tier: 4, label: "relax_follower_engagement", result: t };
-    }
-
-    // Tier 5 — full relax: all filters off, pure relevance ranking
+    // Tier 4/5 — User specified filters, but the tiers were dropping them.
+    // Fix: Always re-apply active filters even in fallback tiers.
     if (!activeTier.tier) {
-      console.log(`[search] T5 full-relax: ${uniqueResults.length} results`);
-      activeTier = { tier: 5, label: "full_relax", result: uniqueResults };
+      let t = uniqueResults;
+      if (hasFollowerFilter) t = applyFollowerFilter(t, followerRange);
+      if (hasEngagementFilter) t = applyEngagementFilter(t, engagementRange);
+      t = applyLangFilter(t);
+      
+      console.log(`[search] Final Fallback (Strict Filters): ${t.length} results`);
+      activeTier = { tier: 5, label: "full_relax_relevance", result: t };
     }
 
     const TIER_LABELS: Record<number, string> = {
@@ -842,11 +842,22 @@ Deno.serve(async (req) => {
       })();
 
       const isFullyEnriched = profile?.enrichment_status === "success";
+
+      // Word-boundary bio truncation helper
+      const truncateAtWord = (text: string, maxLen: number): string => {
+        if (text.length <= maxLen) return text;
+        const truncated = text.substring(0, maxLen);
+        const lastSpace = truncated.lastIndexOf(" ");
+        return lastSpace > 0 ? truncated.substring(0, lastSpace) + "..." : truncated + "...";
+      };
+
       return {
         ...r,
-        // Only use DB image/bio/full_name when fully enriched ΓÇö stubs have no real data
+        // Only use DB image/bio/full_name when fully enriched — stubs have no real data
         imageUrl: isFullyEnriched ? (profile?.avatar_url ?? r.imageUrl) : r.imageUrl,
-        bio: isFullyEnriched ? (profile?.bio ?? null) : (r.snippet ? r.snippet.substring(0, 200) : null),
+        bio: isFullyEnriched
+          ? (profile?.bio ?? null)
+          : (r.snippet ? truncateAtWord(r.snippet, 200) : null),
         extracted_followers: profile?.follower_count ?? r._follower_count_raw,
         ...engagementMeta,
         city_extracted: profile?.city ?? r.city_extracted,
@@ -859,6 +870,20 @@ Deno.serve(async (req) => {
           : false,
       };
     });
+
+    // ── Phase 3 Fix: Post-Merge Strict Follower Filter ─────────────────────────
+    // After the DB profile merge step above, `extracted_followers` may have been
+    // updated with a DB value that differs from the pre-filter raw count.
+    // Re-apply the follower range filter to guarantee no out-of-range results
+    // reach the client, regardless of which data source populated the count.
+    const postMergeFiltered = hasFollowerFilter
+      ? enrichedResults.filter((r: any) => {
+          const [min, max] = rangeMap[followerRange];
+          const fc = r.extracted_followers;
+          if (fc == null) return false; // Unknown count — drop when filter is active
+          return fc >= min && (max === Infinity || fc <= max);
+        })
+      : enrichedResults;
 
     // Infer query niche and city for multi-factor relevance scoring.
     // inferNiche scans NICHE_KEYWORDS against the query text.
@@ -886,7 +911,7 @@ Deno.serve(async (req) => {
       return 1.0;
     };
 
-    const sortedResults = enrichedResults
+    const sortedResults = postMergeFiltered
       .filter((r: any) => {
         // Hard reject: verified real engagement data below absolute bot floor (0.3 %)
         if (r.is_enriched && r.engagement_source !== "benchmark_estimate" &&

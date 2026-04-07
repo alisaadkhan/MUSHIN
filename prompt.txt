@@ -1,27 +1,63 @@
-# MUSHIN - High-Fidelity Creator Search Requirements (V3)
 
-1. **Platform-Specific Isolation**: 
-   - Refactor extraction logic into 3 dedicated files: `instagram.ts`, `tiktok.ts`, and `youtube.ts`.
-   - Each platform MUST have custom regex and terminology handlers (e.g., YouTube uses "Subscribers").
+---
 
-2. **Mandatory Metrics**:
-   - Followers/Subscribers are NO LONGER OPTIONAL. 
-   - Every search card MUST display a follower/subscriber count.
-   - If extraction fails from snippets, use secondary pattern matching or fallback to "Unknown" (but try to avoid "-" dashes).
+## Mushin Creator Search — V3 Discovery Engine Requirements
 
-3. **YouTube Specifics**:
-   - Display label MUST be "Subscribers" for YouTube creators.
-   - Profile images MUST work (Fix the issue where some creators show placeholder icons).
+### **Bug Fixes (Must Remain Fixed)**:
 
-4. **100% Precision Filter**:
-   - Searching for "Gaming" MUST only return gaming-related creators. 
-   - Tighten `snippetRelevanceScore` and `inferNiche` to reject high-confidence distractors.
-   - Bias results heavily towards creators whose bio/snippet explicitly mentions the search keyword.
+1. **Bug: Engagement "Data Refreshing" State** (FIXED):
+   - The `getBenchmarkEngagement()` function provides industry-standard fallback rates per platform and follower tier.
+   - ALL results must have `engagement_rate` populated — either from real scraping/enrichment or from the benchmark fallback.
+   - The `engagement_source` field MUST be set: `"real_eval"` | `"real_enriched"` | `"benchmark_estimate"`.
+   - The UI shows `EST` badge when source is `"benchmark_estimate"`. Never show "Refreshing..." or "Data Refreshing".
 
-5. **UI Fixes (Image1 Reference)**:
-   - Fix the empty state ("-") for "Videos", "Following", and "Engagement". These should show real data or a "Data Refreshing" state instead of a dash.
-   - Ensure the "Creator Bio" is always populated in the search results list.
+2. **Bug: Filter Failure — Follower Range** (FIXED):
+   - STRICT ENFORCEMENT at TWO checkpoints:
+     a. Pre-merge: `applyFollowerFilter` drops results with null counts when a range is active.
+     b. Post-merge: `postMergeFiltered` re-checks after DB profile data merges (follower count may change from DB).
+   - Any creator outside the range OR with unknown count is DROPPED when a follower range filter is selected.
+   - Fallback tiers NEVER relax the follower filter when the user has explicitly set a range.
 
-6. **Branding & Consistency**:
-   - Clean names only (e.g., "Sana Malik" instead of "Sana Malik (@sana_pk) - Instagram profile").
-   - Ensure bio truncation is elegant and doesn't cut off mid-word.
+---
+
+### **V3 Feature Requirements**:
+
+**#1 — Platform-Specific Extraction**:
+- `_shared/instagram.ts`: `extractInstagramFollowers(text)`, `extractInstagramEngagement(text)`, `extractInstagramProfileImage(html)`
+- `_shared/tiktok.ts`: `extractTikTokFollowers(text)`, `extractTikTokEngagement(text)`, `extractTikTokProfileImage(html)`
+- `_shared/youtube.ts`: `extractYouTubeSubscribers(text)`, `fetchYouTubeSubscriberCount(username, apiKey)`, `extractYouTubeProfileImage(username)`
+- Each extractor matches real Serper snippet patterns for its platform (e.g., "125K Followers", "12.5M Subscribers", "fans", "subs").
+- YouTube falls back to Data API (`forHandle` or channel ID) if snippet extraction fails.
+- Follower/subscriber counts are MANDATORY — never show "—" in the count field if a range filter is active.
+
+**#2 — Mandatory UI Labels**:
+- YouTube: Always display "Subscribers" (not "Followers").
+- Instagram/TikTok: Always display "Followers".
+- Engagement column: Show real % if available → benchmark % + `EST` badge → `—` if truly no data.
+
+**#3 — 100% Content Precision Filter**:
+- `ranking.ts → snippetRelevanceScore()`:
+  - `termHitRate` weight: `0.55` (increased from `0.45`)
+  - Hard rejection: if `exactHits === 0 && partialHits === 0 && trigramScore < 0.15`, return `0`
+  - Keyword density boost: `+0.1` per repeated query term occurrence in snippet
+- `niche.ts → inferNiche()`:
+  - `THRESHOLD = 5` (from 3) — higher bar for niche confidence
+  - `DOMINANCE_GAP = 3` (from 2) — winning niche must dominate by larger margin
+
+**#4 — Clean Display Names**:
+- `cleanTitle(raw, username, platform)` strips platform noise: "• Instagram photos and videos", " - YouTube", etc.
+- Applied to ALL results (both Serper and DB-first paths).
+- Bio truncated at word boundary: `truncateAtWord(text, 200)` — no mid-word cuts.
+
+**#5 — Scoring**:
+- `followerPenalty()`: Out-of-range creators receive 0.2× score multiplier. Unknown count → 0.6×.
+- `postMergeFiltered` feeds into `sortedResults` (not raw `enrichedResults`).
+- `engagement_rate: 0` used as stable sentinel when benchmark value is available — never `null` in response.
+
+---
+
+### **Deployment Checklist**:
+- Deploy: `search-influencers`, `ai-insights`, `ai-analytics`
+- Clear Redis cache after deploy (TTL 3600s — stale results expire naturally)
+- Verify: Search "gaming" on YouTube → all results must be gaming creators, all with subscriber counts
+- Verify: Set follower range 50k–100k → zero results outside range

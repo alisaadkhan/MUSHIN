@@ -284,16 +284,27 @@ export const ResultCard = React.memo(function ResultCard({
         <div>
           <p className="text-xs text-muted-foreground">{c.platform === "youtube" ? "Subscribers" : "Followers"}</p>
           <p data-testid="card-followers" className="text-sm font-semibold text-foreground data-mono">
-            {c.extracted_followers ? formatFollowers(c.extracted_followers) : (c.platform === "youtube" ? "Refreshing..." : "Data Refreshing")}
+            {c.extracted_followers != null ? formatFollowers(c.extracted_followers) : "—"}
           </p>
         </div>
         <div>
           <div className="flex items-center justify-center gap-1">
             <p className="text-xs text-muted-foreground">Engagement</p>
           </div>
-          <p data-testid="card-engagement" className="text-sm font-semibold text-foreground data-mono">
-            {c.engagement_rate != null ? `${c.engagement_rate.toFixed(1)}%` : "Refreshing..."}
-          </p>
+          <div className="flex flex-col items-center">
+            <p data-testid="card-engagement" className="text-sm font-semibold text-foreground data-mono">
+              {c.engagement_rate != null ? `${c.engagement_rate.toFixed(1)}%` : "—"}
+            </p>
+            {c.engagement_source === "benchmark_estimate" && (
+              <Badge
+                variant="outline"
+                className="text-[10px] h-4 py-0 px-1 border-muted-foreground/30 text-muted-foreground mt-0.5"
+                title="Industry benchmark estimate — real rate available after enrichment"
+              >
+                EST
+              </Badge>
+            )}
+          </div>
           <div className="flex justify-center mt-1">
             {c.is_enriched && (
               <span
