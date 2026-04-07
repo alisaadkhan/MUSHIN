@@ -206,8 +206,21 @@ export default function Auth() {
 
   const [form, dispatch] = useReducer(formReducer, {
     ...initialState,
-    mode: searchParams.get("verify") === "required" ? "verification-notice" : "sign-in",
+    mode: window.location.pathname === "/signup" 
+      ? "sign-up" 
+      : searchParams.get("verify") === "required" 
+        ? "verification-notice" 
+        : "sign-in",
   });
+
+  // Keep mode in sync with URL path changes
+  useEffect(() => {
+    if (window.location.pathname === "/signup") {
+      dispatch({ type: "MODE", mode: "sign-up" });
+    } else if (window.location.pathname === "/login") {
+      dispatch({ type: "MODE", mode: "sign-in" });
+    }
+  }, [window.location.pathname]);
 
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaReady, setCaptchaReady] = useState(false);
@@ -387,7 +400,11 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen flex bg-background">
-      <SEO title="Sign In / Sign Up" description="Create your MUSHIN account or sign in to access creator intelligence tools." noindex />
+      <SEO 
+        title={window.location.pathname === "/signup" ? "Sign Up" : "Login"} 
+        description="Create your MUSHIN account or sign in to access creator intelligence tools." 
+        noindex 
+      />
 
       {/* ── LEFT: Form Panel ── */}
       <div className="flex-1 relative flex items-center justify-center p-6 max-w-[480px]">

@@ -679,7 +679,14 @@ export function snippetRelevanceScore(query: string, snippet: string): number {
     snippetLower.slice(0, 200),
   );
 
-  // Weights sum to 1.0. Head bonus replaces some flat term-hit weight so that
-  // creaters whose bio leads with the query topic rank above those that bury it.
-  return Math.min(1, termHitRate * 0.45 + headRate * 0.15 + partialRate * 0.10 + trigramScore * 0.30);
+  // keyword density coverage (v3 improvement)
+  const densityScore = queryTerms.reduce((acc, t) => {
+    const count = (snippetLower.match(new RegExp(t, "g")) || []).length;
+    return acc + (count > 1 ? 0.1 : 0);
+  }, 0);
+
+  // Weights sum to 1.0. Hard rejection for zero query terms appearing in snippet
+  if (exactHits === 0 && partialHits === 0 && trigramScore < 0.15) return 0;
+
+  return Math.min(1, termHitRate * 0.55 + headRate * 0.15 + partialRate * 0.10 + trigramScore * 0.20 + densityScore);
 }

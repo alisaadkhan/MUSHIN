@@ -38,7 +38,7 @@ export const LandingHero = () => {
                 {/* Hero CTAs */}
                 <div className="flex flex-col sm:flex-row items-center gap-4">
                     <Button asChild size="lg" variant="default" className="w-full sm:w-auto h-14 px-10 rounded-full tracking-wide">
-                        <Link to="/auth">Start for Free <ArrowRight className="w-4 h-4 ml-2 opacity-80" /></Link>
+                        <Link to="/signup">Start for Free <ArrowRight className="w-4 h-4 ml-2 opacity-80" /></Link>
                     </Button>
                     <Button asChild size="lg" variant="ghost" className="w-full sm:w-auto h-14 px-8 rounded-full tracking-wide opacity-80 hover:opacity-100">
                         <button onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>

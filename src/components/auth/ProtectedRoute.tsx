@@ -17,12 +17,12 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   }
 
   if (!user) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   // Allow /update-password even if email not confirmed (recovery flow)
   if (needsEmailVerification && location.pathname !== "/update-password") {
-    return <Navigate to="/auth?verify=required" replace />;
+    return <Navigate to="/login?verify=required" replace />;
   }
 
   // Profile error – show retry card

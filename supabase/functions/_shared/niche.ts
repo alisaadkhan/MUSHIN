@@ -131,8 +131,8 @@ export const NICHE_PRIORITY = [
   "Entertainment", "Health", "News", "Photography", "Art", "Lifestyle",
 ];
 
-const THRESHOLD = 3;
-const DOMINANCE_GAP = 2;
+const THRESHOLD = 5;
+const DOMINANCE_GAP = 3;
 
 /** Query-level keyword boosts: if the search query contains these words,
  *  boost the corresponding niche by +4 so it's promoted in ties. */

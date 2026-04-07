@@ -510,9 +510,9 @@ export default function LandingPage() {
               </motion.button>
             ))}
             <div className="w-px h-6 bg-white/10 mx-1" />
-            <Link to="/auth" className="text-xs font-medium text-white/45 hover:text-white/75 px-3 py-2 hidden sm:block">Log in</Link>
+            <Link to="/login" className="text-xs font-medium text-white/45 hover:text-white/75 px-3 py-2 hidden sm:block">Log in</Link>
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Link to="/auth" className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold px-5 py-2 rounded-full block">Start Free</Link>
+              <Link to="/login" className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold px-5 py-2 rounded-full block">Start Free</Link>
             </motion.div>
           </div>
         </nav>
@@ -606,7 +606,7 @@ export default function LandingPage() {
                     <RevealText text="Fails in Pakistan." delay={0.2} />
                   </h2>
                   <p className="text-zinc-400 text-lg leading-relaxed mb-8">Most brands are burning budget on fake audiences, manual guesswork, and global tools never designed for Pakistan's unique creator landscape.</p>
-                  <Link to="/auth" className="inline-flex items-center gap-2 text-purple-400 text-sm font-semibold hover:text-purple-300 transition-colors">
+                  <Link to="/login" className="inline-flex items-center gap-2 text-purple-400 text-sm font-semibold hover:text-purple-300 transition-colors">
                     See how Mushin fixes this <ArrowRight className="w-4 h-4" />
                   </Link>
                 </div>
@@ -906,7 +906,7 @@ export default function LandingPage() {
                           </li>
                         ))}
                       </ul>
-                      <Link to="/auth" className={`block text-center py-3 rounded-full text-sm font-bold transition-all ${plan.highlight ? 'bg-purple-600 hover:bg-purple-500 text-white' : 'border border-white/20 hover:border-white/40 text-white'}`}>{plan.cta}</Link>
+                      <Link to="/login" className={`block text-center py-3 rounded-full text-sm font-bold transition-all ${plan.highlight ? 'bg-purple-600 hover:bg-purple-500 text-white' : 'border border-white/20 hover:border-white/40 text-white'}`}>{plan.cta}</Link>
                     </motion.div>
                   ))}
                 </div>
@@ -947,7 +947,7 @@ export default function LandingPage() {
                 <p className="text-zinc-400 text-lg mb-10 max-w-xl mx-auto">Join Pakistani marketing teams already using Mushin to find, verify, and close creators — faster.</p>
                 <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: .97 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 20 }} className="conic-wrap inline-block">
-                  <Link to="/auth" className="conic-inner flex items-center gap-3 px-12 py-4 text-white font-bold text-sm tracking-[0.18em] uppercase">
+                  <Link to="/login" className="conic-inner flex items-center gap-3 px-12 py-4 text-white font-bold text-sm tracking-[0.18em] uppercase">
                     Begin Your Search
                     <span className="w-px h-4 bg-white/20" />
                     <ArrowRight className="w-4 h-4 opacity-50" />

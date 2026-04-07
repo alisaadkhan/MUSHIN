@@ -96,3 +96,16 @@ export function isTikTokProfileUrl(url: string): boolean {
     return false;
   }
 }
+/**
+ * Clean platform noise and duplicate usernames from a creator's display name.
+ */
+export function cleanTitle(raw: string, username: string, platform: string): string {
+  let cleaned = raw;
+  // Strip platform suffix patterns like "• Instagram photos and videos", " - YouTube", etc.
+  cleaned = cleaned.replace(/\s*[•·\-]\s*(Instagram|YouTube|TikTok|Twitch)\s*(photos|videos|channel|profile)?.*/gi, "");
+  // Strip @username mentions already shown as sub-text
+  cleaned = cleaned.replace(new RegExp(`\\s*\\(@?${username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\)`, "gi"), "");
+  // Strip trailing parentheses content that's just platform noise
+  cleaned = cleaned.replace(/\s*\(.*?(?:instagram|youtube|tiktok|twitch).*?\)/gi, "");
+  return cleaned.trim() || username;
+}

@@ -11,6 +11,9 @@ import { computeSearchScore, computeSearchScoreV2, snippetRelevanceScore, detect
 import { normalizeQuery, detectLanguage } from "../_shared/language.ts";
 import { getTagScore, normalizeTags } from "../_shared/tag_intelligence.ts";
 import { expandSerperQueries, extractContactEmail, detectSocialLinks } from "../_shared/query_expander.ts";
+import { extractInstagramFollowers, extractInstagramEngagement } from "../_shared/instagram.ts";
+import { extractTikTokFollowers, extractTikTokEngagement } from "../_shared/tiktok.ts";
+import { extractYouTubeSubscribers, fetchYouTubeSubscriberCount, extractYouTubeProfileImage } from "../_shared/youtube.ts";
 const YOUTUBE_API_KEY = Deno.env.get("YOUTUBE_API_KEY");
 let redis: Redis | null = null;
 if (Deno.env.get("UPSTASH_REDIS_REST_URL") && Deno.env.get("UPSTASH_REDIS_REST_TOKEN")) {
@@ -582,73 +585,48 @@ Deno.serve(async (req) => {
 
         let title = item.title || "";
 
-        if (platform === "youtube" && username.startsWith("UC")) {
-          try {
-            const ctrl = new AbortController();
-            const tid = setTimeout(() => ctrl.abort(), 2000);
-            const res = await fetch(
-              `https://www.youtube.com/oembed?url=https://www.youtube.com/channel/${username}&format=json`,
-              { signal: ctrl.signal }
-            );
-            clearTimeout(tid);
-            if (res.ok) {
-              const d = await res.json();
-              if (d.author_name) title = d.author_name;
-            }
-          } catch { /* noop */ }
-        }
-
-        let ytThumbnail: string | null = null;
-        if (platform === "youtube" && !username.startsWith("UC")) {
-          try {
-            const ytOeCtrl = new AbortController();
-            const ytOeTid = setTimeout(() => ytOeCtrl.abort(), 2000);
-            const ytOeRes = await fetch(
-              `https://www.youtube.com/oembed?url=https://www.youtube.com/@${username.replace("@", "")}&format=json`,
-              { signal: ytOeCtrl.signal }
-            );
-            clearTimeout(ytOeTid);
-            if (ytOeRes.ok) {
-              const ytOeData = await ytOeRes.ok ? await ytOeRes.json() : null;
-              if (ytOeData) {
-                if (ytOeData.author_name) title = ytOeData.author_name;
-                if (ytOeData.thumbnail_url) ytThumbnail = ytOeData.thumbnail_url;
-              }
-            }
-          } catch { /* noop */ }
-        }
-
-        // Clean titles to remove platform suffixes and duplicate usernames
-        title = cleanTitle(title, username, platform);
-
-        let ytSubscriberCount: number | null = null;
-        if (platform === "youtube" && YOUTUBE_API_KEY) {
-          try {
-            const ytCtrl = new AbortController();
-            const ytTid = setTimeout(() => ytCtrl.abort(), 3000);
-            let ytUrl: string;
-            if (username.startsWith("UC")) {
-              ytUrl = `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${username}&key=${YOUTUBE_API_KEY}`;
-            } else {
-              ytUrl = `https://www.googleapis.com/youtube/v3/channels?part=statistics&forHandle=${username.replace("@", "")}&key=${YOUTUBE_API_KEY}`;
-            }
-            const ytRes = await fetch(ytUrl, { signal: ytCtrl.signal });
-            clearTimeout(ytTid);
-            if (ytRes.ok) {
-              const ytData = await ytRes.json();
-              if (ytData.items?.[0]?.statistics?.subscriberCount) {
-                ytSubscriberCount = parseInt(ytData.items[0].statistics.subscriberCount, 10);
-              }
-            }
-          } catch { /* noop */ }
-        }
-
         const snippetText = title + " " + (item.snippet || "");
+        const extractors = {
+          instagram: { 
+            f: () => extractInstagramFollowers(snippetText), 
+            e: () => extractInstagramEngagement(snippetText),
+            img: async () => null 
+          },
+          tiktok: { 
+            f: () => extractTikTokFollowers(snippetText), 
+            e: () => extractTikTokEngagement(snippetText),
+            img: async () => null 
+          },
+          youtube: { 
+            f: () => extractYouTubeSubscribers(snippetText), 
+            e: () => null,
+            img: async () => extractYouTubeProfileImage(username)
+          }
+        };
+
+        const platformKey = platform as keyof typeof extractors;
+        const platformData = extractors[platformKey];
+        
+        // 1. Follower/Subscriber Extraction
+        let followerCount = platformData?.f() ?? null;
+        if (platform === "youtube" && !followerCount && YOUTUBE_API_KEY) {
+            followerCount = await fetchYouTubeSubscriberCount(username, YOUTUBE_API_KEY);
+        }
+
+        // 2. Engagement Extraction
+        let engagementRate = platformData?.e() ?? null;
+
+        // 3. Profile Image Extraction
+        let specificImageUrl = null;
+        if (!item.thumbnailUrl && !item.imageUrl) {
+            specificImageUrl = await platformData?.img() || null;
+        }
+
         const nicheData = inferNiche(title, item.snippet || "", query);
         const city_extracted = extractCity(snippetText, query);
 
         const imageUrl =
-          ytThumbnail ||
+          specificImageUrl ||
           (knowledgeGraph?.imageUrl ? knowledgeGraph.imageUrl : null) ||
           item.thumbnailUrl || item.imageUrl ||
           profileImageMap.get(item.link) ||
@@ -667,16 +645,16 @@ Deno.serve(async (req) => {
           username,
           platform,
           displayUrl: item.link || "",
-          extracted_followers: extractFollowers(snippetText) ?? ytSubscriberCount,
+          extracted_followers: followerCount,
           imageUrl,
           niche: nicheData.niche,
           niche_confidence: parseFloat(nicheData.confidence.toFixed(2)),
           city_extracted,
           contact_email,
           social_links,
-          engagement_rate: null, // will be filled in the merge step below
-          _follower_count_raw: extractFollowers(snippetText) ?? ytSubscriberCount, // needed for benchmark lookup
-          _quality_score: qualityScore(item),  // internal — used for transparency
+          engagement_rate: engagementRate,
+          _follower_count_raw: followerCount,
+          _quality_score: qualityScore(item),
         };
       })
     );

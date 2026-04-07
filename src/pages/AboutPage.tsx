@@ -132,7 +132,7 @@ export default function AboutPage() {
             </span>
           </Link>
           <Link
-            to="/auth"
+            to="/login"
             className="bg-purple-600 hover:bg-purple-500 transition-colors text-white text-xs font-bold px-5 py-2 rounded-full ml-2"
           >
             Start Free
@@ -393,7 +393,7 @@ export default function AboutPage() {
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
-              to="/auth"
+              to="/signup"
               className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-500 transition-colors text-white font-bold px-8 py-3.5 rounded-full text-sm"
             >
               Start for Free

@@ -1,5 +1,27 @@
-title just shows name not url 
-4. Critical Bugs on Creator Profile:
-- Enrich & Evaluate: Fails with "Evaluation failed: AI evaluation service is unavailable. Make sure the edge functions are deployed and your AI API key is configured."
-- Refresh Analytics: Fails with "Analytics unavailable: Edge Function returned a non-2xx status code" (500 or 404).
-also show case creators bio
+# MUSHIN - High-Fidelity Creator Search Requirements (V3)
+
+1. **Platform-Specific Isolation**: 
+   - Refactor extraction logic into 3 dedicated files: `instagram.ts`, `tiktok.ts`, and `youtube.ts`.
+   - Each platform MUST have custom regex and terminology handlers (e.g., YouTube uses "Subscribers").
+
+2. **Mandatory Metrics**:
+   - Followers/Subscribers are NO LONGER OPTIONAL. 
+   - Every search card MUST display a follower/subscriber count.
+   - If extraction fails from snippets, use secondary pattern matching or fallback to "Unknown" (but try to avoid "-" dashes).
+
+3. **YouTube Specifics**:
+   - Display label MUST be "Subscribers" for YouTube creators.
+   - Profile images MUST work (Fix the issue where some creators show placeholder icons).
+
+4. **100% Precision Filter**:
+   - Searching for "Gaming" MUST only return gaming-related creators. 
+   - Tighten `snippetRelevanceScore` and `inferNiche` to reject high-confidence distractors.
+   - Bias results heavily towards creators whose bio/snippet explicitly mentions the search keyword.
+
+5. **UI Fixes (Image1 Reference)**:
+   - Fix the empty state ("-") for "Videos", "Following", and "Engagement". These should show real data or a "Data Refreshing" state instead of a dash.
+   - Ensure the "Creator Bio" is always populated in the search results list.
+
+6. **Branding & Consistency**:
+   - Clean names only (e.g., "Sana Malik" instead of "Sana Malik (@sana_pk) - Instagram profile").
+   - Ensure bio truncation is elegant and doesn't cut off mid-word.

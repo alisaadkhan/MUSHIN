@@ -96,7 +96,8 @@ const App = () => {
             <AppErrorBoundary>
               <Suspense fallback={<PageShell />}>
                 <Routes>
-                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/login" element={<Auth />} />
+                  <Route path="/signup" element={<Auth />} />
                   <Route path="/update-password" element={<ProtectedRoute><UpdatePassword /></ProtectedRoute>} />
                   <Route path="/" element={<LandingPage />} />
                   <Route path="/dashboard" element={<ProtectedPage><Index /></ProtectedPage>} />

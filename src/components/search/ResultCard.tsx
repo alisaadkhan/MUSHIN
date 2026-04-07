@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EvaluationScoreBadge } from "@/components/influencer/EvaluationScoreBadge";
 import { getQualityTier } from "@/modules/search/ranking";
+import { cleanTitle } from "@/modules/platform";
 import type { useNavigate } from "react-router-dom";
 
 export interface SearchResult {
@@ -81,7 +82,7 @@ export const ResultCard = React.memo(function ResultCard({
   canUseAI, navigate, evaluateInfluencer, setEvaluatingUsername,
   setCachedScores, handleAddToList, setPendingAddResult, setShowCreateList,
 }: ResultCardProps) {
-  const displayName = c.full_name || c.title || c.username;
+  const displayName = cleanTitle(c.full_name || c.title || c.username, c.username, c.platform);
   const initials = displayName.split(" ").map((n: string) => n[0]).slice(0, 2).join("") || "?";
   const city = c.city_extracted || c.city;
   const scoreKey = `${c.platform} - ${c.username}`;
@@ -136,10 +137,12 @@ export const ResultCard = React.memo(function ResultCard({
                 disabled={evalLoading && evaluatingUsername === c.username}
                 onClick={async () => {
                   setEvaluatingUsername(c.username);
+                  let title = c.title || "";
+                  title = cleanTitle(title, c.username, c.platform);
                   const result = await evaluateInfluencer({
                     username: c.username, platform: c.platform,
                     followers: c.extracted_followers, snippet: c.snippet,
-                    title: c.title, link: c.link,
+                    title: title, link: c.link,
                   });
                   if (result) {
                     setCachedScores((prev: any) => ({ ...prev, [scoreKey]: result.overall_score }));
@@ -279,9 +282,9 @@ export const ResultCard = React.memo(function ResultCard({
 
       <div className="grid grid-cols-3 gap-2 text-center mt-4 border-t border-border/50 pt-4">
         <div>
-          <p className="text-xs text-muted-foreground">Followers</p>
+          <p className="text-xs text-muted-foreground">{c.platform === "youtube" ? "Subscribers" : "Followers"}</p>
           <p data-testid="card-followers" className="text-sm font-semibold text-foreground data-mono">
-            {c.extracted_followers ? formatFollowers(c.extracted_followers) : "—"}
+            {c.extracted_followers ? formatFollowers(c.extracted_followers) : (c.platform === "youtube" ? "Refreshing..." : "Data Refreshing")}
           </p>
         </div>
         <div>
@@ -289,7 +292,7 @@ export const ResultCard = React.memo(function ResultCard({
             <p className="text-xs text-muted-foreground">Engagement</p>
           </div>
           <p data-testid="card-engagement" className="text-sm font-semibold text-foreground data-mono">
-            {c.engagement_rate != null ? `${c.engagement_rate.toFixed(1)}%` : "—"}
+            {c.engagement_rate != null ? `${c.engagement_rate.toFixed(1)}%` : "Refreshing..."}
           </p>
           <div className="flex justify-center mt-1">
             {c.is_enriched && (
