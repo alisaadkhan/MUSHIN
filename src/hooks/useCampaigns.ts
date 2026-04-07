@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { notifyIntegrations } from "@/lib/integrations";
+import { trackEvent } from "@/lib/analytics";
 
 export function useCampaigns() {
   const { workspace } = useAuth();
@@ -34,7 +35,10 @@ export function useCampaigns() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["campaigns", workspace?.workspace_id] }),
+    onSuccess: (result) => {
+      trackEvent("campaign_created", { campaignId: result.id });
+      qc.invalidateQueries({ queryKey: ["campaigns", workspace?.workspace_id] });
+    },
   });
 
   const updateCampaign = useMutation({
@@ -55,7 +59,12 @@ export function useCampaigns() {
         }).catch((e: unknown) => console.warn("[campaigns] notifyIntegrations failed:", e));
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["campaigns", workspace?.workspace_id] }),
+    onSuccess: (_, { id, ...values }) => {
+      if (values.status) {
+        trackEvent("campaign_status_changed", { campaignId: id, newStatus: values.status });
+      }
+      qc.invalidateQueries({ queryKey: ["campaigns", workspace?.workspace_id] });
+    },
   });
 
   const deleteCampaign = useMutation({
@@ -68,7 +77,10 @@ export function useCampaigns() {
         .eq("workspace_id", workspace.workspace_id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["campaigns", workspace?.workspace_id] }),
+    onSuccess: (_, id) => {
+      trackEvent("campaign_deleted", { campaignId: id });
+      qc.invalidateQueries({ queryKey: ["campaigns", workspace?.workspace_id] });
+    },
   });
 
   return { ...campaignsQuery, createCampaign, updateCampaign, deleteCampaign };

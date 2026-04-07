@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { SEO } from "@/components/SEO";
 import { motion, useScroll, useTransform, useInView, animate, AnimatePresence, MotionConfig, useMotionValueEvent } from 'framer-motion';
 import {
   CheckCircle, DollarSign, Info, Sparkles, ArrowRight, Search, Star, Shield, Zap, Users,
@@ -7,14 +8,13 @@ import {
   MessageCircle, Eye, Layers, Instagram
 } from 'lucide-react';
 import { MushInLogo, MushInIcon } from '@/components/ui/MushInLogo';
-import { Button } from '@/components/ui/button';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { DottedSurface } from '@/components/ui/dotted-surface';
 import { LandingHero } from "@/components/landing/LandingHero";
 
 /* --- TikTok icon (custom SVG, since lucide-react doesn't provide it) --- */
 const TikTokIcon = ({ className, size = 16, style }: { className?: string; size?: number; style?: React.CSSProperties }) => (
-  <svg
+    <svg
     xmlns="http://www.w3.org/2000/svg"
     width={size}
     height={size}
@@ -275,7 +275,7 @@ const BentoCard = ({ children, className = '', glow = false }: { children: React
         }
       }}
       onMouseLeave={() => { if (spotRef.current) spotRef.current.style.opacity = '0'; }}
-      className={`relative rounded-2xl border border-white/5 bg-[#0f1119] overflow-hidden ${className}`}>
+      className={`relative rounded-2xl border border-white/10 bg-[#0f1119] overflow-hidden ${className}`}>
       <div ref={spotRef} className="pointer-events-none absolute inset-0 rounded-2xl" style={{ opacity: 0, zIndex: 0, transition: 'opacity 0.2s' }} />
       {glow && <BorderBeam />}
       <div className="relative z-10">{children}</div>
@@ -461,16 +461,6 @@ export default function LandingPage() {
     { id: 'about',    icon: <Info className="w-4 h-4" />, label: 'About' },
   ];
 
-  /* Stagger container for nav */
-  const navList = {
-    visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.2 } },
-    hidden: { opacity: 0 }
-  };
-  const navItemVar: any = {
-    visible: { opacity: 1, x: 0, transition: { duration: 0.5, ease: "circOut" } },
-    hidden: { opacity: 0, x: -10 }
-  };
-
   const platforms = [
     { name: 'Instagram', color: '#E1306C', bg: '#E1306C15', border: '#E1306C30', niches: ['Fashion','Beauty','Lifestyle','Food','Travel'] },
     { name: 'TikTok',    color: '#69C9D0', bg: '#69C9D015', border: '#69C9D030', niches: ['Comedy','Entertainment','Dance','Trends','DIY'] },
@@ -488,50 +478,43 @@ export default function LandingPage() {
 
   return (
     <MotionConfig transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}>
+      <SEO title="Creator Intelligence Platform" description="Find verified Pakistani creators, detect fraud, and run outreach campaigns from one workspace. Used by 2,800+ marketing teams." />
       <div className="bg-[#060608] text-white">
         <G />
         <GrainOverlay />
         <DottedSurface />
 
-        {/* Navbar – solid box, premium animations */}
-        <nav className="fixed top-8 left-1/2 -translate-x-1/2 z-[100] w-full max-w-fit px-4">
-          <motion.div 
-            initial="hidden"
-            animate="visible"
-            variants={navList}
-            className="flex items-center gap-2 border rounded-2xl bg-[#0d0f1a] border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.8)] px-4 py-2"
-          >
-            <motion.div variants={navItemVar} className="flex items-center gap-2 mr-4">
-              <Link to="/" className="flex items-center gap-2">
-                <MushInIcon size={30} className="text-purple-500" />
-                <span className="text-xs font-black tracking-[0.2em] text-white">MUSHIN</span>
-              </Link>
-            </motion.div>
-
-            <div className="hidden md:flex items-center gap-1">
-              {navItems.map(item => (
-                <motion.button
-                  key={item.id}
-                  variants={navItemVar}
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.96 }}
-                  onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth' })}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition-all text-xs font-bold uppercase tracking-widest"
+        {/* Navbar – solid background, animated icons, no glass */}
+        <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-[100]">
+          <div className="flex items-center gap-3 border rounded-full bg-[#0a0c12] border-white/15 shadow-[0_8px_48px_rgba(0,0,0,0.7)] px-4 py-1.5">
+            <Link to="/" className="flex items-center gap-2 mr-2">
+              <MushInIcon size={28} className="text-primary" />
+              <span className="text-sm font-bold tracking-[0.15em] text-white">MUSHIN</span>
+            </Link>
+            {navItems.map(item => (
+              <motion.button
+                key={item.id}
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth' })}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-full text-white/70 hover:text-white transition-all group"
+              >
+                <motion.span
+                  className="inline-block"
+                  animate={{ y: [0, -2, 0] }}
+                  transition={{ duration: 0.4, repeat: Infinity, repeatDelay: 1.2 }}
                 >
-                  {item.label}
-                </motion.button>
-              ))}
-            </div>
-
-            <div className="w-px h-4 bg-white/10 mx-2 hidden md:block" />
-            
-            <motion.div variants={navItemVar} className="flex items-center gap-3">
-              <Link to="/auth" className="text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white px-2 transition-colors">Log in</Link>
-              <Button asChild size="sm" className="bg-white hover:bg-zinc-200 text-black text-[10px] font-black uppercase tracking-widest px-6 h-9 rounded-xl shadow-[0_0_20px_rgba(255,255,255,0.1)]">
-                <Link to="/auth">Start Free</Link>
-              </Button>
+                  {item.icon}
+                </motion.span>
+                <span className="text-sm font-medium">{item.label}</span>
+              </motion.button>
+            ))}
+            <div className="w-px h-6 bg-white/10 mx-1" />
+            <Link to="/auth" className="text-xs font-medium text-white/45 hover:text-white/75 px-3 py-2 hidden sm:block">Log in</Link>
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Link to="/auth" className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold px-5 py-2 rounded-full block">Start Free</Link>
             </motion.div>
-          </motion.div>
+          </div>
         </nav>
 
         <LandingHero />
@@ -678,20 +661,12 @@ export default function LandingPage() {
               </div>
             </SectionSpotlight>
 
-            {/* Intelligence Engine – Atom Orbit (Balanced for Mobile) */}
+            {/* Intelligence Engine – Atom Orbit */}
             <SectionSpotlight className="py-24 px-6 border-t border-white/[0.06]">
               <div className="max-w-5xl mx-auto text-center">
-                <h2 className="text-4xl md:text-5xl font-black tracking-tighter mb-16">Intelligence Engine</h2>
-                <div className="hidden md:block">
-                  <AtomOrbit />
-                </div>
-                <div className="md:hidden opacity-60">
-                   {/* Simplified representation for mobile performance */}
-                   <div className="flex justify-center mb-8">
-                     <MushInIcon size={80} className="text-purple-500 animate-pulse" />
-                   </div>
-                </div>
-                <p className="text-zinc-500 mt-8 tracking-widest text-xs uppercase font-bold">Instagram · TikTok · YouTube · Unified Intelligence</p>
+                <h2 className="text-4xl md:text-5xl font-black tracking-tighter mb-8">Intelligence Engine</h2>
+                <AtomOrbit />
+                <p className="text-zinc-400 mt-8">Instagram, TikTok, YouTube – unified creator intelligence.</p>
               </div>
             </SectionSpotlight>
 
@@ -789,6 +764,53 @@ export default function LandingPage() {
               </div>
             </SectionSpotlight>
 
+            {/* Testimonials */}
+            <SectionSpotlight className="py-20 border-t border-white/[0.06]">
+              <div>
+                <div className="text-center mb-12 px-6">
+                  <motion.div initial={{ opacity: 0, x: -16 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="text-purple-400 text-xs font-medium uppercase tracking-widest mb-4">Built for Marketing Teams Across Pakistan</motion.div>
+                  <RevealLine />
+                  <h2 className="text-3xl md:text-5xl font-black tracking-tighter leading-tight">
+                    <RevealText text="Teams Love" className="aurora-text" />{' '}
+                    <RevealText text="What We Built." delay={0.2} />
+                  </h2>
+                  <p className="text-white/30 text-xs mt-4">* Testimonials below are illustrative scenarios — not attributed to specific companies.</p>
+                </div>
+                <div className="mb-8">
+                  <MarqueeRow speed={28} items={['Fintech','E-commerce','Telecom','Fashion Retail','FMCG','Digital Agency','D2C Brand','Media House','Startup','Food & Beverage','Beauty & Skincare','EdTech'].map((b, i) => (
+                    <div key={i} className="px-5 py-2 rounded-full border border-white/10 bg-[#0f1119] text-white/60 text-sm font-semibold whitespace-nowrap hover:border-purple-500/30 hover:text-purple-400 transition-colors cursor-pointer">{b}</div>
+                  ))} />
+                </div>
+                <div className="space-y-4">
+                  <MarqueeRow speed={38} items={[
+                    { name: 'Sarah K.',  role: 'Brand Manager — Fintech',         text: 'Found 3 mega-creators for our Eid campaign in under 10 minutes. The ROAS was exceptional.' },
+                    { name: 'Ahmed R.',  role: 'Growth Lead — E-commerce',        text: 'The fraud detection alone saved us from 2 fake-follower influencers with 800K combined followers.' },
+                    { name: 'Fatima Z.', role: 'CMO — Fashion Retail',            text: 'We replaced 3 separate tools with Mushin. The Kanban board is a game changer.' },
+                    { name: 'Usman T.', role: 'Digital Director — Fintech',       text: 'Karachi-specific filtering is insane. Found 47 verified nano-influencers in our exact market.' },
+                  ].map((t, i) => (
+                    <div key={i} className="w-72 flex-shrink-0 bg-[#0f1119] border border-white/10 rounded-2xl p-5 hover:border-purple-500/20 transition-all">
+                      <div className="flex gap-1 mb-3">{[...Array(5)].map((_, j) => <Star key={j} className="w-3 h-3 fill-purple-400 text-purple-400" />)}</div>
+                      <p className="text-white/70 text-sm leading-relaxed mb-4">"{t.text}"</p>
+                      <div className="text-sm font-bold text-white">{t.name}</div>
+                      <div className="text-white/60 text-xs">{t.role}</div>
+                    </div>
+                  ))} />
+                  <MarqueeRow reverse speed={42} items={[
+                    { name: 'Nadia M.',  role: 'Influencer Lead — Fashion Retail', text: "The Relevance Score is the most reliable metric for Pakistani creator quality I've ever used." },
+                    { name: 'Bilal A.',  role: 'CEO — Digital Agency',             text: 'Clients trust our recommendations more now that we back everything with Mushin data.' },
+                    { name: 'Anosha B.', role: 'Marketing Head — D2C Brand',       text: 'Went from 2 weeks of manual research to 30 minutes of verified outreach. Remarkable.' },
+                    { name: 'Zaid H.',   role: 'Founder — Media House',            text: 'City-level niche filters are something no other platform offers for Pakistan. Game-changing.' },
+                  ].map((t, i) => (
+                    <div key={i} className="w-72 flex-shrink-0 bg-[#0f1119] border border-white/10 rounded-2xl p-5 hover:border-purple-500/20 transition-all">
+                      <div className="flex gap-1 mb-3">{[...Array(5)].map((_, j) => <Star key={j} className="w-3 h-3 fill-purple-400 text-purple-400" />)}</div>
+                      <p className="text-white/70 text-sm leading-relaxed mb-4">"{t.text}"</p>
+                      <div className="text-sm font-bold text-white">{t.name}</div>
+                      <div className="text-white/60 text-xs">{t.role}</div>
+                    </div>
+                  ))} />
+                </div>
+              </div>
+            </SectionSpotlight>
 
             {/* About */}
             <SectionSpotlight id="about" className="py-24 px-6 border-t border-white/[0.06]">
@@ -814,6 +836,35 @@ export default function LandingPage() {
               </div>
             </SectionSpotlight>
 
+            {/* Zero Risk / Objection Handling */}
+            <SectionSpotlight className="py-20 px-6 border-t border-white/[0.06]">
+              <div className="max-w-4xl mx-auto">
+                <div className="text-center mb-10">
+                  <div className="text-purple-400 text-xs font-medium uppercase tracking-widest mb-4">Zero Risk</div>
+                  <RevealLine />
+                  <h2 className="text-3xl md:text-4xl font-black tracking-tighter">Every Concern, Addressed.</h2>
+                </div>
+                <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  {[
+                    { icon: <Shield className="w-5 h-5 text-green-400" />, title: 'No Lock-In', desc: 'Month-to-month billing. Cancel instantly from your dashboard — no questions asked.' },
+                    { icon: <CheckCircle className="w-5 h-5 text-blue-400" />, title: 'Transparent Pricing', desc: 'The price listed is the price you pay. Zero hidden overages or surprise fees.' },
+                    { icon: <Zap className="w-5 h-5 text-yellow-400" />, title: 'Real Human Support', desc: 'Every plan includes support via email and chat — not a bot, not a knowledge base article.' },
+                    { icon: <Users className="w-5 h-5 text-purple-400" />, title: '10,000+ Creators', desc: '10,000+ indexed Pakistani creator profiles. If they are active, we are tracking them.' },
+                  ].map((item, i) => (
+                    <div key={i} className="rounded-2xl border border-white/10 bg-[#0f1119] p-5">
+                      <div className="mb-3">{item.icon}</div>
+                      <div className="font-bold text-sm text-white mb-1">{item.title}</div>
+                      <div className="text-zinc-500 text-xs leading-relaxed">{item.desc}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="rounded-2xl border border-purple-500/20 bg-purple-500/[0.05] p-8 text-center">
+                  <div className="text-4xl mb-3">💰</div>
+                  <div className="text-white font-black text-xl mb-2">14-Day Money-Back Guarantee</div>
+                  <div className="text-zinc-400 text-sm max-w-md mx-auto">Not satisfied in the first 14 days? Email us and we'll refund every rupee. No forms, no friction.</div>
+                </div>
+              </div>
+            </SectionSpotlight>
 
             {/* Pricing */}
             <SectionSpotlight id="pricing" className="py-24 px-6 border-t border-white/[0.06]">
@@ -834,7 +885,7 @@ export default function LandingPage() {
                   {([
                     { name: 'Free',     price: { m: 0,     a: 0     }, desc: 'For individuals just getting started.',       features: ['50 searches/month','5 creator profiles/day','Basic Relevance score','Email support'],                                                                     cta: 'Start Free',     highlight: false },
                     { name: 'Pro',      price: { m: 4999,  a: 3999  }, desc: 'For brands running active campaigns.',        features: ['Unlimited searches','Full creator profiles','Fraud detection reports','Campaign Kanban board','CSV export','Priority support'],                    cta: 'Start Pro',      highlight: true  },
-                    { name: 'Business', price: { m: 14999, a: 11999 }, desc: 'For agencies managing multiple brands.',      features: ['Everything in Pro','Multi-seat access (5 users)','Extra Search Credits','White-label reports','Dedicated account manager','Custom integrations'],           cta: 'Contact Sales',  highlight: false },
+                    { name: 'Business', price: { m: 14999, a: 11999 }, desc: 'For agencies managing multiple brands.',      features: ['Everything in Pro','Multi-seat access (5 users)','API access','White-label reports','Dedicated account manager','Custom integrations'],           cta: 'Contact Sales',  highlight: false },
                   ] as { name: string; price: { m: number; a: number }; desc: string; features: string[]; cta: string; highlight: boolean }[]).map(plan => (
                     <motion.div key={plan.name} initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
                       className={`relative rounded-2xl border p-7 flex flex-col ${plan.highlight ? 'border-purple-500/40 bg-[#13102a]' : 'border-white/10 bg-[#0f1119]'}`}>
@@ -883,6 +934,28 @@ export default function LandingPage() {
               </div>
             </SectionSpotlight>
 
+            {/* CTA */}
+            <SectionSpotlight className="py-32 px-6 border-t border-white/[0.06]">
+              <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 50%, rgba(88,28,135,0.18) 0%, transparent 70%)' }} />
+              <div className="max-w-3xl mx-auto text-center relative z-10">
+                <motion.div initial={{ opacity: 0, x: -16 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="text-purple-400 text-xs font-medium uppercase tracking-widest mb-4">Get Started</motion.div>
+                <RevealLine />
+                <h2 className="font-black tracking-tighter leading-[.88] mb-8" style={{ fontSize: 'clamp(3rem,8vw,6rem)' }}>
+                  <RevealText text="Your Next Campaign" /><br />
+                  <RevealText text="Starts Here." delay={0.2} />
+                </h2>
+                <p className="text-zinc-400 text-lg mb-10 max-w-xl mx-auto">Join Pakistani marketing teams already using Mushin to find, verify, and close creators — faster.</p>
+                <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: .97 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 20 }} className="conic-wrap inline-block">
+                  <Link to="/auth" className="conic-inner flex items-center gap-3 px-12 py-4 text-white font-bold text-sm tracking-[0.18em] uppercase">
+                    Begin Your Search
+                    <span className="w-px h-4 bg-white/20" />
+                    <ArrowRight className="w-4 h-4 opacity-50" />
+                  </Link>
+                </motion.div>
+                <p className="text-zinc-600 text-xs mt-6">Free forever plan available. No credit card required.</p>
+              </div>
+            </SectionSpotlight>
 
             {/* Footer */}
             <footer className="border-t border-white/[0.06] py-12 px-6">

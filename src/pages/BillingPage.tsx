@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { SEO } from "@/components/SEO";
 import { Link, useSearchParams } from "react-router-dom";
 import { Check, CreditCard, ExternalLink, Zap } from "lucide-react";
 import { format } from "date-fns";
@@ -12,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { PaymentsPanel, type PaymentRecord } from "@/components/payments/PaymentsPanel";
 import { supabase } from "@/integrations/supabase/client";
+import { trackEvent } from "@/lib/analytics";
 
 const planOrder: PlanKey[] = ["free", "pro", "business"];
 
@@ -81,9 +83,14 @@ export default function BillingPage() {
 
   const handleCheckout = async (priceId: string) => {
     try {
+      // Determine plan from priceId
+      const planForPrice = Object.values(PLANS).find(p => 'price_id' in p && p.price_id === priceId)?.name || 'unknown';
+      trackEvent("checkout_started", { plan: planForPrice, priceId });
       await checkout(priceId);
+      trackEvent("checkout_completed", { plan: planForPrice, priceId });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Something went wrong";
+      trackEvent("checkout_failed", { error: message });
       toast({ title: "Checkout failed", description: message, variant: "destructive" });
     }
   };
@@ -119,6 +126,7 @@ export default function BillingPage() {
 
   return (
     <div className="space-y-6 max-w-5xl">
+      <SEO title="Billing" description="Manage your MUSHIN subscription and billing." noindex />
       <div>
         <h1 className="font-serif text-2xl font-bold text-foreground">Billing</h1>
         <p className="text-sm text-muted-foreground mt-1">Manage your subscription and billing</p>

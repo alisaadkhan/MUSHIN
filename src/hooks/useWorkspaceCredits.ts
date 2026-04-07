@@ -1,11 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { trackEvent } from "@/lib/analytics";
+import { useEffect, useRef } from "react";
 
 export function useWorkspaceCredits() {
   const { workspace } = useAuth();
+  const previousCredits = useRef<number | null>(null);
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ["workspace-credits", workspace?.workspace_id],
     queryFn: async () => {
       if (!workspace) throw new Error("No workspace");
@@ -28,4 +31,27 @@ export function useWorkspaceCredits() {
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
+
+  // Track when credits drop significantly (indicating usage)
+  useEffect(() => {
+    if (query.data && previousCredits.current !== null) {
+      const current = query.data.search_credits_remaining;
+      const previous = previousCredits.current;
+      
+      // If credits dropped by more than 10%, track it
+      if (current < previous * 0.9) {
+        trackEvent("credits_used", {
+          creditsRemaining: current,
+          creditsUsed: previous - current,
+          plan: query.data.plan
+        });
+      }
+    }
+    
+    if (query.data) {
+      previousCredits.current = query.data.search_credits_remaining;
+    }
+  }, [query.data]);
+
+  return query;
 }

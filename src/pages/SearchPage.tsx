@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useReducer, lazy, Suspense, useMemo } from "react";
+import { SEO } from "@/components/SEO";
 import {
   Search as SearchIcon, Filter, ExternalLink, Loader2, Bookmark,
   AlertCircle, Lock, Sparkles, Plus, MapPin,
@@ -28,6 +29,8 @@ import { format } from "date-fns";
 import { useInfluencerEvaluation } from "@/hooks/useInfluencerEvaluation";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { ResultCard, type SearchResult } from "@/components/search/ResultCard";
+import { trackEvent } from "@/lib/analytics";
+import { logger } from "@/lib/logger";
 
 const CreateListDialog = lazy(() => import("@/components/search/dialogs/CreateListDialog"));
 const SaveSearchDialog = lazy(() => import("@/components/search/dialogs/SaveSearchDialog"));
@@ -353,6 +356,15 @@ export default function SearchPage() {
       setResults(sortedResults);
       setCreditsRemaining(creditsLeft);
 
+      trackEvent("search_performed", {
+        query: query.trim(),
+        platforms: selectedPlatforms,
+        city: selectedCity,
+        followerRange,
+        aiSearch: isAiSearch,
+        resultsCount: sortedResults.length,
+      });
+
       const cacheKey = buildCacheKey(query.trim(), platforms, selectedCity, followerRange);
       try {
         sessionStorage.setItem(cacheKey, JSON.stringify({
@@ -370,10 +382,18 @@ export default function SearchPage() {
       queryClient.invalidateQueries({ queryKey: ["workspace-credits"] });
       queryClient.invalidateQueries({ queryKey: ["search-history"] });
 
+      trackEvent("credit_usage", {
+        action: "search",
+        creditsRemaining: creditsLeft,
+      });
+      logger.info("search", "Search completed", { query: query.trim(), results: sortedResults.length });
+
       if (sortedResults.length === 0) {
         toast({ title: "No results", description: "Try a different keyword, city, or platform." });
       }
     } catch (err: any) {
+      logger.error("search", "Search failed", err);
+      trackEvent("search_failed", { query: query.trim(), error: err.message });
       setSearchError(err.message || "Something went wrong");
       toast({ title: "Search failed", description: err.message || "Something went wrong", variant: "destructive" });
       setResults([]);
@@ -438,6 +458,7 @@ export default function SearchPage() {
 
   return (
     <div className="space-y-6">
+      <SEO title="Search Creators" description="Search verified Pakistani creators across Instagram, TikTok, and YouTube." noindex />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

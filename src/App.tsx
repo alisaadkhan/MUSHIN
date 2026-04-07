@@ -9,6 +9,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { AdminRoute } from "@/components/admin/AdminRoute";
+import { usePostHogPageview } from "@/lib/analytics";
 
 // Eagerly load the two routes users land on most — zero extra network round-trip
 import LandingPage from "./pages/LandingPage";
@@ -63,6 +64,11 @@ const ProtectedPage = ({ children }: { children: React.ReactNode }) => (
   </ProtectedRoute>
 );
 
+const PostHogPageviewTracker = () => {
+  usePostHogPageview();
+  return null;
+};
+
 const App = () => {
   // Stable client — recreated only on component mount, never on re-render.
   // Prevents cache miss storms caused by constructing a new QueryClient every render.
@@ -85,6 +91,7 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <PostHogPageviewTracker />
           <AuthProvider>
             <AppErrorBoundary>
               <Suspense fallback={<PageShell />}>

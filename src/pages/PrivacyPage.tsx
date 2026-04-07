@@ -14,6 +14,7 @@
  */
 
 import React from 'react';
+import { SEO } from "@/components/SEO";
 import LegalPageLayout, { LegalSection } from '@/components/LegalPageLayout';
 
 const sections: LegalSection[] = [
@@ -221,12 +222,15 @@ const sections: LegalSection[] = [
 
 export default function PrivacyPage() {
   return (
-    <LegalPageLayout
-      badge="Legal"
-      title="Privacy Policy"
-      subtitle="We take your privacy seriously. Here's exactly what we collect, why we collect it, and how it's protected."
-      lastUpdated="April 2026"
-      sections={sections}
-    />
+    <>
+      <SEO title="Privacy Policy" description="MUSHIN privacy policy and data practices." />
+      <LegalPageLayout
+        badge="Legal"
+        title="Privacy Policy"
+        subtitle="We take your privacy seriously. Here's exactly what we collect, why we collect it, and how it's protected."
+        lastUpdated="April 2026"
+        sections={sections}
+      />
+    </>
   );
 }

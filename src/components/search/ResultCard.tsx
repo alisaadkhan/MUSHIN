@@ -113,9 +113,9 @@ export const ResultCard = React.memo(function ResultCard({
               : <span>{initials}</span>
             }
           </div>
-          <div className="overflow-hidden min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
-            <p className="text-xs text-muted-foreground truncate">@{c.username.replace("@", "")}</p>
+          <div className="overflow-hidden min-w-0 max-w-[200px]">
+            <p className="text-sm font-medium text-foreground truncate" title={displayName}>{displayName}</p>
+            <p className="text-xs text-muted-foreground truncate" title={c.username.replace("@", "")}>@{c.username.replace("@", "")}</p>
           </div>
         </div>
 

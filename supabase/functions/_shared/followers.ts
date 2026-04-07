@@ -27,9 +27,19 @@ export function extractFollowers(text: string): number | null {
     /[·•]\s*(\d[\d,.]*)\s*([kKmMbB](?:illion)?)?\s*(followers?|subs(?:cribers?)?)/i,
     /(\d[\d,.]*)\s*([kKmMbB](?:illion)?)?\s*(followers?|subs(?:cribers?)?)/i,
     /(followers?|subs(?:cribers?)?)\s*:?\s*(\d[\d,.]*)\s*([kKmMbB](?:illion)?)?/i,
+    // ── Standalone K/M/B with follower context nearby ────────────────────
+    /(\d[\d,.]*)\s*([kKmMbB])\b(?=.{0,30}(?:follower|subscriber|audience|fan))/i,
+    /(?:(?:follower|subscriber|audience|fan)[s']?\s*:?\s*)(\d[\d,.]*)\s*([kKmMbB])?/i,
+    // ── Numbers in parentheses with follower context ─────────────────────
+    /\((\d[\d,.]*)\s*([kKmMbB])?\s*(?:follower|subscriber|sub|fan)/i,
+    // ── "1.2M+" or "500K+" style ──────────────────────────────────────────
+    /(\d[\d,.]*)\s*([kKmMbB])\+?\s*(?:followers?|subs?)/i,
+    // ── Bare number with K/M/B near follower word (within 30 chars) ──────
+    /(\d[\d,.]*)\s*([kKmMbB])\b.{0,30}(?:follower|subscriber|sub\b)/i,
+    /(?:follower|subscriber|subs?)\b.{0,30}(\d[\d,.]*)\s*([kKmMbB])\b/i,
   ];
 
-  const REVERSED_PATTERN_INDEX = 6; // the last pattern has reversed group order
+  const REVERSED_PATTERN_INDEX = 6;
 
   for (let i = 0; i < patterns.length; i++) {
     const patt = patterns[i];

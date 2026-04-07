@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { SEO } from "@/components/SEO";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Plus, Megaphone, Trash2, Users, CalendarIcon, BarChart3, DollarSign, MoreHorizontal } from "lucide-react";
@@ -104,6 +105,7 @@ export default function CampaignsPage() {
 
   return (
     <div className="space-y-6">
+      <SEO title="Campaigns" description="Manage your influencer marketing campaigns." noindex />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-serif text-2xl font-bold text-foreground">Campaigns</h1>

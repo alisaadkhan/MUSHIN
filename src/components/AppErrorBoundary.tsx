@@ -1,6 +1,8 @@
 import React, { Component, ErrorInfo } from 'react';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCcw, Home } from 'lucide-react';
+import { Sentry } from '@/lib/sentry';
+import { logger } from '@/lib/logger';
 
 interface Props {
     children?: React.ReactNode;
@@ -21,7 +23,8 @@ export class AppErrorBoundary extends Component<Props, State> {
     }
 
     public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-        console.error('Uncaught application error:', error, errorInfo);
+        logger.error('AppErrorBoundary', 'Uncaught application error', error, { componentStack: errorInfo.componentStack });
+        Sentry?.captureException(error, { contexts: { react: { componentStack: errorInfo.componentStack } } });
     }
 
     private handleReset = () => {

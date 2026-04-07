@@ -16,6 +16,7 @@
 
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { SEO } from "@/components/SEO";
 import { ArrowLeft, ArrowRight, Clock, Tag, Rss } from 'lucide-react';
 import { MushInIcon } from '@/components/ui/MushInLogo';
 
@@ -228,6 +229,7 @@ export default function BlogPage() {
 
   return (
     <div className="min-h-screen bg-[#060608] text-white overflow-x-hidden">
+      <SEO title="Blog" description="Latest insights on influencer marketing in Pakistan." />
       {/* Background */}
       <div
         className="pointer-events-none fixed inset-0"

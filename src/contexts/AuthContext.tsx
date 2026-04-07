@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { identifyUser, resetPostHog, trackEvent } from "@/lib/analytics";
+import { logger } from "@/lib/logger";
 
 interface Profile {
   id: string;
@@ -32,7 +34,7 @@ interface AuthContextType {
   resendVerificationEmail: (email: string) => Promise<{ error: Error | null }>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -84,14 +86,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         // Block consumer email domains for Google OAuth sign-in.
-        // We call the server-side check_email_allowed RPC so the authoritative
-        // blocked-domain list (managed in the DB) is always used.
         if (event === 'SIGNED_IN' && newSession) {
           const provider = newSession.user.app_metadata?.provider;
           if (provider === 'google') {
             const email = newSession.user.email || '';
-            const { data: checkResult } = await supabase.rpc('check_email_allowed', { p_email: email });
-            if (checkResult && checkResult.allowed === false) {
+            // Type assertion since the RPC may not be in generated types yet
+            const { data: checkResult } = await (supabase.rpc as any)('check_email_allowed', { p_email: email });
+            const result = checkResult as { allowed?: boolean } | null;
+            if (result && result.allowed === false) {
               await supabase.auth.signOut();
               localStorage.setItem('auth_google_blocked', email.split('@')[1] || 'consumer');
               setSession(null); setUser(null); setProfile(null); setWorkspace(null);
@@ -111,18 +113,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (newSession) {
           setSession(newSession);
           setUser(newSession.user);
+          if (newSession.user.id) {
+            identifyUser(newSession.user.id, {
+              email: newSession.user.email,
+              email_confirmed: !!newSession.user.email_confirmed_at,
+            });
+          }
           if (newSession.user.email_confirmed_at) {
             setTimeout(() => fetchProfileAndWorkspace(newSession.user.id), 0);
           }
+          trackEvent("login", { method: newSession.user.app_metadata?.provider || "email" });
         }
         setLoading(false);
       }
     );
-
-    // M-5 fix: onAuthStateChange fires INITIAL_SESSION immediately with the
-    // current session — no need to call getSession() separately which causes a
-    // duplicate fetchProfileAndWorkspace on every app load.
-    // setLoading(false) is already handled inside the listener for all paths.
 
     return () => subscription.unsubscribe();
   }, [fetchProfileAndWorkspace]);
@@ -136,6 +140,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...(captchaToken ? { captchaToken } : {}),
       },
     });
+    if (!error) {
+      trackEvent("signup", { email_domain: email.split("@")[1] });
+      logger.info("auth", "User signed up", { email });
+    }
     return { error: error ? new Error(error.message) : null };
   };
 
@@ -145,10 +153,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
       options: captchaToken ? { captchaToken } : undefined,
     });
+    if (!error) {
+      trackEvent("login", { method: "email" });
+      logger.info("auth", "User signed in", { email });
+    }
     return { error: error ? new Error(error.message) : null };
   };
 
   const signInWithGoogle = async () => {
+    trackEvent("login", { method: "google" });
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: window.location.origin },
@@ -157,7 +170,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    trackEvent("logout");
     await supabase.auth.signOut();
+    resetPostHog();
     setProfile(null);
     setWorkspace(null);
   };

@@ -1,0 +1,6 @@
+generated secrets = 772f1b19e4920e8ca7fb23e94f6395daa24b80c81990fcfc0b83af4e33201cc2
+UPSTASH_REDIS_REST_URL="https://boss-racer-79284.upstash.io"
+UPSTASH_REDIS_REST_TOKEN="gQAAAAAAATW0AAIncDFhZjE4ODY3MjkwMTI0ZGE2YjUxMWYzOTBiNjBiNTBlY3AxNzkyODQ"
+app url https://mushin-syq3.vercel.app/
+https://github.com/al
+isaadkhan/MUSHIN.git 

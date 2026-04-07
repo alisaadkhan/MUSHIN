@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { SEO } from "@/components/SEO";
 import { User, Globe, Lock, Zap, Mail, Trash2, Camera, Monitor, Loader2, Shield, UserPlus, QrCode, CheckCircle2, AlertCircle, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -276,7 +277,7 @@ export default function Settings() {
   const handleRemoveMember = async (userId: string) => {
     if (!workspace?.workspace_id) return;
     try {
-      const { data, error } = await supabase.rpc("remove_workspace_member", {
+      const { data, error } = await (supabase.rpc as any)("remove_workspace_member", {
         p_workspace_id: workspace.workspace_id,
         p_user_id: userId,
       });
@@ -299,7 +300,7 @@ export default function Settings() {
     }
     setInviting(true);
     try {
-      const { data, error } = await supabase.rpc("invite_workspace_member", {
+      const { data, error } = await (supabase.rpc as any)("invite_workspace_member", {
         p_workspace_id: workspace.workspace_id,
         p_email: inviteEmail.trim(),
         p_role: inviteRole,
@@ -320,6 +321,7 @@ export default function Settings() {
 
   return (
     <div className="space-y-6 max-w-5xl">
+      <SEO title="Settings" description="Manage your MUSHIN account settings." noindex />
       <div>
         <h1 className="font-serif text-2xl font-bold text-foreground">Settings</h1>
         <p className="text-sm text-muted-foreground mt-1">Manage your account and preferences</p>

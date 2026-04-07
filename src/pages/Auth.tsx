@@ -14,6 +14,9 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
+import { SEO } from "@/components/SEO";
+import { useRateLimit } from "@/hooks/useRateLimit";
+import { logger } from "@/lib/logger";
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "";
 
@@ -384,6 +387,7 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen flex bg-background">
+      <SEO title="Sign In / Sign Up" description="Create your MUSHIN account or sign in to access creator intelligence tools." noindex />
 
       {/* ── LEFT: Form Panel ── */}
       <div className="flex-1 relative flex items-center justify-center p-6 max-w-[480px]">

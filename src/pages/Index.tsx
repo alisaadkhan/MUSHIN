@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { SEO } from "@/components/SEO";
 import { Users, Eye, TrendingUp, DollarSign } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
@@ -80,6 +81,7 @@ export default function Index() {
 
   return (
     <div className="space-y-5">
+      <SEO title="Dashboard" description="Your MUSHIN dashboard overview." noindex />
       <div className="flex items-center justify-between">
         <div>
           <h1 style={{ fontFamily:"'Syne',sans-serif", fontSize:21, fontWeight:800, color:S.text, letterSpacing:"-0.01em" }}>Dashboard</h1>

@@ -17,6 +17,7 @@
 
 import React, { useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { SEO } from "@/components/SEO";
 import { ArrowLeft, ArrowRight, MapPin, Shield, Zap, Users, Globe, Heart } from 'lucide-react';
 import { MushInIcon, MushInLogo } from '@/components/ui/MushInLogo';
 
@@ -97,6 +98,7 @@ const TimelineItem = ({
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-[#060608] text-white overflow-x-hidden">
+      <SEO title="About MUSHIN" description="Learn about MUSHIN, Pakistan's Creator Intelligence Platform." />
       <Grain />
 
       {/* Background glows */}

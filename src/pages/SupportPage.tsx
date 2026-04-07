@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SEO } from "@/components/SEO";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -162,6 +163,7 @@ export default function SupportPage() {
 
   return (
     <div className="space-y-6 max-w-5xl">
+      <SEO title="Support" description="Get help with MUSHIN." />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
