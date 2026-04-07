@@ -1,6 +1,23 @@
-generated secrets = 772f1b19e4920e8ca7fb23e94f6395daa24b80c81990fcfc0b83af4e33201cc2
-UPSTASH_REDIS_REST_URL="https://boss-racer-79284.upstash.io"
-UPSTASH_REDIS_REST_TOKEN="gQAAAAAAATW0AAIncDFhZjE4ODY3MjkwMTI0ZGE2YjUxMWYzOTBiNjBiNTBlY3AxNzkyODQ"
-app url https://mushin-syq3.vercel.app/
-https://github.com/al
-isaadkhan/MUSHIN.git 
+1. Title Redundancy (The "Serper" Title Issue)
+The search engine (Serper/Google) returns titles like: Pakistani PC Gamers (@ppg_pk) • Instagram photos and videos
+
+Because the codebase uses c.full_name || c.title || c.username for the display name, it often picks up this long, "dirty" title. This leads to:
+
+Wasted Space: You are seeing words like "Instagram" and the username repeated inside the title, even though they are already shown as icons or sub-text.
+Crowding: Even with the truncate fix I just applied, the titles are so long that they hit the 200px limit immediately, making the cards look "cut off" rather than clean.
+2. Duplicate Mapping (Logic Bug)
+If you look closely at your second and third cards:
+
+Card 2: Reviving Gaming Culture in Faisalabad... has the username @trongamingzone.
+Card 3: Tron E-Gaming... also has the username @trongamingzone.
+This happens because the search engine finds different pages (posts, reels, or mentions) for the same creator. The system treats them as separate results because their Serper title is different, but they ultimately point to the same person. This results in duplicate cards in your search results, which is a poor user experience.
+
+3. Visual Overflow (The UI Bug)
+Before the fix I just pushed, the names were literally bleeding into the next card because there was no container constraint. Now that I've added max-w-[200px], they stay inside, but the root cause is that the titles being displayed are not "clean" enough.
+
+Recommendation:
+To fully "solve" this visually and logically, we should:
+
+Clean the Titles: Stripping out the (...) and • Instagram... parts of the title so only the actual name remains.
+Deduplicate Results: If multiple search results point to the same platform + username, we should merge them or only show the most relevant one.
+Constrain Width Further: Depending on the screen size, 200px might still be too wide for a 3-column grid.

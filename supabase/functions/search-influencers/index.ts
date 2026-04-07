@@ -11,6 +11,7 @@ import { computeSearchScore, computeSearchScoreV2, snippetRelevanceScore, detect
 import { normalizeQuery, detectLanguage } from "../_shared/language.ts";
 import { getTagScore, normalizeTags } from "../_shared/tag_intelligence.ts";
 import { expandSerperQueries, extractContactEmail, detectSocialLinks } from "../_shared/query_expander.ts";
+const YOUTUBE_API_KEY = Deno.env.get("YOUTUBE_API_KEY");
 let redis: Redis | null = null;
 if (Deno.env.get("UPSTASH_REDIS_REST_URL") && Deno.env.get("UPSTASH_REDIS_REST_TOKEN")) {
   redis = new Redis({
@@ -552,6 +553,17 @@ Deno.serve(async (req) => {
       console.log(`[search] Relaxed quality filter: ${candidates.length} → ${finalResults.length} results`);
     }
 
+    function cleanTitle(raw: string, username: string, platform: string): string {
+      let cleaned = raw;
+      // Strip platform suffix patterns like "• Instagram photos and videos", " - YouTube", etc.
+      cleaned = cleaned.replace(/\s*[•·\-]\s*(Instagram|YouTube|TikTok|Twitch)\s*(photos|videos|channel|profile)?.*/gi, "");
+      // Strip @username mentions already shown as sub-text
+      cleaned = cleaned.replace(new RegExp(`\\s*\\(@?${username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\)`, "gi"), "");
+      // Strip trailing parentheses content that's just platform noise
+      cleaned = cleaned.replace(/\s*\(.*?(?:instagram|youtube|tiktok|twitch).*?\)/gi, "");
+      return cleaned.trim() || username;
+    }
+
     const rawResults = await Promise.all(
       finalResults.map(async (item: any) => {
         const username = extractUsername(item.link, platform);
@@ -575,13 +587,35 @@ Deno.serve(async (req) => {
           } catch { /* noop */ }
         }
 
+        // Clean titles to remove platform suffixes and duplicate usernames
+        title = cleanTitle(title, username, platform);
+
+        let ytSubscriberCount: number | null = null;
+        if (platform === "youtube" && YOUTUBE_API_KEY) {
+          try {
+            const ytCtrl = new AbortController();
+            const ytTid = setTimeout(() => ytCtrl.abort(), 3000);
+            const channelId = username.startsWith("UC") ? username : `@${username.replace("@", "")}`;
+            const ytRes = await fetch(
+              `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${channelId}&key=${YOUTUBE_API_KEY}`,
+              { signal: ytCtrl.signal }
+            );
+            clearTimeout(ytTid);
+            if (ytRes.ok) {
+              const ytData = await ytRes.json();
+              if (ytData.items?.[0]?.statistics?.subscriberCount) {
+                ytSubscriberCount = parseInt(ytData.items[0].statistics.subscriberCount, 10);
+              }
+            }
+          } catch { /* noop */ }
+        }
+
         const snippetText = title + " " + (item.snippet || "");
         const nicheData = inferNiche(title, item.snippet || "", query);
         const city_extracted = extractCity(snippetText, query);
 
         const imageUrl =
-          (knowledgeGraph?.imageUrl && platformFiltered.indexOf(item) === 0
-            ? knowledgeGraph.imageUrl : null) ||
+          (knowledgeGraph?.imageUrl ? knowledgeGraph.imageUrl : null) ||
           item.thumbnailUrl || item.imageUrl ||
           profileImageMap.get(item.link) || null;
 
@@ -598,7 +632,7 @@ Deno.serve(async (req) => {
           username,
           platform,
           displayUrl: item.link || "",
-          extracted_followers: extractFollowers(snippetText),
+          extracted_followers: extractFollowers(snippetText) ?? ytSubscriberCount,
           imageUrl,
           niche: nicheData.niche,
           niche_confidence: parseFloat(nicheData.confidence.toFixed(2)),
@@ -606,24 +640,23 @@ Deno.serve(async (req) => {
           contact_email,
           social_links,
           engagement_rate: null, // will be filled in the merge step below
-          _follower_count_raw: extractFollowers(snippetText), // needed for benchmark lookup
+          _follower_count_raw: extractFollowers(snippetText) ?? ytSubscriberCount, // needed for benchmark lookup
           _quality_score: qualityScore(item),  // internal — used for transparency
         };
       })
     );
 
     const results = rawResults.filter(Boolean);
-    const seen = new Set();
-    const uniqueResults = results.filter((r: any) => {
-      // Normalize to lowercase + strip leading @ before dedup so that
-      // expansion queries returning the same profile in different casing
-      // are correctly recognised as duplicates.
+    const grouped = new Map<string, any>();
+    for (const r of results) {
       const normalizedUsername = r.username.toLowerCase().replace(/^@/, "");
       const key = `${r.platform}:${normalizedUsername}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+      const existing = grouped.get(key);
+      if (!existing || (r?._quality_score ?? 0) > (existing?._quality_score ?? 0)) {
+        grouped.set(key, r);
+      }
+    }
+    const uniqueResults = Array.from(grouped.values());
     // Early exit when no results — avoids .in('username', []) Postgres crash
     if (uniqueResults.length === 0) {
       await serviceClient.from("search_history").insert({
