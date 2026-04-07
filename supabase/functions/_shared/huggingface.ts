@@ -9,7 +9,7 @@
 // so callers can catch and fall back to non-AI paths.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const HF_API      = "https://api-inference.huggingface.co/models";
+const HF_API      = "https://router.huggingface.co/hf-inference/models";
 const TEXT_MODEL  = "mistralai/Mistral-7B-Instruct-v0.2";
 const EMBED_MODEL = "BAAI/bge-large-en-v1.5";
 

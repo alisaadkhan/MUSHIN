@@ -34,6 +34,12 @@ export async function enforceGlobalRateLimit(input: GlobalRateLimitInput): Promi
   });
 
   if (error) {
+    // RC-02: If the underlying RPC is missing, fail-open to prevent system-wide crashes.
+    // This allows core features to work even if the rate-limit control plane isn't fully migrated.
+    if (error.message?.includes("function") && error.message?.includes("does not exist")) {
+      console.warn("[global_rate_limit] RPC check_api_rate_limit not found. Failing open.");
+      return { allowed: true, retryAfter: 0, remaining: 999 };
+    }
     throw error;
   }
 
