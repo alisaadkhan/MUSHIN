@@ -245,20 +245,43 @@ Deno.serve(async (req) => {
         console.log(`[search-influencers] DB-first HIT: ${fullyEnriched} enriched + ${enrichedDbResults.length - fullyEnriched} stubs with follower data`);
         console.log(`[search-influencers] DB-first hit: ${enrichedDbResults.length} enriched profiles, skipping Serper`);
 
-        // Re-use ranking infrastructure on DB results
+        // ── DB-first path: apply follower range filter ─────────────────────
+        // The DB query already filters via p_min_followers/p_max_followers,
+        // but we re-filter here in case a stub slipped through.
         const queryIntentPre = detectSearchIntent(query);
         const queryLanguagePre = detectLanguage(query);
 
-        const scoredDbResults = enrichedDbResults.map((r: any) => {
+        const dbHasFollowerFilter = !!(followerRange && followerRange !== "any" && rangeMap[followerRange]);
+        const dbFiltered = dbHasFollowerFilter
+          ? enrichedDbResults.filter((r: any) => {
+              const [mn, mx] = rangeMap[followerRange];
+              const fc = r.follower_count;
+              if (fc == null) return false;
+              return fc >= mn && (mx === Infinity || fc <= mx);
+            })
+          : enrichedDbResults;
+
+        const scoredDbResults = dbFiltered.map((r: any) => {
           const creatorTags = r.tags ?? [];
           const tagScore = getTagScore(query, creatorTags);
+
+          // ── Engagement: use real DB rate when available, benchmark otherwise ──
+          const dbEngRate: number | null = r.engagement_rate ?? null;
+          const engMeta = (() => {
+            if (dbEngRate != null && dbEngRate > 0) {
+              return { engagement_rate: dbEngRate, engagement_source: "real_enriched" as const };
+            }
+            const bm = getBenchmarkEngagement(platform, r.follower_count ?? null);
+            return { engagement_rate: bm.rate, engagement_source: "benchmark_estimate" as const, engagement_benchmark_bucket: bm.bucket };
+          })();
+
           const score = computeSearchScoreV2({
             query,
             displayName:                  r.full_name ?? r.username,
             username:                     r.username,
-            engagementRate:               r.engagement_rate ?? null,
+            engagementRate:               engMeta.engagement_rate,
             followerCount:                r.follower_count ?? null,
-            isRealEngagement:             true,
+            isRealEngagement:             engMeta.engagement_source === "real_enriched",
             platform,
             niche:                        r.primary_niche ?? null,
             queryNiche:                   queryNichePre,
@@ -271,22 +294,30 @@ Deno.serve(async (req) => {
             recencySignal:                computeRecencySignal(r.last_enriched_at ?? null),
             intent:                       queryIntentPre,
           });
+
+          // Truncate bio at word boundary
+          const bioSnippet = r.bio
+            ? (() => {
+                const words = r.bio.split(/\s+/);
+                return words.length > 20 ? words.slice(0, 20).join(" ") + "..." : r.bio;
+              })()
+            : "";
+
           return {
-            title:            r.full_name ?? r.username,
+            title:            cleanTitle(r.full_name ?? r.username, r.username, platform),
             link:             `https://www.${platform === "youtube" ? "youtube.com/@" : platform === "instagram" ? "instagram.com/" : platform === "tiktok" ? "tiktok.com/@" : "twitch.tv/"}${r.username}`,
-            snippet:          r.bio ? r.bio.split(/\s+/).slice(0, 20).join(" ") + (r.bio.split(/\s+/).length > 20 ? "..." : "") : "",
+            snippet:          bioSnippet,
             username:         r.username,
             platform,
             imageUrl:         r.avatar_url ?? null,
             bio:              r.bio ?? null,
             full_name:        r.full_name ?? null,
             extracted_followers: r.follower_count ?? null,
-            engagement_rate:  r.engagement_rate ?? 0,
-            engagement_source: "real_enriched" as const,
+            ...engMeta,
             city_extracted:   r.city ?? null,
             niche:            r.primary_niche ?? null,
-            is_enriched:      true,
-            enrichment_status: "success",
+            is_enriched:      r.enrichment_status === "success",
+            enrichment_status: r.enrichment_status ?? null,
             last_enriched_at: r.last_enriched_at ?? null,
             is_stale:         r.last_enriched_at
               ? (Date.now() - new Date(r.last_enriched_at).getTime()) > 30 * 86400000
