@@ -378,6 +378,7 @@ Deno.serve(async (req) => {
 
     let serperData: any = { organic: [], knowledgeGraph: null };
     const profileImageMap: Map<string, string> = new Map();
+    const usernameImageMap: Map<string, string> = new Map();
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
@@ -434,6 +435,16 @@ Deno.serve(async (req) => {
       const imageData = imageRes.ok ? await imageRes.json() : { images: [] };
       for (const img of (imageData.images || [])) {
         if (img.link && img.imageUrl) profileImageMap.set(img.link, img.imageUrl);
+      }
+
+      const usernameImageMap = new Map<string, string>();
+      for (const img of (imageData.images || [])) {
+        if (img.imageUrl) {
+          const imgUsername = extractUsername(img.link, platform);
+          if (imgUsername) {
+            usernameImageMap.set(imgUsername.toLowerCase(), img.imageUrl);
+          }
+        }
       }
     } catch (serperErr: any) {
       console.error("Serper fetch failed:", serperErr?.message);
@@ -587,6 +598,26 @@ Deno.serve(async (req) => {
           } catch { /* noop */ }
         }
 
+        let ytThumbnail: string | null = null;
+        if (platform === "youtube" && !username.startsWith("UC")) {
+          try {
+            const ytOeCtrl = new AbortController();
+            const ytOeTid = setTimeout(() => ytOeCtrl.abort(), 2000);
+            const ytOeRes = await fetch(
+              `https://www.youtube.com/oembed?url=https://www.youtube.com/@${username.replace("@", "")}&format=json`,
+              { signal: ytOeCtrl.signal }
+            );
+            clearTimeout(ytOeTid);
+            if (ytOeRes.ok) {
+              const ytOeData = await ytOeRes.ok ? await ytOeRes.json() : null;
+              if (ytOeData) {
+                if (ytOeData.author_name) title = ytOeData.author_name;
+                if (ytOeData.thumbnail_url) ytThumbnail = ytOeData.thumbnail_url;
+              }
+            }
+          } catch { /* noop */ }
+        }
+
         // Clean titles to remove platform suffixes and duplicate usernames
         title = cleanTitle(title, username, platform);
 
@@ -595,11 +626,13 @@ Deno.serve(async (req) => {
           try {
             const ytCtrl = new AbortController();
             const ytTid = setTimeout(() => ytCtrl.abort(), 3000);
-            const channelId = username.startsWith("UC") ? username : `@${username.replace("@", "")}`;
-            const ytRes = await fetch(
-              `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${channelId}&key=${YOUTUBE_API_KEY}`,
-              { signal: ytCtrl.signal }
-            );
+            let ytUrl: string;
+            if (username.startsWith("UC")) {
+              ytUrl = `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${username}&key=${YOUTUBE_API_KEY}`;
+            } else {
+              ytUrl = `https://www.googleapis.com/youtube/v3/channels?part=statistics&forHandle=${username.replace("@", "")}&key=${YOUTUBE_API_KEY}`;
+            }
+            const ytRes = await fetch(ytUrl, { signal: ytCtrl.signal });
             clearTimeout(ytTid);
             if (ytRes.ok) {
               const ytData = await ytRes.json();
@@ -615,9 +648,11 @@ Deno.serve(async (req) => {
         const city_extracted = extractCity(snippetText, query);
 
         const imageUrl =
+          ytThumbnail ||
           (knowledgeGraph?.imageUrl ? knowledgeGraph.imageUrl : null) ||
           item.thumbnailUrl || item.imageUrl ||
-          profileImageMap.get(item.link) || null;
+          profileImageMap.get(item.link) ||
+          usernameImageMap.get(username.toLowerCase()) || null;
 
         // Extract contact email from Google snippet when available
         const contact_email = extractContactEmail(snippetText) ?? null;
@@ -649,6 +684,7 @@ Deno.serve(async (req) => {
     const results = rawResults.filter(Boolean);
     const grouped = new Map<string, any>();
     for (const r of results) {
+      if (!r) continue;
       const normalizedUsername = r.username.toLowerCase().replace(/^@/, "");
       const key = `${r.platform}:${normalizedUsername}`;
       const existing = grouped.get(key);
@@ -832,7 +868,7 @@ Deno.serve(async (req) => {
         ...r,
         // Only use DB image/bio/full_name when fully enriched ΓÇö stubs have no real data
         imageUrl: isFullyEnriched ? (profile?.avatar_url ?? r.imageUrl) : r.imageUrl,
-        bio: isFullyEnriched ? (profile?.bio ?? null) : null,
+        bio: isFullyEnriched ? (profile?.bio ?? null) : (r.snippet ? r.snippet.substring(0, 200) : null),
         extracted_followers: profile?.follower_count ?? r._follower_count_raw,
         ...engagementMeta,
         city_extracted: profile?.city ?? r.city_extracted,

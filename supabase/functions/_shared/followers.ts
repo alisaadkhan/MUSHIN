@@ -37,6 +37,10 @@ export function extractFollowers(text: string): number | null {
     // ── Bare number with K/M/B near follower word (within 30 chars) ──────
     /(\d[\d,.]*)\s*([kKmMbB])\b.{0,30}(?:follower|subscriber|sub\b)/i,
     /(?:follower|subscriber|subs?)\b.{0,30}(\d[\d,.]*)\s*([kKmMbB])\b/i,
+    // ── TikTok-specific formats ────────────────────────────────────────────
+    /(\d[\d,.]*)\s*([kKmMbB])\s*(?:followers?|fans?|likes?)/i,
+    /(?:(?:followers?|fans?|likes?)[s']?\s*:?\s*)(\d[\d,.]*)\s*([kKmMbB])?/i,
+    /(\d[\d,.]*)\s*([kKmMbB])\+?\s*(?:followers?|fans?|likes?)/i,
   ];
 
   const REVERSED_PATTERN_INDEX = 6;
