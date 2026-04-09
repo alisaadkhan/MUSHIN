@@ -20,6 +20,10 @@ export function extractTikTokFollowers(text: string): number | null {
     /(?:followers?|fans?)\s*[:\·\s]\s*(\d[\d,.]*)[\s]*([kKmMbB])?/i,
     // Bullet/pipe separated: "• 12.5M followers"
     /[·•\|]\s*(\d[\d,.]*)[\s]*([kKmMbB])?\s+(?:followers?|fans?)\b/i,
+    // "X Likes. Y Followers." pattern (common in TikTok snippets)
+    /(\d[\d,.]*)[\s]*([kKmMbB])\s+(?:followers?|fans?)\.?\s*$/i,
+    // "2M Likes. 150.5K Followers." - capture the followers part
+    /(\d[\d,.]*)[\s]*([kKmMbB])\s+(?:followers?|fans?)/i,
   ];
 
   for (const patt of patterns) {

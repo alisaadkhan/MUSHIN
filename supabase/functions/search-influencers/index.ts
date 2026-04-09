@@ -876,6 +876,20 @@ Deno.serve(async (req) => {
 
       const isFullyEnriched = profile?.enrichment_status === "success";
 
+      // Clean bio/snippet text - remove hashtags, mentions, and noise
+      const cleanBio = (text: string): string => {
+        if (!text) return "";
+        // Remove hashtags
+        let cleaned = text.replace(/#[\w\u0600-\u06FF]+/g, "");
+        // Remove @mentions
+        cleaned = cleaned.replace(/@[\w.]+/g, "");
+        // Remove multiple spaces
+        cleaned = cleaned.replace(/\s+/g, " ").trim();
+        // Remove common noise patterns
+        cleaned = cleaned.replace(/^(Watch|See|Check out|Follow|Discover)\s*/i, "");
+        return cleaned;
+      };
+
       // Word-boundary bio truncation helper
       const truncateAtWord = (text: string, maxLen: number): string => {
         if (text.length <= maxLen) return text;
@@ -890,7 +904,7 @@ Deno.serve(async (req) => {
         imageUrl: isFullyEnriched ? (profile?.avatar_url ?? r.imageUrl) : r.imageUrl,
         bio: isFullyEnriched
           ? (profile?.bio ?? null)
-          : (r.snippet ? truncateAtWord(r.snippet, 200) : null),
+          : (r.snippet ? truncateAtWord(cleanBio(r.snippet), 200) : null),
         extracted_followers: profile?.follower_count ?? r._follower_count_raw,
         ...engagementMeta,
         city_extracted: profile?.city ?? r.city_extracted,
