@@ -768,9 +768,6 @@ export default function InfluencerProfilePage() {
                     <span className={`font-semibold ${audienceQualityScore >= 70 ? "text-emerald-600" :
                       audienceQualityScore >= 40 ? "text-amber-600" : "text-red-600"
                       }`}>{audienceQualityScore}/100</span>
-                    {dataSource === "apify" && (
-                      <span title="Verified by Apify" className="bg-blue-100 text-blue-700 text-[9px] font-semibold px-1.5 py-0.5 rounded-full border border-blue-200">LIVE</span>
-                    )}
                   </div>
                 )}
                 {/* Data Staleness Badge (DB Source of Truth) */}
