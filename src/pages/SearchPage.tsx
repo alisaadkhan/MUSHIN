@@ -228,7 +228,7 @@ export default function SearchPage() {
     searchParams.get("platform") ? [searchParams.get("platform")!] : []
   );
   const [selectedCity, setSelectedCity] = useState(searchParams.get("city") || "All Pakistan");
-  const [followerRange, setFollowerRange] = useState(searchParams.get("range") || "any");
+  const [followerRange, setFollowerRange] = useState(searchParams.get("range") || "10k-50k");
 
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
