@@ -746,14 +746,18 @@ Deno.serve(async (req) => {
       });
     };
 
-    // Helper: apply follower range filter (soft — only hard-drop confirmed out-of-range)
+    // Helper: apply follower range filter (soft — only hard-drop confirmed out-of-range, keep unknowns)
     const applyFollowerFilter = (candidates: any[], range: string): any[] => {
       if (!range || range === "any" || !rangeMap[range]) return candidates;
       const [min, max] = rangeMap[range];
       return candidates.filter((r: any) => {
         const fc = r.extracted_followers ?? r._follower_count_raw;
-        if (fc == null) return false; // STRICT: if range is selected, and count is unknown, drop it
-        return fc >= min && (max === Infinity || fc <= max);
+        // Keep results with unknown follower count — they'll be penalized in ranking
+        if (fc == null) return true;
+        // Only drop if confirmed to be way outside range (< 50% of min or > 2x max)
+        if (fc < min * 0.5) return false;
+        if (max !== Infinity && fc > max * 2) return false;
+        return true;
       });
     };
 
@@ -879,14 +883,19 @@ Deno.serve(async (req) => {
       // Clean bio/snippet text - remove hashtags, mentions, and noise
       const cleanBio = (text: string): string => {
         if (!text) return "";
+        // Remove follower/post counts at start (e.g., "19K followers · 1K+ posts · ")
+        let cleaned = text.replace(/^\d+\.?\d*[kKmMbB]?\s*(?:followers?|posts?|following|likes?)\s*[·|]\s*/gi, "");
+        cleaned = cleaned.replace(/^\d+\.?\d*[kKmMbB]?\s*(?:followers?|posts?|following|likes?)\s*·\s*\d+\.?\d*[kKmMbB]?\s*(?:followers?|posts?|following|likes?)\s*·\s*/gi, "");
         // Remove hashtags
-        let cleaned = text.replace(/#[\w\u0600-\u06FF]+/g, "");
+        cleaned = cleaned.replace(/#[\w\u0600-\u06FF]+/g, "");
         // Remove @mentions
         cleaned = cleaned.replace(/@[\w.]+/g, "");
         // Remove multiple spaces
         cleaned = cleaned.replace(/\s+/g, " ").trim();
         // Remove common noise patterns
         cleaned = cleaned.replace(/^(Watch|See|Check out|Follow|Discover)\s*/i, "");
+        // Remove leading/trailing separators
+        cleaned = cleaned.replace(/^[·|:-]+\s*/, "").replace(/\s*[·|:-]+$/, "");
         return cleaned;
       };
 
@@ -918,17 +927,20 @@ Deno.serve(async (req) => {
       };
     });
 
-    // ── Phase 3 Fix: Post-Merge Strict Follower Filter ─────────────────────────
+    // ── Phase 3 Fix: Post-Merge Soft Follower Filter ─────────────────────────
     // After the DB profile merge step above, `extracted_followers` may have been
     // updated with a DB value that differs from the pre-filter raw count.
-    // Re-apply the follower range filter to guarantee no out-of-range results
-    // reach the client, regardless of which data source populated the count.
+    // Apply soft filter — keep unknowns, only drop confirmed out-of-range.
     const postMergeFiltered = hasFollowerFilter
       ? enrichedResults.filter((r: any) => {
           const [min, max] = rangeMap[followerRange];
           const fc = r.extracted_followers;
-          if (fc == null) return false; // Unknown count — drop when filter is active
-          return fc >= min && (max === Infinity || fc <= max);
+          // Keep results with unknown follower count — they'll be penalized in ranking
+          if (fc == null) return true;
+          // Only drop if confirmed to be way outside range
+          if (fc < min * 0.5) return false;
+          if (max !== Infinity && fc > max * 2) return false;
+          return true;
         })
       : enrichedResults;
 
