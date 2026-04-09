@@ -15,14 +15,19 @@ function mountApp() {
     document.body.innerHTML = '<div style="color:white;background:#7c3aed;padding:2rem;font-family:monospace">FATAL: #root element not found in index.html</div>';
     return;
   }
+  
   try {
-    createRoot(root).render(
+    const reactRoot = createRoot(root);
+    reactRoot.render(
       <>
         <App />
         <Analytics />
         <SpeedInsights />
       </>
     );
+    
+    // Signal that app is ready (helps with loading screen removal)
+    window.dispatchEvent(new CustomEvent('app-ready'));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     root.innerHTML = `<div style="color:white;background:#7f1d1d;padding:2rem;font-family:monospace;min-height:100vh">

@@ -101,13 +101,31 @@
     </noscript>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      // Remove loading screen once app is ready
-      window.addEventListener('load', function() {
-        setTimeout(function() {
-          var loading = document.getElementById('loading-screen');
-          if (loading) loading.style.display = 'none';
-        }, 100);
+      // Remove loading screen when app signals it's ready
+      window.addEventListener('app-ready', function() {
+        var loading = document.getElementById('loading-screen');
+        if (loading) {
+          setTimeout(function() {
+            loading.style.opacity = '0';
+            loading.style.transition = 'opacity 0.3s ease';
+            setTimeout(function() {
+              loading.style.display = 'none';
+            }, 300);
+          }, 500);
+        }
       });
+      
+      // Fallback: remove after 10 seconds even if app doesn't signal
+      setTimeout(function() {
+        var loading = document.getElementById('loading-screen');
+        if (loading && loading.style.display !== 'none') {
+          loading.style.opacity = '0';
+          loading.style.transition = 'opacity 0.3s ease';
+          setTimeout(function() {
+            loading.style.display = 'none';
+          }, 300);
+        }
+      }, 10000);
     </script>
   </body>
 </html>
