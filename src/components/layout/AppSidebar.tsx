@@ -49,13 +49,14 @@ interface AppSidebarProps {
 
 export function AppSidebar({ isOpen = true, onClose }: AppSidebarProps) {
   const location = useLocation();
-  const { data: credits } = useWorkspaceCredits();
-  const { planConfig, plan } = useSubscription();
+  const { data: credits, isLoading: creditsLoading } = useWorkspaceCredits();
+  const { planConfig, plan, isLoading: subscriptionLoading } = useSubscription();
   const { isAnyAdmin } = useAdminPermissions();
 
-  const totalCredits = credits?.search_credits_remaining ?? planConfig.search_credits;
-  const maxCredits = planConfig.search_credits;
-  const pct = maxCredits === 0 ? 0 : Math.min((totalCredits / maxCredits) * 100, 100);
+  const isLoading = creditsLoading || subscriptionLoading;
+  const totalCredits = credits?.search_credits_remaining ?? (isLoading ? 0 : planConfig.search_credits);
+  const maxCredits = isLoading ? 1 : planConfig.search_credits;
+  const pct = maxCredits === 0 ? 100 : Math.min((totalCredits / maxCredits) * 100, 100);
 
   return (
     <aside
@@ -128,17 +129,23 @@ export function AppSidebar({ isOpen = true, onClose }: AppSidebarProps) {
         {/* Credits widget */}
         <div className="rounded-lg p-3 bg-muted/40 border border-border">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-            <span>{planConfig.name} Plan</span>
+            <span>{isLoading ? "Loading..." : `${planConfig.name} Plan`}</span>
             <span className="data-mono font-semibold text-foreground">
-              {totalCredits} / {maxCredits}
+              {isLoading ? "—" : `${totalCredits} / ${maxCredits}`}
             </span>
           </div>
-          <div className="h-1 w-full rounded-full bg-border overflow-hidden">
-            <div
-              className="h-full rounded-full bg-primary transition-all"
-              style={{ width: `${pct}%`, boxShadow: "0 0 8px rgba(168,85,247,0.5)" }}
-            />
-          </div>
+          {isLoading ? (
+            <div className="h-1 w-full rounded-full bg-border overflow-hidden">
+              <div className="h-full rounded-full bg-primary/30 animate-pulse" style={{ width: "30%" }} />
+            </div>
+          ) : (
+            <div className="h-1 w-full rounded-full bg-border overflow-hidden">
+              <div
+                className="h-full rounded-full bg-primary transition-all"
+                style={{ width: `${pct}%`, boxShadow: "0 0 8px rgba(168,85,247,0.5)" }}
+              />
+            </div>
+          )}
         </div>
         <div className="w-full">
           <UserMenu />
