@@ -3,6 +3,8 @@ import App from "./App.tsx";
 import "./index.css";
 import { initSentry } from "./lib/sentry";
 import { initPostHog } from "./lib/analytics";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 initSentry();
 initPostHog();
@@ -14,7 +16,13 @@ function mountApp() {
     return;
   }
   try {
-    createRoot(root).render(<App />);
+    createRoot(root).render(
+      <>
+        <App />
+        <Analytics />
+        <SpeedInsights />
+      </>
+    );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     root.innerHTML = `<div style="color:white;background:#7f1d1d;padding:2rem;font-family:monospace;min-height:100vh">

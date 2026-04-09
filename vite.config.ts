@@ -21,10 +21,17 @@ export default defineConfig(() => ({
     // Source maps only in development — never in production (security: prevents business logic exposure via DevTools)
     // For production error monitoring, use Sentry's private source-map upload: https://docs.sentry.io/platforms/javascript/guides/react/sourcemaps/
     sourcemap: process.env.NODE_ENV !== 'production',
-    // Increase limit since we're now properly splitting
-    chunkSizeWarningLimit: 500,
+    // Increase chunk size limit to suppress warnings (we use code splitting)
+    chunkSizeWarningLimit: 1500,
+    // Fix white screen - ensure proper loading
+    minify: 'esbuild',
+    target: 'esnext',
     rollupOptions: {
       output: {
+        // Improve caching and reduce white screen
+        entryFileNames: 'assets/[name].[hash].js',
+        chunkFileNames: 'assets/[name].[hash].js',
+        assetFileNames: 'assets/[name].[hash].[ext]',
         manualChunks: {
           // Core React runtime — never changes, max cache lifetime
           "vendor-react": ["react", "react-dom", "react-router-dom"],

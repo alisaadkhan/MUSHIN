@@ -84,12 +84,30 @@
   </head>
 
   <body>
-    <div id="root" style="background:#0a0114;min-height:100vh"></div>
+    <div id="root" style="background:#0a0114;min-height:100vh">
+      <!-- Loading screen to prevent white flash -->
+      <div id="loading-screen" style="position:fixed;inset:0;background:#0a0114;display:flex;align-items:center;justify-content:center;z-index:9999">
+        <div style="text-align:center">
+          <div style="width:48px;height:48px;border:4px solid #7c3aed;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px"></div>
+          <p style="color:#a78bfa;font-family:monospace;font-size:14px">Loading MUSHIN...</p>
+        </div>
+      </div>
+      <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+    </div>
     <noscript>
       <div style="color:white;background:#0a0114;padding:3rem;font-family:sans-serif;text-align:center">
         <strong>JavaScript is required to use MUSHIN.</strong><br/>Please enable JavaScript in your browser settings.
       </div>
     </noscript>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Remove loading screen once app is ready
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          var loading = document.getElementById('loading-screen');
+          if (loading) loading.style.display = 'none';
+        }, 100);
+      });
+    </script>
   </body>
 </html>
