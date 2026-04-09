@@ -567,13 +567,6 @@ export default function InfluencerProfilePage() {
       {/* ── Similar Creators (inline) ──────────────────────────── */}
       {profile?.id && <SimilarCreatorsSection profileId={profile.id} currentPlatform={platform} />}
 
-      {platform !== "youtube" && (
-        <div className="bg-blue-50/50 border border-blue-200/50 text-blue-800 rounded-lg p-3 text-sm flex items-start gap-2 backdrop-blur-sm">
-          <Info className="h-4 w-4 mt-0.5 shrink-0 text-blue-600" />
-          <p>Instagram and TikTok data is sourced via Apify. YouTube data comes directly from the official YouTube Data API v3.</p>
-        </div>
-      )}
-
       {/* ── Profile Header ─────────────────────────────────────── */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <div className="bg-background/80 backdrop-blur-md border border-white/50 rounded-2xl p-6 shadow-sm">
@@ -666,19 +659,85 @@ export default function InfluencerProfilePage() {
                   )}
                 </div>
 
-                {/* Stats */}
+                {/* Stats - Platform Specific */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-lg">
-                  {[  
-                    { label: "Followers", value: followers != null ? formatFollowers(followers) : "—" },
-                    { label: platform === "youtube" ? "Videos" : "Posts", value: (isEnriched ? postsCount : (postsCount ?? snippetStats.posts)) != null ? (isEnriched ? postsCount! : (postsCount ?? snippetStats.posts)!).toLocaleString() : "—" },
-                    { label: "Following", value: following != null ? formatFollowers(following) : "—" },
-                    { label: "Engagement", value: engagementRate != null ? `${engagementRate.toFixed(1)}%` : "—" },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="bg-muted/40 border border-border/50 rounded-xl px-3 py-2.5 text-center">
-                      <p className="text-base font-bold text-foreground leading-tight">{value}</p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">{label}</p>
-                    </div>
-                  ))}
+                  {platform === "youtube" ? (
+                    <>
+                      <div className="bg-muted/40 border border-border/50 rounded-xl px-3 py-2.5 text-center">
+                        <p className="text-base font-bold text-foreground leading-tight">{followers != null ? formatFollowers(followers) : "—"}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Subscribers</p>
+                      </div>
+                      <div className="bg-muted/40 border border-border/50 rounded-xl px-3 py-2.5 text-center">
+                        <p className="text-base font-bold text-foreground leading-tight">{(isEnriched ? postsCount : (postsCount ?? snippetStats.posts)) != null ? (isEnriched ? postsCount! : (postsCount ?? snippetStats.posts)!).toLocaleString() : "—"}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Videos</p>
+                      </div>
+                      <div className="bg-muted/40 border border-border/50 rounded-xl px-3 py-2.5 text-center">
+                        <p className="text-base font-bold text-foreground leading-tight">{following != null ? formatFollowers(following) : "—"}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Following</p>
+                      </div>
+                      <div className="bg-muted/40 border border-border/50 rounded-xl px-3 py-2.5 text-center">
+                        <p className="text-base font-bold text-foreground leading-tight">{engagementRate != null ? `${engagementRate.toFixed(1)}%` : "—"}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Engagement</p>
+                      </div>
+                    </>
+                  ) : platform === "instagram" ? (
+                    <>
+                      <div className="bg-muted/40 border border-border/50 rounded-xl px-3 py-2.5 text-center">
+                        <p className="text-base font-bold text-foreground leading-tight">{followers != null ? formatFollowers(followers) : "—"}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Followers</p>
+                      </div>
+                      <div className="bg-muted/40 border border-border/50 rounded-xl px-3 py-2.5 text-center">
+                        <p className="text-base font-bold text-foreground leading-tight">{following != null ? formatFollowers(following) : "—"}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Following</p>
+                      </div>
+                      <div className="bg-muted/40 border border-border/50 rounded-xl px-3 py-2.5 text-center">
+                        <p className="text-base font-bold text-foreground leading-tight">{engagementRate != null ? `${engagementRate.toFixed(1)}%` : "—"}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Engagement</p>
+                      </div>
+                      <div className="bg-muted/40 border border-border/50 rounded-xl px-3 py-2.5 text-center">
+                        <p className="text-base font-bold text-foreground leading-tight">{(isEnriched ? postsCount : (postsCount ?? snippetStats.posts)) != null ? (isEnriched ? postsCount! : (postsCount ?? snippetStats.posts)!).toLocaleString() : "—"}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Posts</p>
+                      </div>
+                    </>
+                  ) : platform === "tiktok" ? (
+                    <>
+                      <div className="bg-muted/40 border border-border/50 rounded-xl px-3 py-2.5 text-center">
+                        <p className="text-base font-bold text-foreground leading-tight">{followers != null ? formatFollowers(followers) : "—"}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Followers</p>
+                      </div>
+                      <div className="bg-muted/40 border border-border/50 rounded-xl px-3 py-2.5 text-center">
+                        <p className="text-base font-bold text-foreground leading-tight">{(isEnriched ? postsCount : (postsCount ?? snippetStats.posts)) != null ? (isEnriched ? postsCount! : (postsCount ?? snippetStats.posts)!).toLocaleString() : "—"}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Posts</p>
+                      </div>
+                      <div className="bg-muted/40 border border-border/50 rounded-xl px-3 py-2.5 text-center">
+                        <p className="text-base font-bold text-foreground leading-tight">{metrics.likes ?? profile?.likes_count != null ? (metrics.likes ?? profile?.likes_count).toLocaleString() : "—"}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Likes</p>
+                      </div>
+                      <div className="bg-muted/40 border border-border/50 rounded-xl px-3 py-2.5 text-center">
+                        <p className="text-base font-bold text-foreground leading-tight">{engagementRate != null ? `${engagementRate.toFixed(1)}%` : "—"}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Engagement</p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="bg-muted/40 border border-border/50 rounded-xl px-3 py-2.5 text-center">
+                        <p className="text-base font-bold text-foreground leading-tight">{followers != null ? formatFollowers(followers) : "—"}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Followers</p>
+                      </div>
+                      <div className="bg-muted/40 border border-border/50 rounded-xl px-3 py-2.5 text-center">
+                        <p className="text-base font-bold text-foreground leading-tight">{(isEnriched ? postsCount : (postsCount ?? snippetStats.posts)) != null ? (isEnriched ? postsCount! : (postsCount ?? snippetStats.posts)!).toLocaleString() : "—"}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Posts</p>
+                      </div>
+                      <div className="bg-muted/40 border border-border/50 rounded-xl px-3 py-2.5 text-center">
+                        <p className="text-base font-bold text-foreground leading-tight">{following != null ? formatFollowers(following) : "—"}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Following</p>
+                      </div>
+                      <div className="bg-muted/40 border border-border/50 rounded-xl px-3 py-2.5 text-center">
+                        <p className="text-base font-bold text-foreground leading-tight">{engagementRate != null ? `${engagementRate.toFixed(1)}%` : "—"}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Engagement</p>
+                      </div>
+                    </>
+                  )}
                 </div>
                 {!isEnriched && followers == null && following == null && engagementRate == null && (
                   <p className="text-[11px] text-amber-600/80 mt-2 flex items-center gap-1">

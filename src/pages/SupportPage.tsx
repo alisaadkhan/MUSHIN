@@ -55,7 +55,7 @@ const statusIcons: Record<TicketStatus, React.ElementType> = {
 };
 
 export default function SupportPage() {
-  const { user } = useAuth();
+  const { user, workspace } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -116,6 +116,7 @@ export default function SupportPage() {
     try {
       const { error } = await supabase.from("support_tickets").insert({
         user_id: user!.id,
+        workspace_id: workspace?.workspace_id || null,
         subject: newSubject.trim(),
         description: newDescription.trim(),
         priority: newPriority,

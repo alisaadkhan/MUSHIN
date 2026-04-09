@@ -17,7 +17,10 @@ export function useCampaigns() {
         .select("*, pipeline_cards(count)")
         .eq("workspace_id", workspace.workspace_id)
         .order("created_at", { ascending: false });
-      if (error) throw error;
+      if (error) {
+        console.error("Campaigns fetch error:", error);
+        throw error;
+      }
       return data;
     },
     enabled: !!workspace,

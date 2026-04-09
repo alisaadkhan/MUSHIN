@@ -160,7 +160,9 @@ Deno.serve(async (req) => {
         { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { platform: _platformIgnored, location: rawLocation, followerRange, engagementRange } = requestBody;
+    const { platform: _platformIgnored, location: rawLocation, followerRange: rawFollowerRange, engagementRange } = requestBody;
+    // Default to 10k+ followers if no range specified
+    const followerRange = rawFollowerRange || "10k-50k";
     // Sanitize location ΓÇö strip anything that isn't letters/spaces/hyphens
     const location = typeof rawLocation === "string"
       ? rawLocation.replace(/[^a-zA-Z\s-]/g, "").trim().slice(0, 50)
@@ -205,7 +207,7 @@ Deno.serve(async (req) => {
       "500k+":      [500_000,   Infinity],
     };
     const [dbMinFollowers, dbMaxFollowers] = (followerRange && rangeMap[followerRange])
-      ? rangeMap[followerRange] : [0, 9_999_999_999];
+      ? rangeMap[followerRange] : [10_000, 9_999_999_999];
 
     // Parse engagement rate range
     const engRangeMap: Record<string, [number, number]> = {

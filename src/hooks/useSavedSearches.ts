@@ -15,7 +15,10 @@ export function useSavedSearches() {
         .select("*")
         .eq("workspace_id", workspace.workspace_id)
         .order("created_at", { ascending: false });
-      if (error) throw error;
+      if (error) {
+        console.error("Saved searches fetch error:", error);
+        throw error;
+      }
       return data;
     },
     enabled: !!workspace,
