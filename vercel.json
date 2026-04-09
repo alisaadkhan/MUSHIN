@@ -1,4 +1,14 @@
 {
+  "experimentalServices": {
+    "frontend": {
+      "routePrefix": "/",
+      "framework": "vite"
+    },
+    "python-analytics": {
+      "entrypoint": "services/python-analytics",
+      "routePrefix": "/_/python-analytics"
+    }
+  },
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
   "headers": [
     {
