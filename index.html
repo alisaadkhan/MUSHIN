@@ -45,18 +45,11 @@
       while the custom font loads in the background — eliminates render blocking.
       Only the weights actually used in the app are requested.
     -->
+    <!-- Google Fonts: loaded as normal stylesheet (onload removed for CSP compliance) -->
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Roboto:wght@400;500;700;900&display=swap"
-      media="print"
-      onload="this.media='all'"
     />
-    <noscript>
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Roboto:wght@400;500;700;900&display=swap"
-      />
-    </noscript>
 
     <!-- Structured data for rich search results -->
     <script type="application/ld+json">
@@ -100,32 +93,5 @@
       </div>
     </noscript>
     <script type="module" src="/src/main.tsx"></script>
-    <script>
-      // Remove loading screen when app signals it's ready
-      window.addEventListener('app-ready', function() {
-        var loading = document.getElementById('loading-screen');
-        if (loading) {
-          setTimeout(function() {
-            loading.style.opacity = '0';
-            loading.style.transition = 'opacity 0.3s ease';
-            setTimeout(function() {
-              loading.style.display = 'none';
-            }, 300);
-          }, 500);
-        }
-      });
-      
-      // Fallback: remove after 10 seconds even if app doesn't signal
-      setTimeout(function() {
-        var loading = document.getElementById('loading-screen');
-        if (loading && loading.style.display !== 'none') {
-          loading.style.opacity = '0';
-          loading.style.transition = 'opacity 0.3s ease';
-          setTimeout(function() {
-            loading.style.display = 'none';
-          }, 300);
-        }
-      }, 10000);
-    </script>
   </body>
 </html>
