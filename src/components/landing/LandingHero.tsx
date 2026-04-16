@@ -9,7 +9,7 @@ export const LandingHero = () => {
       <div className="sticky top-0 h-screen overflow-hidden bg-black" style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 30%, #2d0a5e 0%, #0a0114 50%, #060608 100%)' }}>
         <video
           aria-hidden="true"
-          src="/A_seamless_cinematic_transition_from_a_dark_obsidian_c.mp4"
+          src="/Flow_202604160852.mp4"
           autoPlay playsInline muted preload="auto" loop
           poster="/hero-poster.jpg"
           className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-screen"
