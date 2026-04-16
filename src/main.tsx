@@ -9,44 +9,44 @@ import { SpeedInsights } from "@vercel/speed-insights/react";
 initSentry();
 initPostHog();
 
-/** Hide the loading screen shown in index.html — CSP-safe, runs as a module */
+/** Remove the initial loading screen from index.html. 
+ *  Called from module scope — CSP-safe, always fires. */
 function hideLoadingScreen() {
-  const loading = document.getElementById("loading-screen");
-  if (!loading || loading.style.display === "none") return;
-  loading.style.opacity = "0";
-  loading.style.transition = "opacity 0.3s ease";
-  setTimeout(() => { loading.style.display = "none"; }, 320);
+  const el = document.getElementById("loading-screen");
+  if (!el) return;
+  el.style.transition = "opacity 0.25s ease";
+  el.style.opacity = "0";
+  setTimeout(() => { el.remove(); }, 280);
 }
 
-function mountApp() {
-  const root = document.getElementById("root");
-  if (!root) {
-    document.body.innerHTML = '<div style="color:white;background:#7c3aed;padding:2rem;font-family:monospace">FATAL: #root element not found in index.html</div>';
-    return;
-  }
-
+const root = document.getElementById("root");
+if (!root) {
+  document.body.innerHTML =
+    '<div style="color:white;background:#7c3aed;padding:2rem;font-family:monospace">FATAL: #root missing</div>';
+} else {
   try {
-    const reactRoot = createRoot(root);
-    reactRoot.render(
+    createRoot(root).render(
       <>
         <App />
         <Analytics />
         <SpeedInsights />
       </>
     );
-    // Hide loading screen shortly after React paints its first frame
-    setTimeout(hideLoadingScreen, 400);
+    // Hide after first animation frame so React has painted
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        hideLoadingScreen();
+      });
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     root.innerHTML = `<div style="color:white;background:#7f1d1d;padding:2rem;font-family:monospace;min-height:100vh">
-      <strong style="font-size:1.25rem">React failed to mount</strong><br/><br/>${msg}
+      <strong style="font-size:1.25rem">Failed to mount</strong><br/><br/>${msg}
     </div>`;
-    console.error('[MUSHIN] React mount failed:', err);
+    console.error("[MUSHIN] mount error:", err);
     hideLoadingScreen();
   }
 }
 
-// Safety fallback: force-hide loading screen after 5s regardless
-setTimeout(hideLoadingScreen, 5000);
-
-mountApp();
+// Hard fallback — never leave users stuck after 4 seconds
+setTimeout(hideLoadingScreen, 4000);
