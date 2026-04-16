@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { SEO } from "@/components/SEO";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -55,7 +54,7 @@ const statusIcons: Record<TicketStatus, React.ElementType> = {
 };
 
 export default function SupportPage() {
-  const { user, workspace } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -116,7 +115,6 @@ export default function SupportPage() {
     try {
       const { error } = await supabase.from("support_tickets").insert({
         user_id: user!.id,
-        workspace_id: workspace?.workspace_id || null,
         subject: newSubject.trim(),
         description: newDescription.trim(),
         priority: newPriority,
@@ -164,7 +162,6 @@ export default function SupportPage() {
 
   return (
     <div className="space-y-6 max-w-5xl">
-      <SEO title="Support" description="Get help with MUSHIN." />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

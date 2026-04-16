@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { SEO } from "@/components/SEO";
 import { BarChart3, TrendingUp, Users, Eye, DollarSign, Globe } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, AreaChart, Area, ScatterChart, Scatter, XAxis, YAxis, Tooltip, CartesianGrid, Cell } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
@@ -149,7 +148,6 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <SEO title="Analytics" description="View your campaign analytics." noindex />
       <div>
         <h1 className="font-serif text-2xl font-bold text-foreground">Analytics</h1>
         <p className="text-sm text-muted-foreground">Deep insights into your influencer marketing performance</p>

@@ -66,7 +66,7 @@ export default function AdminSupportTickets() {
     queryFn: async () => {
       let q = supabase
         .from("support_tickets")
-        .select("*, profiles!support_tickets_user_id_fkey(full_name, avatar_url)")
+        .select("*, profiles!user_id(full_name, avatar_url)")
         .order("created_at", { ascending: false });
 
       if (filterStatus !== "all") {
@@ -74,10 +74,7 @@ export default function AdminSupportTickets() {
       }
 
       const { data, error } = await q;
-      if (error) {
-        console.error("Admin tickets fetch error:", error);
-        throw error;
-      }
+      if (error) throw error;
       return data as Ticket[];
     },
     refetchInterval: 60_000,

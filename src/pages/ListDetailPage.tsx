@@ -72,20 +72,18 @@ export default function ListDetailPage() {
   const { data: stages } = usePipelineStages(selectedCampaignId || undefined);
   const { addCard } = usePipelineCards(selectedCampaignId || undefined);
 
-  const { data: list, error: listError } = useQuery({
+  const { data: list } = useQuery({
     queryKey: ["list-detail", id],
     queryFn: async () => {
-      if (!id || !workspace?.workspace_id) throw new Error("No workspace");
       const { data, error } = await supabase
         .from("influencer_lists")
         .select("*")
-        .eq("id", id)
-        .eq("workspace_id", workspace.workspace_id)
+        .eq("id", id!)
         .single();
-      if (error || !data) throw new Error("List not found or access denied");
+      if (error) throw error;
       return data;
     },
-    enabled: !!id && !!workspace?.workspace_id,
+    enabled: !!id,
   });
 
   const allSelected = useMemo(

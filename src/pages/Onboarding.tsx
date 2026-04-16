@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { SEO } from "@/components/SEO";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -70,7 +69,6 @@ export default function Onboarding() {
 
   return (
     <div className="relative min-h-screen bg-background flex items-center justify-center p-4">
-      <SEO title="Setup Your Account" description="Complete your MUSHIN account setup." noindex />
       <AuroraBackground />
       <div className="glass-card w-full max-w-lg p-8 space-y-6 relative z-10">
         {/* Logo */}

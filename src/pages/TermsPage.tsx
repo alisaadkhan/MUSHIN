@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import { SEO } from "@/components/SEO";
 import { Link } from "react-router-dom";
 import { Zap, ArrowLeft } from "lucide-react";
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
@@ -9,7 +8,6 @@ export default function TermsPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      <SEO title="Terms of Service" description="MUSHIN terms of service." />
       <div className="fixed inset-0 -z-10 animated-mesh-bg" />
       <div className="fixed inset-0 -z-10 dot-grid-overlay" />
 

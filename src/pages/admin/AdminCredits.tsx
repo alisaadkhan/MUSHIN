@@ -115,65 +115,38 @@ export default function AdminCredits() {
     if (!selected) return;
     setSubmitting(true);
     try {
-      const creditTypes = [
-        { key: "search_credits", credit_type: "search" as const, field: "search_credits" as const },
-        { key: "ai_credits", credit_type: "ai" as const, field: "ai_credits" as const },
-        { key: "email_sends", credit_type: "email" as const, field: "email_sends" as const },
-        { key: "enrichment_credits", credit_type: "enrichment" as const, field: "enrichment_credits" as const },
-      ];
-
       if (dialogMode === "adjust") {
-        const adjustments = creditTypes
-          .filter((ct) => form[ct.field] !== "")
-          .map((ct) => ({ credit_type: ct.credit_type, amount_delta: Number(form[ct.field]) }));
-
-        if (adjustments.length === 0) {
+        const body: Record<string, any> = { target_user_id: selected.owner_id };
+        if (form.search_credits !== "") body.search_credits = Number(form.search_credits);
+        if (form.ai_credits !== "") body.ai_credits = Number(form.ai_credits);
+        if (form.email_sends !== "") body.email_sends = Number(form.email_sends);
+        if (form.enrichment_credits !== "") body.enrichment_credits = Number(form.enrichment_credits);
+        if (Object.keys(body).length === 1) {
           toast({ title: "No changes", description: "Enter at least one delta value.", variant: "destructive" });
           return;
         }
-
-        for (const adj of adjustments) {
-          const { data, error } = await supabase.functions.invoke("admin-adjust-credits", {
-            body: {
-              workspace_id: selected.id,
-              credit_type: adj.credit_type,
-              amount_delta: adj.amount_delta,
-              mode: "adjust",
-              reason: form.note || "Manual credit adjustment",
-              target_user_id: selected.owner_id,
-            },
-          });
-          if (error) throw error;
-          if (data?.error) throw new Error(data.error);
-        }
+        const { data, error } = await supabase.functions.invoke("admin-adjust-credits", { body });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
         toast({ title: "Credits adjusted", description: `Updated workspace for ${selected.owner_email ?? selected.owner_id}` });
       } else {
+        // Hard-set absolute values (delta = target − current)
         const targets = {
           search_credits: Number(form.search_credits),
           ai_credits: Number(form.ai_credits),
           email_sends: Number(form.email_sends),
           enrichment_credits: Number(form.enrichment_credits),
         };
-
-        for (const ct of creditTypes) {
-          const targetVal = targets[ct.field];
-          const currentVal = selected[ct.key];
-          const delta = targetVal - currentVal;
-          if (delta === 0) continue;
-
-          const { data, error } = await supabase.functions.invoke("admin-adjust-credits", {
-            body: {
-              workspace_id: selected.id,
-              credit_type: ct.credit_type,
-              amount_delta: delta,
-              mode: "adjust",
-              reason: form.note || "Reset to plan defaults",
-              target_user_id: selected.owner_id,
-            },
-          });
-          if (error) throw error;
-          if (data?.error) throw new Error(data.error);
-        }
+        const body: Record<string, any> = {
+          target_user_id: selected.owner_id,
+          search_credits:      targets.search_credits      - selected.search_credits_remaining,
+          ai_credits:          targets.ai_credits          - selected.ai_credits_remaining,
+          email_sends:         targets.email_sends         - selected.email_sends_remaining,
+          enrichment_credits:  targets.enrichment_credits  - selected.enrichment_credits_remaining,
+        };
+        const { data, error } = await supabase.functions.invoke("admin-adjust-credits", { body });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
         toast({ title: "Credits reset to plan defaults", description: `Workspace for ${selected.owner_email ?? selected.owner_id} updated` });
       }
       setDialogMode(null);

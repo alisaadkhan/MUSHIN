@@ -1,0 +1,23 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:8080",
+      "localStorage": [
+        {
+          "name": "sb-127-auth-token",
+          "value": "{\"access_token\":\"eyJhbGciOiJFUzI1NiIsImtpZCI6ImI4MTI2OWYxLTIxZDgtNGYyZS1iNzE5LWMyMjQwYTg0MGQ5MCIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwOi8vMTI3LjAuMC4xOjU0MzIxL2F1dGgvdjEiLCJzdWIiOiI2NWY1NTliNS0wYTc0LTQ3OTctYjc2MS0wMmJkNDQ5ZTA5YTMiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzc1ODE5NjkwLCJpYXQiOjE3NzU4MTYwOTAsImVtYWlsIjoiYWxpc2FhZDc1ODc4QGdtYWlsLmNvbSIsInBob25lIjoiIiwiYXBwX21ldGFkYXRhIjp7InByb3ZpZGVyIjoiZW1haWwiLCJwcm92aWRlcnMiOlsiZW1haWwiXX0sInVzZXJfbWV0YWRhdGEiOnsiZW1haWxfdmVyaWZpZWQiOnRydWUsImZ1bGxfbmFtZSI6IkFsaSBTYWFkIn0sInJvbGUiOiJhdXRoZW50aWNhdGVkIiwiYWFsIjoiYWFsMSIsImFtciI6W3sibWV0aG9kIjoicGFzc3dvcmQiLCJ0aW1lc3RhbXAiOjE3NzU4MTYwOTB9XSwic2Vzc2lvbl9pZCI6IjI0OWVhMjNmLTdjOTktNDQxMy1hZWUwLWQ4OWY5ZDM1NzkxZiIsImlzX2Fub255bW91cyI6ZmFsc2V9.xhRX37wLwSy6ZxyhjD3TyqWBg1rtPIULDV8qmtc2q8XZI_vwcfsEMNsO7s_rEBA1nMHZeYdLGkWT3Og2SHdzig\",\"token_type\":\"bearer\",\"expires_in\":3600,\"expires_at\":1775819690,\"refresh_token\":\"x7dld5xopngo\",\"user\":{\"id\":\"65f559b5-0a74-4797-b761-02bd449e09a3\",\"aud\":\"authenticated\",\"role\":\"authenticated\",\"email\":\"alisaad75878@gmail.com\",\"email_confirmed_at\":\"2026-04-10T10:09:40.792251Z\",\"phone\":\"\",\"confirmed_at\":\"2026-04-10T10:09:40.792251Z\",\"last_sign_in_at\":\"2026-04-10T10:14:50.854003267Z\",\"app_metadata\":{\"provider\":\"email\",\"providers\":[\"email\"]},\"user_metadata\":{\"email_verified\":true,\"full_name\":\"Ali Saad\"},\"identities\":[{\"identity_id\":\"6c09e69b-3128-4095-8a92-28333295191f\",\"id\":\"65f559b5-0a74-4797-b761-02bd449e09a3\",\"user_id\":\"65f559b5-0a74-4797-b761-02bd449e09a3\",\"identity_data\":{\"email\":\"alisaad75878@gmail.com\",\"email_verified\":false,\"phone_verified\":false,\"sub\":\"65f559b5-0a74-4797-b761-02bd449e09a3\"},\"provider\":\"email\",\"last_sign_in_at\":\"2026-04-10T10:09:40.789097Z\",\"created_at\":\"2026-04-10T10:09:40.78915Z\",\"updated_at\":\"2026-04-10T10:09:40.78915Z\",\"email\":\"alisaad75878@gmail.com\"}],\"created_at\":\"2026-04-10T10:09:40.78369Z\",\"updated_at\":\"2026-04-10T10:14:50.857715Z\",\"is_anonymous\":false},\"weak_password\":null}"
+        }
+      ]
+    },
+    {
+      "origin": "https://challenges.cloudflare.com",
+      "localStorage": [
+        {
+          "name": "cf.turnstile.u",
+          "value": "2ulOMTo_VpXzjLXRPgV96r9w3Ora4O8vWgjCDglg7TU-1775816083-1.3.1.1-I9ZtbEhwl1o2rbabaxc4Qk7bBbqR91nirTDRE2t_oiwMR1QANssqw5HhGA8j6wO.NS2NxouCeDD99aFkqiNOqw"
+        }
+      ]
+    }
+  ]
+}

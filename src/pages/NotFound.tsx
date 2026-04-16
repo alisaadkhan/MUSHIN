@@ -1,11 +1,9 @@
 import { Link } from "react-router-dom";
 import { AuroraBackground } from "@/components/layout/AuroraBackground";
-import { SEO } from "@/components/SEO";
 
 export default function NotFound() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center relative overflow-hidden">
-      <SEO title="Page Not Found" description="This page doesn't exist." />
       <AuroraBackground />
       <div className="text-center space-y-6 relative z-10">
         <div className="text-8xl font-extrabold aurora-text" style={{ fontFamily: "'Syne', sans-serif" }}>404</div>

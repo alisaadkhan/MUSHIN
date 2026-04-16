@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { SEO } from "@/components/SEO";
 import { motion } from "framer-motion";
 import { Clock, Search, Play, Eye, ExternalLink, UserPlus, Megaphone, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -100,7 +99,6 @@ export default function HistoryPage() {
 
   return (
     <div className="space-y-6">
-      <SEO title="Search History" description="View your past searches." noindex />
       <div>
         <h1 className="font-serif text-2xl font-bold text-foreground">History</h1>
         <p className="text-sm text-muted-foreground mt-1">Your recent activity timeline</p>

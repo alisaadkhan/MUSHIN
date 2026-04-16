@@ -1,0 +1,60 @@
+{
+  "timestamp": "2026-04-10T10:25:08.278Z",
+  "testSuite": "Bug Fix Validation - Deep Browser Testing",
+  "results": {
+    "supportTickets": {
+      "userCanCreate": false,
+      "workspaceIdIncluded": false,
+      "adminCanView": false,
+      "profileJoinWorking": false
+    },
+    "savedSearches": {
+      "pageLoads": false,
+      "canSave": false,
+      "noConsoleErrors": true
+    },
+    "campaigns": {
+      "pageLoads": false,
+      "canCreate": false,
+      "pipelineCardsQuery": false
+    },
+    "profileStats": {
+      "youtube": {
+        "subscribers": false,
+        "videos": false,
+        "following": false,
+        "engagement": false
+      },
+      "instagram": {
+        "followers": false,
+        "following": false,
+        "engagement": false,
+        "posts": false
+      },
+      "tiktok": {
+        "followers": false,
+        "posts": false,
+        "likes": false,
+        "engagement": false
+      }
+    },
+    "apiNoticeRemoved": true,
+    "search": {
+      "defaultRange": "",
+      "showsResults": false,
+      "tiktokNotEmtpy": false,
+      "biosClean": false
+    },
+    "sidebar": {
+      "noFlashGlitch": true,
+      "creditsDisplayCorrectly": false
+    },
+    "searchHistory": {
+      "savesCorrectly": false
+    }
+  },
+  "screenshots": [],
+  "consoleErrors": [],
+  "networkErrors": [],
+  "overallStatus": "FAIL"
+}

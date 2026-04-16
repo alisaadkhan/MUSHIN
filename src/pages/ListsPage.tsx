@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { SEO } from "@/components/SEO";
 import { motion } from "framer-motion";
 import { Plus, Users, Trash2, Eye, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -59,7 +58,6 @@ export default function ListsPage() {
 
   return (
     <div className="space-y-6">
-      <SEO title="Creator Lists" description="Organize and manage your creator lists." noindex />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-serif text-2xl font-bold text-foreground">Lists</h1>
