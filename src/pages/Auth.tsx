@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
-import { Component as SignInCard } from "@/components/ui/sign-in-card-2";
+import { SignInCard2 as SignInCard } from "@/components/ui/sign-in-card-2";
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "";
 import { AuroraBackground } from "@/components/layout/AuroraBackground";

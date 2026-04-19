@@ -865,7 +865,6 @@ export default function LandingPage() {
           </motion.div>
         </div>
       </SectionSpotlight>
-      </SectionSpotlight>
 
       {/* ABOUT */}
       <SectionSpotlight id="about" aria-label="About section" className="py-24 px-6 border-t border-white/[0.06] z-20">
