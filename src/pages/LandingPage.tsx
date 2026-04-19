@@ -1038,7 +1038,14 @@ export default function LandingPage() {
                 <div className="space-y-2">
                   <Link to="/privacy" className="block text-zinc-500 hover:text-white transition-colors">Privacy</Link>
                   <Link to="/terms"   className="block text-zinc-500 hover:text-white transition-colors">Terms</Link>
-                  <Link to="/cookies" className="block text-zinc-500 hover:text-white transition-colors">Cookies</Link>`n                  <Link to="/subscription" className="block text-zinc-500 hover:text-white transition-colors">SaaS Subscription</Link>`n                  <Link to="/eula" className="block text-zinc-500 hover:text-white transition-colors">EULA</Link>`n                  <Link to="/dpa" className="block text-zinc-500 hover:text-white transition-colors">DPA</Link>`n                  <Link to="/sla" className="block text-zinc-500 hover:text-white transition-colors">SLA</Link>`n                  <Link to="/aup" className="block text-zinc-500 hover:text-white transition-colors">AUP</Link>`n                  <Link to="/nda" className="block text-zinc-500 hover:text-white transition-colors">NDA</Link>`n                  <Link to="/msa" className="block text-zinc-500 hover:text-white transition-colors">MSA</Link>
+                   <Link to="/cookies" className="block text-zinc-500 hover:text-white transition-colors">Cookies</Link>
+                  <Link to="/subscription" className="block text-zinc-500 hover:text-white transition-colors">SaaS Subscription</Link>
+                  <Link to="/eula" className="block text-zinc-500 hover:text-white transition-colors">EULA</Link>
+                  <Link to="/dpa" className="block text-zinc-500 hover:text-white transition-colors">DPA</Link>
+                  <Link to="/sla" className="block text-zinc-500 hover:text-white transition-colors">SLA</Link>
+                  <Link to="/aup" className="block text-zinc-500 hover:text-white transition-colors">AUP</Link>
+                  <Link to="/nda" className="block text-zinc-500 hover:text-white transition-colors">NDA</Link>
+                  <Link to="/msa" className="block text-zinc-500 hover:text-white transition-colors">MSA</Link>
                 </div>
               </div>
             </div>

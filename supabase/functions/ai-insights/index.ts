@@ -1,6 +1,8 @@
 import { isSuperAdmin, performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { generateText, extractJsonFromText } from "../_shared/huggingface.ts";
+import { enforceRateLimit } from "../_shared/rate-limit.ts";
+import { enforceBudgetKillSwitch } from "../_shared/budget-guard.ts";
 const ALLOWED_ORIGIN = Deno.env.get("APP_URL") || "https://mushin.app";
 const corsHeaders = {
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
@@ -80,7 +82,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+    const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+
+    // Rate Limit Check (50 requests per minute)
+    const rateLimitResponse = await enforceRateLimit(userId || ipAddress, "ai-insights", 50, 60);
+    if (rateLimitResponse) return rateLimitResponse;
 
     const adminClient = await performPrivilegedWrite({
         authHeader: req.headers.get("Authorization"),
@@ -104,6 +110,10 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Budget Kill-Switch
+    const budgetStatus = await enforceBudgetKillSwitch(membership.workspace_id, 1);
+    if (budgetStatus) return budgetStatus;
 
     const { data: ws } = await adminClient
       .from("workspaces")

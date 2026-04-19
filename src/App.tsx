@@ -125,7 +125,14 @@ const App = () => {
                   <Route path="/privacy" element={<PrivacyPage />} />
                   <Route path="/terms" element={<TermsPage />} />
                   <Route path="/cookies" element={<CookiePolicyPage />} />
-                  <Route path="/subscription" element={<SaaSSubscriptionPage />} />`n                  <Route path="/eula" element={<EulaPage />} />`n                  <Route path="/dpa" element={<DpaPage />} />`n                  <Route path="/sla" element={<SlaPage />} />`n                  <Route path="/aup" element={<AupPage />} />`n                  <Route path="/nda" element={<NdaPage />} />`n                  <Route path="/msa" element={<MsaPage />} />`n                  <Route path="/influencer/:platform/:username" element={<ProtectedPage><InfluencerProfilePage /></ProtectedPage>} />
+                  <Route path="/subscription" element={<SaaSSubscriptionPage />} />
+                  <Route path="/eula" element={<EulaPage />} />
+                  <Route path="/dpa" element={<DpaPage />} />
+                  <Route path="/sla" element={<SlaPage />} />
+                  <Route path="/aup" element={<AupPage />} />
+                  <Route path="/nda" element={<NdaPage />} />
+                  <Route path="/msa" element={<MsaPage />} />
+                  <Route path="/influencer/:platform/:username" element={<ProtectedPage><InfluencerProfilePage /></ProtectedPage>} />
                   <Route path="/blog" element={<BlogPage />} />
                   <Route path="/500" element={<ServerError />} />
                   <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
