@@ -34,11 +34,18 @@ const AboutPage            = lazy(() => import("./pages/AboutPage"));
 const PrivacyPage          = lazy(() => import("./pages/PrivacyPage"));
 const TermsPage            = lazy(() => import("./pages/TermsPage"));
 const CookiePolicyPage     = lazy(() => import("./pages/CookiePolicyPage"));
+const SaaSSubscriptionPage = lazy(() => import('./pages/SaaSSubscriptionPage'));
+const EulaPage             = lazy(() => import('./pages/EulaPage'));
+const DpaPage              = lazy(() => import('./pages/DpaPage'));
+const SlaPage              = lazy(() => import('./pages/SlaPage'));
+const AupPage              = lazy(() => import('./pages/AupPage'));
+const NdaPage              = lazy(() => import('./pages/NdaPage'));
+const MsaPage              = lazy(() => import('./pages/MsaPage'));
 const BlogPage             = lazy(() => import("./pages/BlogPage"));
 const InfluencerProfilePage = lazy(() => import("./pages/InfluencerProfilePage"));
 const NotFound             = lazy(() => import("./pages/NotFound"));
 const ServerError          = lazy(() => import("./pages/ServerError"));
-const SupportPage          = lazy(() => import("./pages/SupportPage"));
+const SupportLogin = lazy(() => import("./pages/SupportLogin"));
 
 // Admin pages — heavy, rarely accessed, loaded on demand
 const AdminDashboard       = lazy(() => import("./pages/admin/AdminDashboard"));
@@ -118,7 +125,7 @@ const App = () => {
                   <Route path="/privacy" element={<PrivacyPage />} />
                   <Route path="/terms" element={<TermsPage />} />
                   <Route path="/cookies" element={<CookiePolicyPage />} />
-                  <Route path="/influencer/:platform/:username" element={<ProtectedPage><InfluencerProfilePage /></ProtectedPage>} />
+                  <Route path="/subscription" element={<SaaSSubscriptionPage />} />`n                  <Route path="/eula" element={<EulaPage />} />`n                  <Route path="/dpa" element={<DpaPage />} />`n                  <Route path="/sla" element={<SlaPage />} />`n                  <Route path="/aup" element={<AupPage />} />`n                  <Route path="/nda" element={<NdaPage />} />`n                  <Route path="/msa" element={<MsaPage />} />`n                  <Route path="/influencer/:platform/:username" element={<ProtectedPage><InfluencerProfilePage /></ProtectedPage>} />
                   <Route path="/blog" element={<BlogPage />} />
                   <Route path="/500" element={<ServerError />} />
                   <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
@@ -130,7 +137,7 @@ const App = () => {
                   <Route path="/admin/audit-log" element={<AdminRoute requiredPermission="canViewAuditLog"><AdminAuditLog /></AdminRoute>} />
                   <Route path="/admin/announcements" element={<AdminRoute requiredPermission="canManageAnnouncements"><AdminAnnouncements /></AdminRoute>} />
                   <Route path="/admin/permissions" element={<AdminRoute requiredPermission="canEditConfig"><AdminPermissions /></AdminRoute>} />
-                  <Route path="/support" element={<ProtectedPage><SupportPage /></ProtectedPage>} />
+                  <Route path="/support-login" element={<SupportLogin />} />
                   <Route path="/admin/support" element={<AdminRoute requiredPermission="canManageUsers"><AdminSupportTickets /></AdminRoute>} />
                   <Route path="/admin/credits" element={<AdminRoute requiredPermission="canManageUsers"><AdminCredits /></AdminRoute>} />
                   <Route path="*" element={<NotFound />} />
