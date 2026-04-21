@@ -4,7 +4,7 @@
  * X (Twitter) Platform Adapter — Trend Intelligence Only (BETA)
  *
  * NOTE: This adapter is in BETA. It provides trend intelligence signals
- * based on engagement patterns. It does NOT use live Twitter API data
+ * based on engagement patterns. It does NOT use live Twitter data
  * in this version — all computations are from supplied profile metrics.
  *
  * @beta isBeta=true — all results carry isBeta flag

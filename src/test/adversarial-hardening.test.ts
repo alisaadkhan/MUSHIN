@@ -795,9 +795,9 @@ describe("Layer 8 — Statistical Integrity: Trend velocity ↔ Follower growth 
 // ── LAYER 9 — Platform Ecosystem Stability Tests ──────────────────────────────
 // =============================================================================
 
-describe("Layer 9 — YouTube: API quota exhaustion simulation", () => {
+describe("Layer 9 — YouTube: quota exhaustion simulation", () => {
   it("quota exhaustion (null metrics) returns safe defaults, not crash", () => {
-    // Simulate YouTube API returning nothing (quota hit)
+    // Simulate YouTube returning nothing (quota hit)
     const result = normaliseYouTubeMetrics({
       subscriberCount: null,
       viewCount: null,

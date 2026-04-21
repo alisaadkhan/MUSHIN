@@ -6,7 +6,7 @@
  *
  * Credit model:
  *   - Search:     1 credit per request
- *   - Enrichment: 5–10 credits per creator (deep analytics via Apify / YouTube API)
+ *   - Enrichment: 5–10 credits per creator (deep analytics via Apify / YouTube data)
  *   - AI Insights: ai_credits_remaining tracked separately
  *
  * Components are imported directly:

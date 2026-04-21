@@ -223,7 +223,7 @@ function scoreTikTok(input: PlatformIntelligenceInput): PlatformIntelligenceResu
 }
 
 // ---------------------------------------------------------------------------
-// Public API
+// Public interface
 // ---------------------------------------------------------------------------
 
 /**

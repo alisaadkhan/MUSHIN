@@ -243,7 +243,7 @@ export default function AdminUsers() {
     if (!error) return;
     toast({
       title: 'Failed to load users',
-      description: (error as any)?.message ?? 'Admin API error',
+      description: (error as any)?.message ?? 'Admin request failed',
       variant: 'destructive',
     });
   }, [error, toast]);
@@ -382,7 +382,7 @@ export default function AdminUsers() {
                   <td colSpan={7} className="px-4 py-10 text-center">
                     <div className="text-white/70 font-medium mb-1">Unable to load users</div>
                     <div className="text-white/35 text-[11px] mono mb-4">
-                      {(error as any)?.message ?? 'Admin API error'}
+                      {(error as any)?.message ?? 'Admin request failed'}
                     </div>
                     <button onClick={() => refetch()} className="btn-secondary inline-flex items-center gap-2">
                       <RefreshCw size={13} />

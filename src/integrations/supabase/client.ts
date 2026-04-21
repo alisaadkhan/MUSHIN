@@ -7,7 +7,7 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 // SECURITY: Fail loudly when environment variables are missing rather than
 // silently creating a broken client. An empty-string URL would cause every
-// API call to fail with cryptic network errors; an explicit throw surfaces
+// request to fail with cryptic network errors; an explicit throw surfaces
 // the misconfiguration at startup and prevents deployments without secrets.
 if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
   throw new Error(
@@ -30,4 +30,4 @@ export const supabase = createClient<Database>(
       autoRefreshToken: true,
     },
   }
-);
+);

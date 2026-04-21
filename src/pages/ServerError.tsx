@@ -2,7 +2,7 @@
  * ServerError.tsx  —  MUSHIN  ·  NEW PAGE (was missing)
  *
  * A production-grade 500 / server error boundary page.
- * Register this in your router for unexpected errors and API failures.
+ * Register this in your router for unexpected errors and service failures.
  *
  * Usage (React Router v6):
  *   <Route path="*" errorElement={<ServerError />} />

@@ -73,7 +73,7 @@ export function useInfluencerEvaluation() {
         else if (status === 402) toast({ title: "Credits exhausted", description: "Add AI credits in settings.", variant: "destructive" });
         else {
           const friendlyDesc = (data.error || "").includes("non-2xx") || (data.error || "").includes("Failed to send a request")
-            ? "AI evaluation service is unavailable. Make sure the edge functions are deployed and your AI API key is configured."
+            ? "AI evaluation service is unavailable. Make sure the edge functions are deployed and your AI key is configured."
             : data.error;
           toast({ title: "Evaluation failed", description: friendlyDesc, variant: "destructive" });
         }
@@ -97,7 +97,7 @@ export function useInfluencerEvaluation() {
     } catch (err: any) {
       const raw: string = err.message || "Unknown error";
       const friendly = raw.includes("non-2xx") || raw.includes("Failed to send a request")
-        ? "AI evaluation service is unavailable. Make sure the edge functions are deployed and your AI API key is configured."
+        ? "AI evaluation service is unavailable. Make sure the edge functions are deployed and your AI key is configured."
         : raw;
       toast({ title: "Evaluation failed", description: friendly, variant: "destructive" });
       return null;

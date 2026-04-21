@@ -139,7 +139,7 @@ function semanticTagSimilarity(query: string, creatorTags: string[]): number {
 }
 
 // ---------------------------------------------------------------------------
-// Public API
+// Public interface
 // ---------------------------------------------------------------------------
 
 export interface TagScoreInput {

@@ -570,7 +570,7 @@ export default function InfluencerProfilePage() {
       {platform !== "youtube" && (
         <div className="bg-blue-50/50 border border-blue-200/50 text-blue-800 rounded-lg p-3 text-sm flex items-start gap-2 backdrop-blur-sm">
           <Info className="h-4 w-4 mt-0.5 shrink-0 text-blue-600" />
-          <p>Instagram and TikTok data is sourced via Apify. YouTube data comes directly from the official YouTube Data API v3.</p>
+          <p>Instagram and TikTok data is sourced via Apify. YouTube data comes directly from official YouTube data sources.</p>
         </div>
       )}
 
@@ -632,7 +632,7 @@ export default function InfluencerProfilePage() {
                     </span>
                   )}
                   {dataSource === "youtube_api" && (
-                    <span title="Real data verified via official YouTube API" className="text-[10px] font-medium bg-red-50 text-red-700 border border-red-200 rounded-full px-2 py-0.5 flex items-center gap-1">
+                    <span title="Real data verified via official sources" className="text-[10px] font-medium bg-red-50 text-red-700 border border-red-200 rounded-full px-2 py-0.5 flex items-center gap-1">
                       <ShieldCheck className="h-2.5 w-2.5" /> YouTube Verified
                     </span>
                   )}
@@ -957,7 +957,7 @@ export default function InfluencerProfilePage() {
                       })}
                     </div>
                     <p className="text-[10px] text-muted-foreground mt-2.5 leading-relaxed">
-                      Ranking only — exact audience percentages require Meta Business API access.
+                      Ranking only — exact audience percentages require Meta Business access.
                     </p>
                   </div>
                 )}

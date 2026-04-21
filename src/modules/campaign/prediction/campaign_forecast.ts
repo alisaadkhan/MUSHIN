@@ -48,7 +48,7 @@ export interface CampaignForecastResult {
   confidence: number;
   uncertain: boolean;
   signals: string[];
-  /** Alias of confidence for API consistency */
+  /** Alias of confidence for interface consistency */
   confidenceScore: number;
   dataOrigin: "computed_from_profile_signals";
 }
