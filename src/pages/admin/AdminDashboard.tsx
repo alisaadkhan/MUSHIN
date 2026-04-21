@@ -93,7 +93,7 @@ export default function AdminDashboard() {
       const startIso = startOfDay.toISOString();
 
       const [usersRes, subsRes, wsRes, auditRes, suspendedRes, creditTodayRes] = await Promise.all([
-        supabase.from('profiles').select('id', { count: 'exact', head: true }),
+        supabase.functions.invoke('admin-list-users'),
         supabase.from('subscriptions').select('id,plan,status', { count: 'exact' }),
         supabase.from('workspaces').select('id', { count: 'exact', head: true }),
         supabase
@@ -112,9 +112,10 @@ export default function AdminDashboard() {
       ]);
 
       const activeSubs = (subsRes.data ?? []).filter(s => s.status === 'active').length;
+      const totalUsers = Array.isArray((usersRes as any)?.data?.users) ? (usersRes as any).data.users.length : 0;
 
       return {
-        totalUsers:        usersRes.count     ?? 0,
+        totalUsers,
         activeUsers7d:     0,                           // needs active_at column
         activeSubs,
         totalSubs:         subsRes.count      ?? 0,
