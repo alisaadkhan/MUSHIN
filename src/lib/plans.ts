@@ -1,14 +1,18 @@
 export const PLANS = {
   free: {
-    name: "Free",
+    // Legacy key kept for compatibility, but MUSHIN does not offer a free plan.
+    // Treat this as a non-marketed trial shell.
+    name: "Trial",
     price: 0,
-    search_credits: 3,
-    enrichment_credits: 2,
-    campaigns: 1,
-    email_sends: 5,
+    search_credits: 0,
+    enrichment_credits: 0,
+    campaigns: 0,
+    email_sends: 0,
     ai_credits: 0,
     team_members: 1,
     priority_support: false,
+    mushin_score_accuracy: 0,
+    real_time_scoring: false,
   },
   pro: {
     name: "Pro",
@@ -22,6 +26,8 @@ export const PLANS = {
     ai_credits: 100,
     team_members: 3,
     priority_support: false,
+    mushin_score_accuracy: 85,
+    real_time_scoring: true,
   },
   business: {
     name: "Business",
@@ -35,6 +41,24 @@ export const PLANS = {
     ai_credits: Infinity,
     team_members: 10,
     priority_support: true,
+    mushin_score_accuracy: 92,
+    real_time_scoring: true,
+  },
+  enterprise: {
+    name: "Enterprise",
+    price: 199,
+    // TODO: fill these after creating the Stripe product/price (or Paddle plan)
+    price_id: "price_enterprise_placeholder",
+    product_id: "prod_enterprise_placeholder",
+    search_credits: 10000,
+    enrichment_credits: 2500,
+    campaigns: Infinity,
+    email_sends: 10000,
+    ai_credits: Infinity,
+    team_members: 50,
+    priority_support: true,
+    mushin_score_accuracy: 96,
+    real_time_scoring: true,
   },
 } as const;
 

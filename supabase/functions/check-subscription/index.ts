@@ -12,6 +12,8 @@ const corsHeaders = {
 const PLAN_TIERS: Record<string, { plan: string }> = {
   "prod_TyMbQ3mEvnVxKK": { plan: "pro" },
   "prod_TyMbNwl6IF6Jis": { plan: "business" },
+  // Enterprise placeholder (set once product exists)
+  "prod_enterprise_placeholder": { plan: "enterprise" },
 };
 
 Deno.serve(async (req) => {

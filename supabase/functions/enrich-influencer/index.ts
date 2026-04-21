@@ -501,11 +501,28 @@ Deno.serve(async (req: Request) => {
         }
 
         // Success -> Deduct Credits Atomically
+        const idempotencyKey = req.headers.get("x-idempotency-key")?.trim() || crypto.randomUUID();
+        let remainingCredits: number | null = null;
         if (!callerIsSuperAdmin) {
             try {
-                await serviceClient.rpc('consume_enrichment_credit', { ws_id: workspaceId });
+                const { data: debitRes, error: debitErr } = await serviceClient.rpc("consume_user_credits", {
+                    p_user_id: user.id,
+                    p_workspace_id: workspaceId,
+                    p_credit_type: "enrichment",
+                    p_amount: 1,
+                    p_action: "enrich_profile",
+                    p_idempotency_key: `enrich-influencer:${idempotencyKey}`,
+                    p_metadata: { endpoint: "enrich-influencer", platform, username },
+                });
+                if (debitErr) throw debitErr;
+                if (!debitRes?.success) {
+                    const e: any = new Error("Insufficient credits");
+                    e.code = "INSUFFICIENT_CREDITS";
+                    throw e;
+                }
+                remainingCredits = typeof debitRes?.balance_after === "number" ? debitRes.balance_after : null;
             } catch (error: any) {
-                if (error.code === 'P0001') {
+                if (error.code === 'P0001' || error.code === "INSUFFICIENT_CREDITS") {
                     // Credit deduction failed AFTER data was saved — mark as partial
                     // so user can see the data but knows credits weren't consumed
                     await serviceClient.from("influencer_profiles").update({
@@ -519,7 +536,7 @@ Deno.serve(async (req: Request) => {
                             profile,
                             data_source: dataSource,
                             is_stale: false,
-                            credits_remaining: workspace?.enrichment_credits_remaining ?? 0,
+                            credits_remaining: remainingCredits,
                             warning: "Profile enriched successfully but credit deduction failed. Please contact support if this persists.",
                         }),
                         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -586,7 +603,13 @@ Deno.serve(async (req: Request) => {
 
         const isStale = profile?.last_enriched_at ? (Date.now() - new Date(profile.last_enriched_at).getTime()) / (1000 * 60 * 60 * 24) > (profile.enrichment_ttl_days ?? 30) : false;
 
-        return new Response(JSON.stringify({ success: true, profile, data_source: dataSource, is_stale: isStale, credits_remaining: callerIsSuperAdmin ? Number.MAX_SAFE_INTEGER : (workspace?.enrichment_credits_remaining || 1) - 1 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({
+            success: true,
+            profile,
+            data_source: dataSource,
+            is_stale: isStale,
+            credits_remaining: callerIsSuperAdmin ? Number.MAX_SAFE_INTEGER : remainingCredits,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     } catch (err: any) {
         // HIGH-04: Log internally, return generic safe error to client
         console.error(`[enrich] Unhandled error for ${req.url}:`, err.message ?? err);

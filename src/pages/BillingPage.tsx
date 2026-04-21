@@ -13,7 +13,9 @@ import { motion } from "framer-motion";
 import { PaymentsPanel, type PaymentRecord } from "@/components/payments/PaymentsPanel";
 import { supabase } from "@/integrations/supabase/client";
 
-const planOrder: PlanKey[] = ["free", "pro", "business"];
+// MUSHIN does not market/sell a free tier. Keep "free" as an internal trial key,
+// but do not show it as an available plan.
+const planOrder: PlanKey[] = ["pro", "business", "enterprise"];
 
 const features = [
   { key: "search_credits", label: "Search credits / mo" },
@@ -23,6 +25,8 @@ const features = [
   { key: "ai_credits", label: "AI insights / mo" },
   { key: "team_members", label: "Team members" },
   { key: "priority_support", label: "Priority support" },
+  { key: "mushin_score_accuracy", label: "MUSHIN score accuracy" },
+  { key: "real_time_scoring", label: "Real-time scoring" },
 ] as const;
 
 export default function BillingPage() {
@@ -101,6 +105,8 @@ export default function BillingPage() {
 
   const formatValue = (key: string, value: any) => {
     if (key === "priority_support") return value ? "✓" : "—";
+    if (key === "real_time_scoring") return value ? "✓" : "—";
+    if (key === "mushin_score_accuracy") return value ? `${value}%` : "—";
     if (value === Infinity) return "Unlimited";
     return String(value);
   };
@@ -291,7 +297,7 @@ export default function BillingPage() {
                     )}
                     {isCurrent && plan === "free" && (
                       <Button variant="outline" className="w-full rounded-lg bg-muted/30" disabled>
-                        Selected Space
+                        Trial (upgrade required)
                       </Button>
                     )}
                   </div>

@@ -6,6 +6,7 @@ import { MushInLogo, MushInIcon } from '@/components/ui/MushInLogo';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { LandingHero } from "@/components/landing/LandingHero";
 import { GlowCard } from "@/components/ui/spotlight-card";
+import OrbitingSkills from "@/components/ui/orbiting-skills";
 
 /* --- Global Styles ------------------------------------------------------------ */
 const G = () => <style>{`
@@ -27,8 +28,8 @@ const G = () => <style>{`
 @keyframes pulse-ring{0%{transform:scale(.9);opacity:.8}70%{transform:scale(1.5);opacity:0}100%{transform:scale(.9);opacity:0}}
 .reveal-word{display:inline-block;overflow:hidden;vertical-align:bottom;margin-right:0.24em}
 @keyframes beam-travel{0%{stroke-dashoffset:400}100%{stroke-dashoffset:-400}}
-.shiny-text{background:linear-gradient(120deg,#fff 20%,#a855f7 40%,#c084fc 50%,#a855f7 60%,#fff 80%);background-size:200% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 3s linear infinite}
-.aurora-text{background:linear-gradient(270deg,#a855f7,#c084fc,#7c3aed,#d946ef,#a855f7);background-size:400% 400%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:aurora 5s ease infinite}
+.shiny-text{background:linear-gradient(120deg,#fff 20%,#a855f7 40%,#c084fc 50%,#a855f7 60%,#fff 80%);background-size:200% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.aurora-text{background:linear-gradient(270deg,#a855f7,#c084fc,#7c3aed,#d946ef,#a855f7);background-size:400% 400%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
 @keyframes star-twinkle{0%,100%{opacity:0.1;transform:scale(1)}50%{opacity:1;transform:scale(1.6)}}
 `}</style>;
 
@@ -175,31 +176,42 @@ const BorderBeam = ({ color = '#a855f7', size = 1.5, dur = 3 }: { color?: string
         -webkit-mask-composite: xor;
         mask-composite: exclude;
       }
-      @keyframes beamspin { to { --bangle: 360deg; } }
-      @property --bangle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+      
+      
     `}</style>
   </div>
 );
 
-/* --- Atom Orbit ------------------------------------------------------------ */
+/* --- Atom Orbit - Mobile Responsive ---------------------------------------- */
 const AtomOrbit = () => {
-  const SZ = 500;
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const SZ = isMobile ? 320 : 500;
   const C  = SZ / 2;
-  const R1 = 130, R2 = 220;
+  const R1 = isMobile ? 80 : 130;
+  const R2 = isMobile ? 140 : 220;
+  const iconScale = isMobile ? 0.7 : 1;
 
   const inner: { deg: number; color: string; icon: React.ReactNode; label: string }[] = [
-    { deg: -90, color: '#E1306C', label: 'Instagram', icon: <Instagram style={{ width: 18, height: 18, color: '#E1306C' }} /> },
-    { deg:  30, color: '#69C9D0', label: 'TikTok',    icon: <span style={{ fontWeight: 900, color: '#69C9D0', fontSize: 12, lineHeight: '1', letterSpacing: '-0.04em' }}>TT</span> },
-    { deg: 150, color: '#FF0000', label: 'YouTube',   icon: <Youtube style={{ width: 16, height: 16, color: '#FF4444' }} /> },
+    { deg: -90, color: '#E1306C', label: 'Instagram', icon: <Instagram style={{ width: 18 * iconScale, height: 18 * iconScale, color: '#E1306C' }} /> },
+    { deg:  30, color: '#69C9D0', label: 'TikTok',    icon: <span style={{ fontWeight: 900, color: '#69C9D0', fontSize: 12 * iconScale, lineHeight: '1', letterSpacing: '-0.04em' }}>TT</span> },
+    { deg: 150, color: '#FF0000', label: 'YouTube',   icon: <Youtube style={{ width: 16 * iconScale, height: 16 * iconScale, color: '#FF4444' }} /> },
   ];
 
   const outer: { deg: number; color: string; icon: React.ReactNode; label: string }[] = [
-    { deg: -90, color: '#a855f7', label: 'AI Search',    icon: <Search    style={{ width: 14, height: 14, color: '#c084fc' }} /> },
-    { deg: -18, color: '#60a5fa', label: 'Fraud Check',  icon: <Shield    style={{ width: 14, height: 14, color: '#60a5fa' }} /> },
-    { deg:  54, color: '#4ade80', label: 'ROAS Engine',  icon: <TrendingUp style={{ width: 14, height: 14, color: '#4ade80' }} /> },
-    { deg: 126, color: '#facc15', label: 'Live Data',    icon: <Zap       style={{ width: 14, height: 14, color: '#facc15' }} /> },
-    { deg: 198, color: '#fb923c', label: 'Multi-City',   icon: <MapPin    style={{ width: 14, height: 14, color: '#fb923c' }} /> },
-    { deg: 270, color: '#f472b6', label: 'Team Board',   icon: <Users     style={{ width: 14, height: 14, color: '#f472b6' }} /> },
+    { deg: -90, color: '#a855f7', label: 'AI Search',    icon: <Search    style={{ width: 14 * iconScale, height: 14 * iconScale, color: '#c084fc' }} /> },
+    { deg: -18, color: '#60a5fa', label: 'Fraud Check',  icon: <Shield    style={{ width: 14 * iconScale, height: 14 * iconScale, color: '#60a5fa' }} /> },
+    { deg:  54, color: '#4ade80', label: 'ROAS Engine',  icon: <TrendingUp style={{ width: 14 * iconScale, height: 14 * iconScale, color: '#4ade80' }} /> },
+    { deg: 126, color: '#facc15', label: 'Live Data',    icon: <Zap       style={{ width: 14 * iconScale, height: 14 * iconScale, color: '#facc15' }} /> },
+    { deg: 198, color: '#fb923c', label: 'Multi-City',   icon: <MapPin    style={{ width: 14 * iconScale, height: 14 * iconScale, color: '#fb923c' }} /> },
+    { deg: 270, color: '#f472b6', label: 'Team Board',   icon: <Users     style={{ width: 14 * iconScale, height: 14 * iconScale, color: '#f472b6' }} /> },
   ];
 
   const pos = (r: number, deg: number) => ({
@@ -239,7 +251,7 @@ const AtomOrbit = () => {
   );
 
   return (
-    <div style={{ position: 'relative', width: SZ, height: SZ, maxWidth: '100%', margin: '0 auto' }}>
+    <div style={{ position: 'relative', width: SZ, height: SZ, maxWidth: '100%', maxHeight: SZ, margin: '0 auto', overflow: 'hidden' }}>
       <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none', opacity: 0.35 }}
         viewBox={`0 0 ${SZ} ${SZ}`}>
         {outer.map(({ deg, color }, i) => {
@@ -253,17 +265,18 @@ const AtomOrbit = () => {
           );
         })}
       </svg>
-      {ring(R1 * 2, '16s', 'ao-r1', 'cw',  inner, 44)}
-      {ring(R2 * 2, '26s', 'ao-r2', 'ccw', outer, 36)}
+      {ring(R1 * 2, '16s', 'ao-r1', 'cw',  inner, 44 * iconScale)}
+      {ring(R2 * 2, '26s', 'ao-r2', 'ccw', outer, 36 * iconScale)}
       <div style={{
-        position: 'absolute', top: C - 44, left: C - 44, width: 88, height: 88,
+        position: 'absolute', top: C - (44 * iconScale), left: C - (44 * iconScale), 
+        width: 88 * iconScale, height: 88 * iconScale,
         borderRadius: '50%',
         background: 'radial-gradient(circle, rgba(88,28,135,0.5) 0%, rgba(4,4,8,0.9) 70%)',
         border: '2px solid rgba(168,85,247,0.5)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         animation: 'hub-pulse 3s ease-in-out infinite', zIndex: 10,
       }}>
-        <MushInIcon size={58} className="drop-shadow-[0_0_10px_rgba(168,85,247,0.7)]" />
+        <MushInIcon size={58 * iconScale} className="drop-shadow-[0_0_10px_rgba(168,85,247,0.7)]" />
       </div>
     </div>
   );
@@ -305,7 +318,7 @@ const BentoCard = ({ children, className = '', glow = false }: { children: React
 /* --- Section Spotlight ------------------------------------------------------- */
 /**
  * Applies the same mouse-follow radial gradient used inside BentoCard
- * at section level � giving every major section a subtle ambient glow
+ * at section level — giving every major section a subtle ambient glow
  * that follows the cursor, reinforcing spatial depth without distraction.
  */
 const SectionSpotlight = ({
@@ -359,13 +372,13 @@ const MockSearch = () => (
       <div className="flex gap-2">
         {['Travel', 'Karachi', 'Instagram'].map(f => <span key={f} className="px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-white/60">{f}</span>)}
       </div>
-      <div className="text-white/20 text-[10px]">3 verified creators � sorted by Relevance</div>
-      <div className="text-white/15 text-[9px] text-right pb-1 italic">Illustrative � not real data</div>
+      <div className="text-white/20 text-[10px]">3 verified creators — sorted by Relevance</div>
+      <div className="text-white/15 text-[9px] text-right pb-1 italic">Illustrative — not real data</div>
       <div className="space-y-1">
         {[
-          { n: 'Sana Malik',   av: 'SM', bg: '7c3aed', s: 'Lifestyle � Lahore',  f: '421K', e: '7.3%', hi: true },
-          { n: 'Usman Tariq',  av: 'UT', bg: '0891b2', s: 'Travel � Karachi',    f: '892K', e: '5.8%' },
-          { n: 'Mehreen Raza', av: 'MR', bg: '059669', s: 'Fashion � Islamabad', f: '1.1M', e: '6.4%' },
+          { n: 'Sana Malik',   av: 'SM', bg: '7c3aed', s: 'Lifestyle — Lahore',  f: '421K', e: '7.3%', hi: true },
+          { n: 'Usman Tariq',  av: 'UT', bg: '0891b2', s: 'Travel — Karachi',    f: '892K', e: '5.8%' },
+          { n: 'Mehreen Raza', av: 'MR', bg: '059669', s: 'Fashion — Islamabad', f: '1.1M', e: '6.4%' },
         ].map(c => (
           <div key={c.n} className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg border ${c.hi ? 'bg-purple-600/10 border-purple-500/20' : 'border-transparent'}`}>
             <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-black text-white" style={{ background: `#${c.bg}` }}>{c.av}</div>
@@ -382,15 +395,15 @@ const MockProfile = () => (
   <div className="rounded-2xl border border-white/10 overflow-hidden bg-[#0d0d14] shadow-2xl select-none text-xs">
     <div className="flex items-center gap-1.5 px-4 py-3 border-b border-white/[0.08] bg-black/25">
       <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
-      <span className="ml-2 text-white/30">Creator Trust Score � Sana Malik</span>
+      <span className="ml-2 text-white/30">Creator Trust Score — Sana Malik</span>
     </div>
     <div className="p-4">
-      <div className="text-white/15 text-[9px] text-right pb-1 italic">Illustrative � not real data</div>
+      <div className="text-white/15 text-[9px] text-right pb-1 italic">Illustrative — not real data</div>
       <div className="flex items-start gap-3 mb-4">
         <div className="w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-black text-white border border-purple-500/30" style={{ background: '#7c3aed' }}>SM</div>
         <div className="flex-1">
           <div className="text-white/80 font-semibold text-sm">Sana Malik</div>
-          <div className="text-white/30 text-[10px] mb-1.5">@sana_pk � Lifestyle � Lahore</div>
+          <div className="text-white/30 text-[10px] mb-1.5">@sana_pk — Lifestyle — Lahore</div>
           <div className="flex gap-1">
             {['Verified', 'Real Eng', 'PK'].map(t => <span key={t} className="px-1.5 py-0.5 rounded text-[9px] font-bold" style={{ background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc' }}>{t}</span>)}
           </div>
@@ -405,7 +418,7 @@ const MockProfile = () => (
         ))}
       </div>
       <div className="mt-3 flex items-center gap-1.5 text-[10px] text-green-400">
-        <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" /><span>Verified audience � Lowest fake-follower ratio</span>
+        <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" /><span>Verified audience — Lowest fake-follower ratio</span>
       </div>
     </div>
   </div>
@@ -415,7 +428,7 @@ const MockKanban = () => (
   <div className="rounded-2xl border border-white/10 overflow-hidden bg-[#0d0d14] shadow-2xl select-none text-xs">
     <div className="flex items-center gap-1.5 px-4 py-3 border-b border-white/[0.08] bg-black/25">
       <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" /><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" /><div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
-      <span className="ml-2 text-white/30">Campaign Kanban � Summer 2025</span>
+      <span className="ml-2 text-white/30">Campaign Kanban — Summer 2025</span>
     </div>
     <div className="p-3 grid grid-cols-3 gap-2">
       {[
@@ -495,7 +508,7 @@ export default function LandingPage() {
   const [activeNav, setActiveNav]   = useState<string | null>(null);
   const [navScrolled, setNavScrolled] = useState(false);
   const [pricePeriod, setPricePeriod] = useState<'m' | 'a'>('m');
-  // heroComplete starts true � sections are in DOM immediately but naturally
+  // heroComplete starts true — sections are in DOM immediately but naturally
   // hidden below the 300vh hero. The scroll event updates it for the fade-in.
   const [heroComplete, setHeroComplete] = useState(true);
 
@@ -513,7 +526,7 @@ export default function LandingPage() {
     if (v >= 0.98) setHeroComplete(true);
   });
 
-  // -- Scroll transforms � identical to Version 2 ----------------------------
+  // -- Scroll transforms — identical to Version 2 ----------------------------
   const hOp       = useTransform(scrollYProgress, [0, 0.12], [1, 0]);
   const hY        = useTransform(scrollYProgress, [0, 0.12], [0, -50]);
   const textScale = useTransform(scrollYProgress, [0, 0.5],  [1, 1.4]);
@@ -541,9 +554,9 @@ export default function LandingPage() {
 
   const faqs = [
     { q: 'Which Pakistani cities do you cover?',    a: 'We index creators from Karachi, Lahore, Islamabad, Faisalabad, Peshawar, Multan, Quetta, and 12+ more cities across Pakistan.' },
-            { q: 'How accurate is the fraud detection?',    a: 'Our AI fraud scoring delivers high accuracy using engagement velocity analysis, follower growth patterns, and audience overlap detection � calibrated for Pakistani social media behaviour.' },
-    { q: 'Can I search for Urdu content creators?', a: 'Yes. You can filter by content language (Urdu/English/Mixed) and niche categories specific to Pakistani culture � cricket, drama, Islamic content, food, and more.' },
-    { q: 'Do I need a credit card to start?',       a: 'No. The free plan gives you 50 searches per month forever � no time limit, no card required.' },
+            { q: 'How accurate is the fraud detection?',    a: 'Our AI fraud scoring delivers high accuracy using engagement velocity analysis, follower growth patterns, and audience overlap detection — calibrated for Pakistani social media behaviour.' },
+    { q: 'Can I search for Urdu content creators?', a: 'Yes. You can filter by content language (Urdu/English/Mixed) and niche categories specific to Pakistani culture — cricket, drama, Islamic content, food, and more.' },
+        { q: 'Do I need a credit card to start?',       a: 'MUSHIN is subscription-based. Choose Pro, Business, or Enterprise to activate credits and real-time scoring.' },
     { q: 'How fresh is the data?',                  a: "Creator profiles refresh every 24 hours. You're never working with data that's weeks old." },
     { q: 'Can my team collaborate on campaigns?',   a: 'Business plan includes multi-seat access, shared campaign boards, and team analytics dashboards.' },
   ];
@@ -552,14 +565,28 @@ export default function LandingPage() {
     <MotionConfig transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}>
     <div className="bg-[#060608] text-white">
       <G />
-      <GrainOverlay />
+      {/* <GrainOverlay /> */}
       <BgBlobs />
       <ScrollGlow />
       <MouseGlow />
 
       {/* -- NAV -- */}
       <nav aria-label="Main navigation" className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] transition-all duration-300">
-        <div role="menubar" className="flex items-center gap-3 border rounded-full bg-[#0a0314] border-white/15 shadow-[0_8px_48px_rgba(0,0,0,0.7)]" style={{ padding: '6px 16px' }}>
+        <motion.div 
+          role="menubar" 
+          className="flex items-center gap-3 border rounded-full bg-[#0a0314] border-white/15 shadow-[0_8px_48px_rgba(0,0,0,0.7)]"
+          animate={{ 
+            padding: navScrolled ? '8px 24px' : '6px 16px',
+            borderRadius: navScrolled ? 9999 : 9999,
+            backdropFilter: navScrolled ? 'blur(20px)' : 'blur(0px)',
+            boxShadow: navScrolled
+              ? '0 8px 48px rgba(0,0,0,0.8), 0 0 0 1px rgba(168,85,247,0.15)'
+              : '0 8px 48px rgba(0,0,0,0.7)',
+            width: navScrolled ? '520px' : 'auto',
+          }}
+          transition={{ duration: 0.3 }}
+          style={{ padding: '6px 16px' }}
+        >
           <Link to="/" aria-label="MUSHIN Home" className="flex items-center gap-2 mr-2">
             <MushInIcon size={28} className="text-primary" />
             <span className="text-sm font-bold tracking-[0.15em] text-white" style={{ fontFamily: "'Syne',sans-serif" }}>MUSHIN</span>
@@ -580,16 +607,16 @@ export default function LandingPage() {
           <div className="w-px h-6 bg-white/10 mx-1" aria-hidden="true" />
           <Link to="/auth" aria-label="Log in" className="text-xs font-medium text-white/45 hover:text-white/75 transition-colors px-3 py-2 hidden sm:block">Log in</Link>
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: .95 }} style={{ borderRadius: 999 }}>
-            <Link to="/auth" aria-label="Start free trial" className="bg-purple-600 hover:bg-purple-500 transition-colors text-white text-sm font-bold px-5 py-2 rounded-full whitespace-nowrap block">Start Free</Link>
+            <Link to="/auth" aria-label="Start subscription" className="bg-purple-600 hover:bg-purple-500 transition-colors text-white text-sm font-bold px-5 py-2 rounded-full whitespace-nowrap block">Start Subscription</Link>
           </motion.div>
-        </div>
+        </motion.div>
       </nav>
 
       {/* -- VIDEO HERO (Modularized) -- */}
       <LandingHero />
 
-      {/* -- Sections � revealed after hero scroll is complete -- */}
-      {heroComplete && <StarField />}
+      {/* -- Sections — revealed after hero scroll is complete -- */}
+      {/* heroComplete && <StarField /> */}
       {heroComplete && (
       <motion.div
         initial={{ opacity: 0, y: 24 }}
@@ -610,8 +637,8 @@ export default function LandingPage() {
           </div>
           <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { icon: <Building2 className="w-5 h-5 text-purple-400" />, title: 'Agencies',          desc: 'Manage multiple brand campaigns, deliver verified creator lists, and produce client-ready reports � all from one workspace.' },
-              { icon: <ShoppingBag className="w-5 h-5 text-pink-400" />,  title: 'E-commerce Brands', desc: 'Find product creators in your exact niche and city who drive real sales � not just impressions and likes.' },
+              { icon: <Building2 className="w-5 h-5 text-purple-400" />, title: 'Agencies',          desc: 'Manage multiple brand campaigns, deliver verified creator lists, and produce client-ready reports — all from one workspace.' },
+              { icon: <ShoppingBag className="w-5 h-5 text-pink-400" />,  title: 'E-commerce Brands', desc: 'Find product creators in your exact niche and city who drive real sales — not just impressions and likes.' },
               { icon: <TrendingUp className="w-5 h-5 text-green-400" />, title: 'Performance Teams', desc: 'Measure estimated ROAS before first rupee is spent. Eliminate zero-return placements with data-first selection.' },
               { icon: <Users className="w-5 h-5 text-blue-400" />,       title: 'Corporate Brands',  desc: 'Multi-seat dashboards, approval workflows, and compliance-grade audit trails for enterprise brand safety.' },
             ].map(({ icon, title, desc }, i) => (
@@ -646,7 +673,7 @@ export default function LandingPage() {
                     <div className="text-7xl md:text-8xl font-black text-white tracking-tight"><Ticker v={95} s="%" /></div>
                   </div>
                   <div>
-                    <p className="text-zinc-500 text-sm leading-relaxed mt-4">AI fraud analysis using engagement velocity, follower growth patterns, and audience anomalies � estimated on benchmark datasets.</p>
+                    <p className="text-zinc-500 text-sm leading-relaxed mt-4">AI fraud analysis using engagement velocity, follower growth patterns, and audience anomalies — estimated on benchmark datasets.</p>
                     <div className="mt-4 flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                       <span className="text-green-400 text-xs font-medium">Live monitoring active</span>
@@ -655,7 +682,7 @@ export default function LandingPage() {
                 </div>
               </BentoCard>
             </motion.div>
-            {[{ v: 10, s: 'K+', l: 'Pakistani Creators', delay: .08 },             { v: 4, s: '.2�', l: 'ROAS Improvement', delay: .12 }, { v: 12, s: '+', l: 'Cities Covered', delay: .16 },             { v: 2800, s: '+', l: 'Indexed Creators', delay: .20 }].map((item, i) => (
+            {[{ v: 10, s: 'K+', l: 'Pakistani Creators', delay: .08 },             { v: 4, s: '.2—', l: 'ROAS Improvement', delay: .12 }, { v: 12, s: '+', l: 'Cities Covered', delay: .16 },             { v: 2800, s: '+', l: 'Indexed Creators', delay: .20 }].map((item, i) => (
               <motion.div key={i} initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: item.delay }}>
                 <BentoCard className="p-6 h-full">
                   <div className="text-purple-400 text-[10px] uppercase tracking-widest mb-1 font-medium">{item.l}</div>
@@ -687,7 +714,7 @@ export default function LandingPage() {
           </div>
           <div className="space-y-3 pt-2">
             {[
-              { problem: 'Fake followers inflate reach by 30�60%',         impact: 'Avg. 2.4� wasted budget per campaign' },
+              { problem: 'Fake followers inflate reach by 30—60%',         impact: 'Avg. 2.4— wasted budget per campaign' },
               { problem: 'Manual spreadsheet research takes 2+ weeks',     impact: 'Opportunities expire before outreach ever happens' },
               { problem: 'No city-level or Urdu language targeting',       impact: 'Karachi brands paying for Lahore audiences' },
               { problem: 'Zero demographic transparency post-campaign',    impact: "You never know who's actually seeing your content" },
@@ -712,7 +739,7 @@ export default function LandingPage() {
           <motion.div initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-16">
             <div className="text-purple-400 text-xs font-medium uppercase tracking-widest mb-4">Platform Coverage</div>
             <h2 className="text-4xl md:text-6xl font-black tracking-tighter mb-4">Find Creators on<br />Every Platform.</h2>
-            <p className="text-zinc-400 text-lg max-w-xl">Search Instagram, TikTok, and YouTube simultaneously. Filter by Pakistani city, niche, and language � real-time.</p>
+            <p className="text-zinc-400 text-lg max-w-xl">Search Instagram, TikTok, and YouTube simultaneously. Filter by Pakistani city, niche, and language — real-time.</p>
           </motion.div>
           <div className="grid md:grid-cols-3 gap-5">
             {platforms.map((pl, pi) => (
@@ -736,7 +763,7 @@ export default function LandingPage() {
         </div>
       </SectionSpotlight>
 
-      {/* INTELLIGENCE ENGINE � ATOM ORBIT */}
+      {/* INTELLIGENCE ENGINE — ATOM ORBIT */}
       <SectionSpotlight aria-label="Intelligence engine section" className="py-24 px-6 border-t border-white/[0.06] z-20">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-16">
@@ -747,11 +774,11 @@ export default function LandingPage() {
               <RevealText text="for Pakistani Creators." delay={0.22} />
             </h2>
             <motion.p initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.4 }}
-              className="text-zinc-400 text-lg max-w-xl mx-auto">Every signal � search, fraud detection, outreach, ROAS � unified in one orbit.</motion.p>
+              className="text-zinc-400 text-lg max-w-xl mx-auto">Every signal — search, fraud detection, outreach, ROAS — unified in one orbit.</motion.p>
           </div>
           <motion.div initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
             className="flex justify-center items-center" style={{ minHeight: 520 }}>
-            <AtomOrbit />
+            <OrbitingSkills />
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.3 }}
             className="grid grid-cols-3 sm:grid-cols-6 gap-3 mt-4 max-w-2xl mx-auto">
@@ -793,7 +820,7 @@ export default function LandingPage() {
               <div>
                 <div className="font-black text-[7rem] leading-none mb-4 select-none" style={{ color: 'rgba(168,85,247,0.10)' }}>01</div>
                 <h3 className="text-2xl md:text-3xl font-black tracking-tight mb-4">Discover Verified Creators</h3>
-                <p className="text-zinc-400 text-lg leading-relaxed">Enter a niche and city. Get live Pakistani creator profiles from the web � not a stale database.</p>
+                <p className="text-zinc-400 text-lg leading-relaxed">Enter a niche and city. Get live Pakistani creator profiles from the web — not a stale database.</p>
               </div>
               <div className="shadow-[0_24px_80px_rgba(0,0,0,.6)]"><MockSearch /></div>
             </motion.div>
@@ -811,7 +838,7 @@ export default function LandingPage() {
               <div>
                 <div className="font-black text-[7rem] leading-none mb-4 select-none" style={{ color: 'rgba(168,85,247,0.10)' }}>03</div>
                 <h3 className="text-2xl md:text-3xl font-black tracking-tight mb-4">Close the Deal</h3>
-                <p className="text-zinc-400 text-lg leading-relaxed">Save to lists, manage on a visual Kanban, and send outreach � all from one workspace.</p>
+                <p className="text-zinc-400 text-lg leading-relaxed">Save to lists, manage on a visual Kanban, and send outreach — all from one workspace.</p>
               </div>
               <div className="shadow-[0_24px_80px_rgba(0,0,0,.6)]"><MockKanban /></div>
             </motion.div>
@@ -902,9 +929,9 @@ export default function LandingPage() {
           </div>
           <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             {[
-              { icon: <Shield className="w-5 h-5 text-green-400" />,   title: 'No Lock-In',         desc: 'Month-to-month billing. Cancel instantly from your dashboard � no questions asked.' },
+              { icon: <Shield className="w-5 h-5 text-green-400" />,   title: 'No Lock-In',         desc: 'Month-to-month billing. Cancel instantly from your dashboard — no questions asked.' },
               { icon: <CheckCircle className="w-5 h-5 text-blue-400" />, title: 'Transparent Pricing', desc: 'The price listed is the price you pay. Zero hidden overages or surprise fees.' },
-              { icon: <Zap className="w-5 h-5 text-yellow-400" />,     title: 'Real Human Support',  desc: 'Every plan includes support via email and chat � not a bot, not a knowledge base article.' },
+              { icon: <Zap className="w-5 h-5 text-yellow-400" />,     title: 'Real Human Support',  desc: 'Every plan includes support via email and chat — not a bot, not a knowledge base article.' },
               { icon: <Users className="w-5 h-5 text-purple-400" />,   title: '10,000+ Creators',   desc: '10,000+ indexed Pakistani creator profiles. If they are active, we are tracking them.' },
             ].map((item, i) => (
               <div key={i} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
@@ -915,9 +942,15 @@ export default function LandingPage() {
             ))}
           </div>
           <div className="rounded-2xl border border-purple-500/20 bg-purple-500/[0.04] p-8 text-center">
-            <div className="text-4xl mb-3">💰</div>
-            <div className="text-white font-black text-xl mb-2">14-Day Money-Back Guarantee</div>
-            <div className="text-zinc-400 text-sm max-w-md mx-auto">Not satisfied in the first 14 days? Email us and we'll refund every rupee. No forms, no friction.</div>
+            <div className="text-white font-black text-xl mb-2">Refund Policy</div>
+            <div className="text-zinc-400 text-sm max-w-md mx-auto">
+              We do not offer refunds. You can cancel anytime and keep access until the end of your billing period.
+            </div>
+            <div className="mt-4">
+              <Link to="/refunds" className="text-purple-400 text-sm font-semibold hover:text-purple-300 transition-colors">
+                Read the full Refund Policy <ArrowRight className="inline-block w-4 h-4 ml-1" />
+              </Link>
+            </div>
           </div>
         </div>
       </SectionSpotlight>
@@ -939,9 +972,30 @@ export default function LandingPage() {
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {([
-              { name: 'Free',     price: { m: 0,     a: 0     }, desc: 'For individuals just getting started.',       features: ['50 searches/month','5 creator profiles/day','Basic Relevance score','Email support'],                                                                     cta: 'Start Free',     highlight: false },
-              { name: 'Pro',      price: { m: 4999,  a: 3999  }, desc: 'For brands running active campaigns.',        features: ['Unlimited searches','Full creator profiles','Fraud detection reports','Campaign Kanban board','CSV export','Priority support'],                    cta: 'Start Pro',      highlight: true  },
-              { name: 'Business', price: { m: 14999, a: 11999 }, desc: 'For agencies managing multiple brands.',      features: ['Everything in Pro','Multi-seat access (5 users)','API access','White-label reports','Dedicated account manager','Custom integrations'],           cta: 'Contact Sales',  highlight: false },
+              {
+                name: 'Pro',
+                price: { m: 4999,  a: 3999  },
+                desc: 'For brands running active campaigns.',
+                features: ['500 search credits/mo','100 enrichment credits/mo','500 email sends/mo','Real-time scoring','MUSHIN score accuracy: 85%','Team members: 3'],
+                cta: 'Start Pro',
+                highlight: true,
+              },
+              {
+                name: 'Business',
+                price: { m: 14999, a: 11999 },
+                desc: 'For agencies managing multiple brands.',
+                features: ['2,000 search credits/mo','500 enrichment credits/mo','2,000 email sends/mo','Unlimited AI insights','Real-time scoring','MUSHIN score accuracy: 92%','Team members: 10'],
+                cta: 'Start Business',
+                highlight: false,
+              },
+              {
+                name: 'Enterprise',
+                price: { m: 39999, a: 31999 },
+                desc: 'For large teams and high-volume research.',
+                features: ['10,000 search credits/mo','2,500 enrichment credits/mo','10,000 email sends/mo','Unlimited AI insights','Real-time scoring','MUSHIN score accuracy: 96%','Team members: 50','Priority support'],
+                cta: 'Contact Sales',
+                highlight: false,
+              },
             ] as { name: string; price: { m: number; a: number }; desc: string; features: string[]; cta: string; highlight: boolean }[]).map(plan => (
               <motion.div key={plan.name} initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
                 className={`relative rounded-2xl border p-7 flex flex-col ${plan.highlight ? 'border-purple-500/40 bg-purple-500/[0.06]' : 'border-white/10 bg-white/[0.02]'}`}>
@@ -963,7 +1017,14 @@ export default function LandingPage() {
                   ))}
                 </ul>
                 <GlowCard className="p-0 rounded-full w-full border-none">
-                  <Link to="/auth" className={`relative z-10 block text-center py-3 rounded-full text-sm font-bold transition-all ${plan.highlight ? 'bg-purple-600 hover:bg-purple-500 text-white' : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'}`}>{plan.cta}</Link>
+                  <Link
+                    to="/auth"
+                    className={`relative z-10 block text-center py-3 rounded-full text-sm font-bold transition-all ${
+                      plan.highlight ? 'bg-purple-600 hover:bg-purple-500 text-white' : 'bg-white/5 hover:bg-white/10 border border-white/10 text-white'
+                    }`}
+                  >
+                    {plan.cta}
+                  </Link>
                 </GlowCard>
               </motion.div>
             ))}
@@ -1002,7 +1063,7 @@ export default function LandingPage() {
             <RevealText text="Your Next Campaign" /><br />
             <RevealText text="Starts Here." delay={0.2} />
           </h2>
-          <p className="text-zinc-400 text-lg mb-10 max-w-xl mx-auto">Join Pakistani marketing teams already using Mushin to find, verify, and close creators � faster.</p>
+          <p className="text-zinc-400 text-lg mb-10 max-w-xl mx-auto">Join Pakistani marketing teams already using Mushin to find, verify, and close creators — faster.</p>
           <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: .97 }}
             transition={{ type: 'spring', stiffness: 400, damping: 20 }} className="conic-wrap inline-block">
             <Link to="/auth" className="conic-inner flex items-center gap-3 px-12 py-4 text-white font-bold text-sm tracking-[0.18em] uppercase">
@@ -1011,7 +1072,7 @@ export default function LandingPage() {
               <ArrowRight className="w-4 h-4 opacity-50" />
             </Link>
           </motion.div>
-          <p className="text-zinc-600 text-xs mt-6">Free forever plan available. No credit card required.</p>
+          <p className="text-zinc-600 text-xs mt-6">Choose a plan to activate credits and real-time scoring.</p>
         </div>
       </SectionSpotlight>
 
@@ -1039,6 +1100,7 @@ export default function LandingPage() {
                   <Link to="/terms"   className="block text-zinc-500 hover:text-white transition-colors">Terms</Link>
                    <Link to="/cookies" className="block text-zinc-500 hover:text-white transition-colors">Cookies</Link>
                   <Link to="/subscription" className="block text-zinc-500 hover:text-white transition-colors">SaaS Subscription</Link>
+                  <Link to="/refunds" className="block text-zinc-500 hover:text-white transition-colors">Refund Policy</Link>
                   <Link to="/eula" className="block text-zinc-500 hover:text-white transition-colors">EULA</Link>
                   <Link to="/dpa" className="block text-zinc-500 hover:text-white transition-colors">DPA</Link>
                   <Link to="/sla" className="block text-zinc-500 hover:text-white transition-colors">SLA</Link>
@@ -1050,7 +1112,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="border-t border-white/[0.06] pt-6 flex flex-col sm:flex-row justify-between items-center gap-3">
-            <div className="text-zinc-600 text-xs">&copy; 2026 Mushin. All rights reserved. Made in Pakistan ????</div>
+            <div className="text-zinc-600 text-xs">&copy; 2026 Mushin. All rights reserved. Made in Pakistan 🇵🇰</div>
             <div className="flex items-center gap-4">
               <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><Instagram className="w-4 h-4 text-zinc-600 hover:text-white transition-colors cursor-pointer" /></a>
               <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" aria-label="YouTube"><Youtube   className="w-4 h-4 text-zinc-600 hover:text-white transition-colors cursor-pointer" /></a>

@@ -23,6 +23,12 @@ if (Deno.env.get("UPSTASH_REDIS_REST_URL") && Deno.env.get("UPSTASH_REDIS_REST_T
   });
 }
 
+function getIdempotencyKey(req: Request): string {
+  const header = req.headers.get("x-idempotency-key") || req.headers.get("x-idempotency_key");
+  if (header && header.trim().length > 0) return header.trim().slice(0, 200);
+  return crypto.randomUUID();
+}
+
 // RC-06: Load explicit preview origins from env — never use *.vercel.app wildcard.
 const PREVIEW_ORIGINS_SI: Set<string> = new Set(
   (Deno.env.get("ALLOWED_PREVIEW_ORIGINS") ?? "")
@@ -139,11 +145,8 @@ Deno.serve(async (req) => {
         execute: async (_ctx, client) => client,
     });
 
-    const { data: workspace } = await serviceClient
-      .from("workspaces")
-      .select("search_credits_remaining")
-      .eq("id", workspaceId)
-      .single();
+    const idempotencyKey = getIdempotencyKey(req);
+    let remainingCredits: number | null = null;
 
     // 1. Behavioral Anomaly Detection
     // If a workspace does more than 30 searches in 5 minutes, flag as anomalous
@@ -175,6 +178,36 @@ Deno.serve(async (req) => {
     const location = typeof rawLocation === "string"
       ? rawLocation.replace(/[^a-zA-Z\s-]/g, "").trim().slice(0, 50)
       : "";
+
+    // Ledger-only credit debit (single source of truth)
+    if (!callerIsSuperAdmin) {
+      const { data: debitRes, error: debitErr } = await serviceClient.rpc("consume_user_credits", {
+        p_user_id: userData.user.id,
+        p_workspace_id: workspaceId,
+        p_credit_type: "search",
+        p_amount: 1,
+        p_action: "search",
+        p_idempotency_key: `search-influencers:${idempotencyKey}`,
+        p_metadata: {
+          endpoint: "search-influencers",
+          query,
+          platform,
+          location: location || null,
+          follower_range: followerRange ?? null,
+          engagement_range: engagementRange ?? null,
+        },
+      });
+      if (debitErr) {
+        console.error("[search-influencers] credit debit error:", debitErr);
+        return new Response(JSON.stringify({ error: "Credit system unavailable" }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (!debitRes?.success) {
+        return new Response(JSON.stringify({ error: "Insufficient credits", code: "insufficient_credits" }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      remainingCredits = typeof debitRes?.balance_after === "number" ? debitRes.balance_after : null;
+    }
 
     const cacheKey = `search:${query.toLowerCase().trim()}:${platform}:${location || "any"}:${followerRange || "any"}`;
     if (redis) {
@@ -349,26 +382,18 @@ Deno.serve(async (req) => {
           }),
           serviceClient.from("credits_usage").insert({ workspace_id: workspaceId, action_type: "search", amount: 1 }),
         ];
-        if (!callerIsSuperAdmin) {
-          writeOps.push(serviceClient.rpc("consume_search_credit", { ws_id: workspaceId }));
-        }
-        try {
-          await Promise.all(writeOps);
-        } catch (creditErr: any) {
-          if (creditErr.code === "P0001") {
-            console.warn("[search-influencers] DB-first credit deduction failed — returning results without deduction");
-            await Promise.all(writeOps.filter((_, i) => i < writeOps.length - 1));
-          } else {
-            throw creditErr;
-          }
-        }
+        await Promise.all(writeOps);
 
         if (redis && scoredDbResults.length > 0) {
           redis.set(cacheKey, JSON.stringify(scoredDbResults), { ex: 1800 }).catch(() => null);
         }
 
         return new Response(
-          JSON.stringify({ results: scoredDbResults, credits_remaining: callerIsSuperAdmin ? Number.MAX_SAFE_INTEGER : (workspace?.search_credits_remaining || 1) - 1, source: "db" }),
+          JSON.stringify({
+            results: scoredDbResults,
+            credits_remaining: callerIsSuperAdmin ? Number.MAX_SAFE_INTEGER : remainingCredits,
+            source: "db",
+          }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -378,18 +403,7 @@ Deno.serve(async (req) => {
       // Non-fatal — fall through to Serper
     }
 
-    // Deduct credit BEFORE Serper call ΓÇö prevents free searches if downstream crashes
-    if (!callerIsSuperAdmin) {
-      try {
-        await serviceClient.rpc("consume_search_credit", { ws_id: workspaceId });
-      } catch (error: any) {
-        if (error.code === "P0001") {
-          return new Response(JSON.stringify({ error: "Insufficient credits" }),
-            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        }
-        throw error;
-      }
-    }
+    // Credit already debited via ledger above (single debit per request)
 
     const SERPER_API_KEY = Deno.env.get("SERPER_API_KEY");
     if (!SERPER_API_KEY) {
@@ -458,7 +472,7 @@ Deno.serve(async (req) => {
         const errText = await searchResponses[0].text();
         console.error("Serper primary API error:", searchResponses[0].status, errText);
         return new Response(
-          JSON.stringify({ results: [], credits_remaining: (workspace?.search_credits_remaining || 1) - 1 }),
+          JSON.stringify({ results: [], credits_remaining: callerIsSuperAdmin ? Number.MAX_SAFE_INTEGER : remainingCredits }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -493,7 +507,7 @@ Deno.serve(async (req) => {
     } catch (serperErr: any) {
       console.error("Serper fetch failed:", serperErr?.message);
       return new Response(
-        JSON.stringify({ results: [], credits_remaining: (workspace?.search_credits_remaining || 1) - 1 }),
+        JSON.stringify({ results: [], credits_remaining: callerIsSuperAdmin ? Number.MAX_SAFE_INTEGER : remainingCredits }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -721,7 +735,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           results: [],
-          credits_remaining: (workspace?.search_credits_remaining || 1) - 1,
+          credits_remaining: callerIsSuperAdmin ? Number.MAX_SAFE_INTEGER : remainingCredits,
           _search_meta: { fallback_tier: 0, tier_label: "no_serper_results", variants_run: queryVariants.length, dedup_before: rawResults.filter(Boolean).length, dedup_after: 0 },
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -1116,7 +1130,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         results: sortedResults,
-        credits_remaining: (workspace?.search_credits_remaining || 1) - 1,
+        credits_remaining: callerIsSuperAdmin ? Number.MAX_SAFE_INTEGER : remainingCredits,
         _search_meta: {
           fallback_tier: activeTier.tier,
           tier_label: activeTier.label,

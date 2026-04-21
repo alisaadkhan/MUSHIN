@@ -85,23 +85,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // Block consumer email domains for Google OAuth sign-in.
-        if (event === 'SIGNED_IN' && newSession) {
-          const provider = newSession.user.app_metadata?.provider;
-          if (provider === 'google') {
-            const email = newSession.user.email || '';
-            // Type assertion since the RPC may not be in generated types yet
-            const { data: checkResult } = await (supabase.rpc as any)('check_email_allowed', { p_email: email });
-            const result = checkResult as { allowed?: boolean } | null;
-            if (result && result.allowed === false) {
-              await supabase.auth.signOut();
-              localStorage.setItem('auth_google_blocked', email.split('@')[1] || 'consumer');
-              setSession(null); setUser(null); setProfile(null); setWorkspace(null);
-              setLoading(false);
-              return;
-            }
-          }
-        }
+        // Allow any email domain for Google OAuth sign-in.
+        // (Previously, consumer domains were blocked via check_email_allowed.)
 
         // Deduplicate rapid TOKEN_REFRESHED events (guard against duplicate fires within 2s)
         if (event === 'TOKEN_REFRESHED') {

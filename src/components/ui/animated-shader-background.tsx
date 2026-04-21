@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import * as THREE from 'three';
+import { useEffect, useRef } from "react";
+import * as THREE from "three";
 
 const AnimatedShaderBackground = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -8,29 +8,17 @@ const AnimatedShaderBackground = () => {
     const container = containerRef.current;
     if (!container) return;
 
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-
     const scene = new THREE.Scene();
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(w, h);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-    // Force the canvas to cover the full wrapper
-    const canvas = renderer.domElement;
-    canvas.style.position = 'absolute';
-    canvas.style.top = '0';
-    canvas.style.left = '0';
-    canvas.style.width = '100%';
-    canvas.style.height = '100%';
-    container.appendChild(canvas);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    container.appendChild(renderer.domElement);
 
     const material = new THREE.ShaderMaterial({
       uniforms: {
         iTime: { value: 0 },
-        iResolution: { value: new THREE.Vector2(w, h) },
+        iResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
       },
       vertexShader: `
         void main() {
@@ -39,7 +27,7 @@ const AnimatedShaderBackground = () => {
       `,
       fragmentShader: `
         uniform float iTime;
-        uniform vec2  iResolution;
+        uniform vec2 iResolution;
 
         #define NUM_OCTAVES 3
 
@@ -49,7 +37,7 @@ const AnimatedShaderBackground = () => {
 
         float noise(vec2 p) {
           vec2 ip = floor(p);
-          vec2 u  = fract(p);
+          vec2 u = fract(p);
           u = u * u * (3.0 - 2.0 * u);
           float res = mix(
             mix(rand(ip), rand(ip + vec2(1.0, 0.0)), u.x),
@@ -82,61 +70,57 @@ const AnimatedShaderBackground = () => {
           float f = 2.0 + fbm(p + vec2(iTime * 5.0, 0.0)) * 0.5;
 
           for (float i = 0.0; i < 35.0; i++) {
-            v = p
-              + cos(i * i + (iTime + p.x * 0.08) * 0.025 + i * vec2(13.0, 11.0)) * 3.5
+            v = p + cos(i * i + (iTime + p.x * 0.08) * 0.025 + i * vec2(13.0, 11.0)) * 3.5
               + vec2(sin(iTime * 3.0 + i) * 0.003, cos(iTime * 3.5 - i) * 0.003);
-
             float tailNoise = fbm(v + vec2(iTime * 0.5, i)) * 0.3 * (1.0 - (i / 35.0));
-
-            // Violet/Indigo aurora palette
             vec4 auroraColors = vec4(
-              0.35 + 0.25 * sin(i * 0.2 + iTime * 0.4),
-              0.10 + 0.15 * cos(i * 0.3 + iTime * 0.5),
-              0.70 + 0.25 * sin(i * 0.4 + iTime * 0.3),
+              0.05 + 0.2 * sin(i * 0.2 + iTime * 0.4),
+              0.1  + 0.3 * cos(i * 0.3 + iTime * 0.5),
+              0.5  + 0.25 * sin(i * 0.4 + iTime * 0.3),
               1.0
             );
-
-            vec4 c = auroraColors
-              * exp(sin(i * i + iTime * 0.8))
-              / length(max(v, vec2(v.x * f * 0.015, v.y * 1.5)));
-
+            vec4 contrib = auroraColors * exp(sin(i * i + iTime * 0.8))
+                           / length(max(v, vec2(v.x * f * 0.015, v.y * 1.5)));
             float thin = smoothstep(0.0, 1.0, i / 35.0) * 0.6;
-            o += c * (1.0 + tailNoise * 0.8) * thin;
+            o += contrib * (1.0 + tailNoise * 0.8) * thin;
           }
 
+          // Darken overall to keep it as a subtle background
           o = tanh(pow(o / 100.0, vec4(1.6)));
-          gl_FragColor = o * 1.1;
+          // Blend with deep dark base so cards stay readable
+          vec4 base = vec4(0.03, 0.03, 0.06, 1.0);
+          gl_FragColor = mix(base, o * 1.2, 0.65);
         }
       `,
-      transparent: true,
     });
 
     const geometry = new THREE.PlaneGeometry(2, 2);
-    scene.add(new THREE.Mesh(geometry, material));
+    const mesh = new THREE.Mesh(geometry, material);
+    scene.add(mesh);
 
     let frameId: number;
-    const clock = new THREE.Clock();
-
-    const animate = () => {
-      material.uniforms.iTime.value = clock.getElapsedTime();
+    let lastTime = 0;
+    const animate = (timestamp: number) => {
+      const delta = Math.min((timestamp - lastTime) / 1000, 0.05);
+      lastTime = timestamp;
+      material.uniforms.iTime.value += delta;
       renderer.render(scene, camera);
       frameId = requestAnimationFrame(animate);
     };
-    animate();
+    frameId = requestAnimationFrame(animate);
 
     const handleResize = () => {
-      const nw = window.innerWidth;
-      const nh = window.innerHeight;
-      renderer.setSize(nw, nh);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      material.uniforms.iResolution.value.set(nw, nh);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      material.uniforms.iResolution.value.set(window.innerWidth, window.innerHeight);
     };
-    window.addEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
 
     return () => {
       cancelAnimationFrame(frameId);
-      window.removeEventListener('resize', handleResize);
-      if (container.contains(canvas)) container.removeChild(canvas);
+      window.removeEventListener("resize", handleResize);
+      if (container.contains(renderer.domElement)) {
+        container.removeChild(renderer.domElement);
+      }
       geometry.dispose();
       material.dispose();
       renderer.dispose();
@@ -146,7 +130,8 @@ const AnimatedShaderBackground = () => {
   return (
     <div
       ref={containerRef}
-      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+      className="fixed inset-0 w-full h-full"
+      style={{ zIndex: 0 }}
       aria-hidden="true"
     />
   );

@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { SupportRoute } from "@/components/auth/SupportRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { AdminRoute } from "@/components/admin/AdminRoute";
 import { usePostHogPageview } from "@/lib/analytics";
@@ -14,6 +15,7 @@ import { usePostHogPageview } from "@/lib/analytics";
 // Eagerly load the two routes users land on most — zero extra network round-trip
 import LandingPage from "./pages/LandingPage";
 import Auth from "./pages/Auth";
+import StaffLogin from "./pages/StaffLogin";
 
 // All other routes are lazy-loaded so they don't inflate the initial JS bundle
 const Index                = lazy(() => import("./pages/Index"));
@@ -28,12 +30,14 @@ const HistoryPage          = lazy(() => import("./pages/HistoryPage"));
 const UpdatePassword       = lazy(() => import("./pages/UpdatePassword"));
 const Onboarding           = lazy(() => import("./pages/Onboarding"));
 const Settings             = lazy(() => import("./pages/Settings"));
+const CreditsPage          = lazy(() => import("./pages/CreditsPage"));
 const BillingPage          = lazy(() => import("./pages/BillingPage"));
 const AnalyticsPage        = lazy(() => import("./pages/AnalyticsPage"));
 const AboutPage            = lazy(() => import("./pages/AboutPage"));
 const PrivacyPage          = lazy(() => import("./pages/PrivacyPage"));
 const TermsPage            = lazy(() => import("./pages/TermsPage"));
 const CookiePolicyPage     = lazy(() => import("./pages/CookiePolicyPage"));
+const RefundPolicyPage     = lazy(() => import("./pages/RefundPolicyPage"));
 const SaaSSubscriptionPage = lazy(() => import('./pages/SaaSSubscriptionPage'));
 const EulaPage             = lazy(() => import('./pages/EulaPage'));
 const DpaPage              = lazy(() => import('./pages/DpaPage'));
@@ -45,7 +49,7 @@ const BlogPage             = lazy(() => import("./pages/BlogPage"));
 const InfluencerProfilePage = lazy(() => import("./pages/InfluencerProfilePage"));
 const NotFound             = lazy(() => import("./pages/NotFound"));
 const ServerError          = lazy(() => import("./pages/ServerError"));
-const SupportLogin = lazy(() => import("./pages/SupportLogin"));
+const SupportDashboard  = lazy(() => import("./pages/SupportDashboard"));
 
 // Admin pages — heavy, rarely accessed, loaded on demand
 const AdminDashboard       = lazy(() => import("./pages/admin/AdminDashboard"));
@@ -59,6 +63,7 @@ const AdminAnnouncements   = lazy(() => import("./pages/admin/AdminAnnouncements
 const AdminPermissions     = lazy(() => import("./pages/admin/AdminPermissions"));
 const AdminSupportTickets  = lazy(() => import("./pages/admin/AdminSupportTickets"));
 const AdminCredits         = lazy(() => import("./pages/admin/AdminCredits"));
+const AdminSecurity        = lazy(() => import("./pages/admin/AdminSecurity"));
 
 // Minimal fallback shown while a lazy chunk is loading
 const PageShell = () => (
@@ -106,6 +111,8 @@ const App = () => {
                   <Route path="/login" element={<Auth />} />
                   <Route path="/signup" element={<Auth />} />
                   <Route path="/auth" element={<Auth />} />
+                  <Route path="/admin/login" element={<StaffLogin />} />
+                  <Route path="/support/login" element={<StaffLogin />} />
                   <Route path="/update-password" element={<ProtectedRoute><UpdatePassword /></ProtectedRoute>} />
                   <Route path="/" element={<LandingPage />} />
                   <Route path="/dashboard" element={<ProtectedPage><Index /></ProtectedPage>} />
@@ -119,12 +126,14 @@ const App = () => {
                   <Route path="/history" element={<ProtectedPage><HistoryPage /></ProtectedPage>} />
                   <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
                   <Route path="/settings" element={<ProtectedPage><Settings /></ProtectedPage>} />
+                  <Route path="/credits" element={<ProtectedPage><CreditsPage /></ProtectedPage>} />
                   <Route path="/billing" element={<ProtectedPage><BillingPage /></ProtectedPage>} />
                   <Route path="/analytics" element={<ProtectedPage><AnalyticsPage /></ProtectedPage>} />
                   <Route path="/about" element={<AboutPage />} />
                   <Route path="/privacy" element={<PrivacyPage />} />
                   <Route path="/terms" element={<TermsPage />} />
                   <Route path="/cookies" element={<CookiePolicyPage />} />
+                  <Route path="/refunds" element={<RefundPolicyPage />} />
                   <Route path="/subscription" element={<SaaSSubscriptionPage />} />
                   <Route path="/eula" element={<EulaPage />} />
                   <Route path="/dpa" element={<DpaPage />} />
@@ -142,9 +151,10 @@ const App = () => {
                   <Route path="/admin/analytics" element={<AdminRoute><AdminAnalytics /></AdminRoute>} />
                   <Route path="/admin/config" element={<AdminRoute requiredPermission="canEditConfig"><AdminConfig /></AdminRoute>} />
                   <Route path="/admin/audit-log" element={<AdminRoute requiredPermission="canViewAuditLog"><AdminAuditLog /></AdminRoute>} />
+                  <Route path="/admin/security" element={<AdminRoute requiredPermission="canViewAuditLog"><AdminSecurity /></AdminRoute>} />
                   <Route path="/admin/announcements" element={<AdminRoute requiredPermission="canManageAnnouncements"><AdminAnnouncements /></AdminRoute>} />
                   <Route path="/admin/permissions" element={<AdminRoute requiredPermission="canEditConfig"><AdminPermissions /></AdminRoute>} />
-                  <Route path="/support-login" element={<SupportLogin />} />
+                  <Route path="/support/dashboard" element={<SupportRoute><SupportDashboard /></SupportRoute>} />
                   <Route path="/admin/support" element={<AdminRoute requiredPermission="canManageUsers"><AdminSupportTickets /></AdminRoute>} />
                   <Route path="/admin/credits" element={<AdminRoute requiredPermission="canManageUsers"><AdminCredits /></AdminRoute>} />
                   <Route path="*" element={<NotFound />} />

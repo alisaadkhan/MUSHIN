@@ -55,6 +55,7 @@ export function MarketingFooter() {
                 <Link to="/privacy" className="block text-zinc-500 hover:text-white transition-colors">Privacy</Link>
                 <Link to="/terms"   className="block text-zinc-500 hover:text-white transition-colors">Terms</Link>
                 <Link to="/cookies" className="block text-zinc-500 hover:text-white transition-colors">Cookies</Link>
+                <Link to="/refunds" className="block text-zinc-500 hover:text-white transition-colors">Refund Policy</Link>
               </div>
             </div>
           </div>

@@ -39,16 +39,15 @@
     <link rel="preconnect" href="https://ui-avatars.com" />
     <link rel="dns-prefetch" href="https://xfeikbhprbqwzdhyjnou.supabase.co" />
 
-    <!--
-      Google Fonts loaded via <link> with display=swap (not CSS @import).
-      This allows the browser to render text immediately with fallback fonts
-      while the custom font loads in the background — eliminates render blocking.
-      Only the weights actually used in the app are requested.
-    -->
-    <!-- Google Fonts: loaded as normal stylesheet (onload removed for CSP compliance) -->
+    <!-- Google Fonts: optimized for LCP -->
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Roboto:wght@400;500;700;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
     />
 
     <!-- Structured data for rich search results -->

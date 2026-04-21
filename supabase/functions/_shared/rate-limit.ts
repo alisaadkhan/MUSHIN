@@ -1,15 +1,25 @@
-import { Redis } from "https://deno.land/x/upstash_redis@v1.20.0/mod.ts";
+type UpstashResponse<T> = { result?: T; error?: string };
 
-let redis: Redis | null = null;
+const UPSTASH_URL = Deno.env.get("UPSTASH_REDIS_REST_URL")?.replace(/\/$/, "") ?? "";
+const UPSTASH_TOKEN = Deno.env.get("UPSTASH_REDIS_REST_TOKEN") ?? "";
 
-try {
-  const url = Deno.env.get("UPSTASH_REDIS_REST_URL");
-  const token = Deno.env.get("UPSTASH_REDIS_REST_TOKEN");
-  if (url && token) {
-    redis = new Redis({ url, token });
+function upstashEnabled(): boolean {
+  return Boolean(UPSTASH_URL && UPSTASH_TOKEN);
+}
+
+async function upstashPost<T>(path: string): Promise<UpstashResponse<T>> {
+  const res = await fetch(`${UPSTASH_URL}${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${UPSTASH_TOKEN}`,
+    },
+  });
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as UpstashResponse<T>;
+  } catch {
+    return { error: `Invalid Upstash response (${res.status}): ${text.slice(0, 200)}` };
   }
-} catch (e) {
-  console.error("Failed to initialize Redis", e);
 }
 
 /**
@@ -26,19 +36,26 @@ export async function enforceRateLimit(
   maxRequests: number,
   windowSecs: number
 ): Promise<Response | null> {
-  if (!redis) {
-    console.warn("Redis not configured, bypassing rate limit.");
+  if (!upstashEnabled()) {
+    console.warn("Upstash Redis not configured, bypassing rate limit.");
     return null; // Bypass if Redis env vars are omitted in this environment
   }
 
   const key = `ratelimit:${identifier}:${category}`;
 
   try {
-    const current = await redis.incr(key);
+    const incr = await upstashPost<number>(`/incr/${encodeURIComponent(key)}`);
+    if (incr.error || typeof incr.result !== "number") {
+      console.error("Upstash INCR failed:", incr.error ?? incr);
+      return null; // Fail-open to avoid breaking product due to infra issues
+    }
+
+    const current = incr.result;
     
     // Set expiry on first increment
     if (current === 1) {
-      await redis.expire(key, windowSecs);
+      const exp = await upstashPost<number>(`/expire/${encodeURIComponent(key)}/${windowSecs}`);
+      if (exp.error) console.error("Upstash EXPIRE failed:", exp.error);
     }
 
     if (current > maxRequests) {

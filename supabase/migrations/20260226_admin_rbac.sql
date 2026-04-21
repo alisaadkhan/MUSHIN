@@ -9,7 +9,7 @@ DO $$
 BEGIN
   -- Create the type fresh if it doesn't exist at all
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'app_role' AND typnamespace = 'public'::regnamespace) THEN
-    CREATE TYPE public.app_role AS ENUM ('admin', 'user', 'super_admin', 'support', 'viewer');
+    CREATE TYPE public.app_role AS ENUM ('admin', 'user', 'super_admin', 'support', 'viewer', 'system_admin');
   ELSE
     -- Type exists (existing DB): add new values if missing
     IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'super_admin' AND enumtypid = 'public.app_role'::regtype) THEN
@@ -20,6 +20,9 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'viewer' AND enumtypid = 'public.app_role'::regtype) THEN
       ALTER TYPE public.app_role ADD VALUE 'viewer';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'system_admin' AND enumtypid = 'public.app_role'::regtype) THEN
+      ALTER TYPE public.app_role ADD VALUE 'system_admin';
     END IF;
   END IF;
 END $$;

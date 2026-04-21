@@ -362,7 +362,12 @@ export async function adminAdjustCredits(args: {
 
   const client = createPrivilegedClient();
 
-  const { data: mutationResult, error: mutationError } = await client.rpc("admin_mutate_workspace_credit", {
+  if (!args.targetUserId || !sanitizeUuid(args.targetUserId)) {
+    throw new Error("targetUserId is required for ledger credit mutations");
+  }
+
+  const { data: mutationResult, error: mutationError } = await client.rpc("admin_mutate_user_credits_ledger", {
+    p_target_user_id: args.targetUserId,
     p_workspace_id: args.workspaceId,
     p_credit_type: args.creditType,
     p_mode: mode,
@@ -370,10 +375,11 @@ export async function adminAdjustCredits(args: {
     p_new_balance: mode === "set" ? args.newBalance ?? null : null,
     p_reason: args.reason,
     p_actor_user_id: userId,
-    p_target_user_id: args.targetUserId ?? null,
     p_idempotency_key: args.idempotencyKey ?? null,
-    p_ip_address: args.ipAddress ?? null,
-    p_user_agent: args.userAgent ?? null,
+    p_metadata: {
+      ip_address: args.ipAddress ?? null,
+      user_agent: args.userAgent ?? null,
+    },
   });
   if (mutationError) throw mutationError;
 

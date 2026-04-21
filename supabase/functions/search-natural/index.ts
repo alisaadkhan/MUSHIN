@@ -93,18 +93,6 @@ Deno.serve(async (req) => {
 
         const callerIsSuperAdmin = await isSuperAdmin(userData.user.id);
 
-        const { data: ws } = await serviceClient
-            .from("workspaces")
-            .select("ai_credits_remaining")
-            .eq("id", workspaceId)
-            .single();
-
-        if (!callerIsSuperAdmin && (!ws || ws.ai_credits_remaining <= 0)) {
-            return new Response(JSON.stringify({ error: "No AI credits remaining" }), {
-                status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" }
-            });
-        }
-
         const body = await req.json();
         const rawQuery: string = body?.query ?? "";
         const platform: string | null = body?.platform ?? null;
@@ -161,6 +149,10 @@ Deno.serve(async (req) => {
             });
         }
 
+        // Ledger-only credit debit (single source of truth)
+        let remainingCredits: number | null = null;
+        const idempotencyKey = req.headers.get("x-idempotency-key")?.trim() || crypto.randomUUID();
+
         // ============================================================
         // CRIT-03 FIX: Deduct credit BEFORE the expensive HuggingFace
         // call. This closes the TOCTOU race window where N simultaneous
@@ -169,16 +161,27 @@ Deno.serve(async (req) => {
         // on insufficient balance, so no negative balances are possible.
         // ============================================================
         if (!callerIsSuperAdmin) {
-            try {
-                await serviceClient.rpc("consume_ai_credit", { ws_id: workspaceId });
-            } catch (creditErr: any) {
-                if (creditErr.code === "P0001") {
-                    return new Response(JSON.stringify({ error: "No AI credits remaining" }), {
-                        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" }
-                    });
-                }
-                throw creditErr;
+            const { data: debitRes, error: debitErr } = await serviceClient.rpc("consume_user_credits", {
+                p_user_id: userData.user.id,
+                p_workspace_id: workspaceId,
+                p_credit_type: "ai",
+                p_amount: 1,
+                p_action: "ai_search",
+                p_idempotency_key: `search-natural:${idempotencyKey}`,
+                p_metadata: { endpoint: "search-natural", query, platform },
+            });
+            if (debitErr) {
+                console.error("[search-natural] credit debit error:", debitErr);
+                return new Response(JSON.stringify({ error: "Credit system unavailable" }), {
+                    status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" }
+                });
             }
+            if (!debitRes?.success) {
+                return new Response(JSON.stringify({ error: "No AI credits remaining", code: "insufficient_credits" }), {
+                    status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" }
+                });
+            }
+            remainingCredits = typeof debitRes?.balance_after === "number" ? debitRes.balance_after : null;
         }
 
         // 1. Generate Embedding for the Search Query via HuggingFace BGE-large
@@ -187,13 +190,18 @@ Deno.serve(async (req) => {
             vector = await generateEmbedding(query, HUGGINGFACE_API_KEY);
         } catch (embErr: any) {
             // Refund the credit — the embedding failed before any value was delivered.
-            // Uses restore_ai_credit which is the correct atomic credit restore RPC.
             if (!callerIsSuperAdmin) {
-                await serviceClient
-                    .rpc("restore_ai_credit", { ws_id: workspaceId })
-                    .catch((e: unknown) => {
-                        console.error("[search-natural] Credit restore failed after embedding error:", e);
-                    });
+                await serviceClient.rpc("grant_user_credits", {
+                    p_user_id: userData.user.id,
+                    p_workspace_id: workspaceId,
+                    p_credit_type: "ai",
+                    p_amount: 1,
+                    p_action: "ai_search_refund",
+                    p_idempotency_key: `search-natural:${idempotencyKey}:refund`,
+                    p_metadata: { reason: "embedding_failed" },
+                }).catch((e: unknown) => {
+                    console.error("[search-natural] Credit refund failed after embedding error:", e);
+                });
             }
             console.error("HuggingFace embedding error:", embErr?.message);
             return new Response(JSON.stringify({ error: "AI search temporarily unavailable. Your credit has been refunded." }), {
@@ -229,7 +237,7 @@ Deno.serve(async (req) => {
 
         return new Response(JSON.stringify({
             results: hydratedResults,
-            credits_remaining: callerIsSuperAdmin ? Number.MAX_SAFE_INTEGER : ws.ai_credits_remaining - 1
+            credits_remaining: callerIsSuperAdmin ? Number.MAX_SAFE_INTEGER : remainingCredits,
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     } catch (err: any) {

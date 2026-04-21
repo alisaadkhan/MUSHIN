@@ -57,11 +57,21 @@ async function ensureRole(
   userId: string,
   role: RoleType,
 ) {
-  const { error } = await serviceClient
+  // The repo contains two historical shapes for `user_roles`:
+  // - UNIQUE(user_id) with enum `app_role`
+  // - UNIQUE(user_id, role) with text roles
+  //
+  // For local testing we support both by attempting the multi-role upsert,
+  // then falling back to single-role semantics.
+  const attempt1 = await serviceClient
     .from("user_roles")
     .upsert({ user_id: userId, role }, { onConflict: "user_id,role" });
+  if (!attempt1.error) return;
 
-  if (error) throw error;
+  const attempt2 = await serviceClient
+    .from("user_roles")
+    .upsert({ user_id: userId, role }, { onConflict: "user_id" });
+  if (attempt2.error) throw attempt2.error;
 }
 
 async function signInWithPasswordOrMagicLink(args: {

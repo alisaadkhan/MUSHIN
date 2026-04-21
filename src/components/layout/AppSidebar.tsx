@@ -36,6 +36,7 @@ const navGroups = [
     label: "Account",
     items: [
       { icon: Settings, label: "Settings", path: "/settings" },
+      { icon: CreditCard, label: "Credits", path: "/credits" },
       { icon: CreditCard, label: "Billing", path: "/billing" },
       { icon: LifeBuoy, label: "Support", path: "/support" },
     ],
@@ -54,8 +55,9 @@ export function AppSidebar({ isOpen = true, onClose }: AppSidebarProps) {
   const { isAnyAdmin } = useAdminPermissions();
 
   const isLoading = creditsLoading || subscriptionLoading;
-  const totalCredits = credits?.search_credits_remaining ?? (isLoading ? 0 : planConfig.search_credits);
-  const maxCredits = isLoading ? 1 : planConfig.search_credits;
+  const hasLedgerCredits = credits != null;
+  const totalCredits = hasLedgerCredits ? (credits.search_credits_remaining ?? 0) : 0;
+  const maxCredits = hasLedgerCredits ? (planConfig.search_credits ?? 0) : 0;
   const pct = maxCredits === 0 ? 100 : Math.min((totalCredits / maxCredits) * 100, 100);
 
   return (
@@ -131,7 +133,7 @@ export function AppSidebar({ isOpen = true, onClose }: AppSidebarProps) {
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
             <span>{isLoading ? "Loading..." : `${planConfig.name} Plan`}</span>
             <span className="data-mono font-semibold text-foreground">
-              {isLoading ? "—" : `${totalCredits} / ${maxCredits}`}
+              {isLoading ? "—" : maxCredits === 0 ? "—" : `${totalCredits} / ${maxCredits}`}
             </span>
           </div>
           {isLoading ? (

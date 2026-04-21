@@ -1,23 +1,51 @@
-import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createPrivilegedClient, requireJwt } from "../_shared/privileged_gateway.ts";
 import { safeErrorResponse } from "../_shared/errors.ts";
-const corsHeaders = {
-    "Access-Control-Allow-Origin": Deno.env.get("APP_URL") || "https://mushin.app",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
 
-async function getCallerRole(serviceClient: any, userId: string): Promise<string | null> {
-    const { data } = await serviceClient
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userId)
-        .maybeSingle();
-    return data?.role ?? null;
+const APP_URL = Deno.env.get("APP_URL") || "https://mushin.app";
+const ALLOWED_PREVIEW_ORIGINS = new Set(
+  (Deno.env.get("ALLOWED_PREVIEW_ORIGINS") ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
+);
+
+function buildCorsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin") ?? "";
+  const allowed = new Set<string>([
+    APP_URL,
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    ...ALLOWED_PREVIEW_ORIGINS,
+  ]);
+
+  return {
+    "Access-Control-Allow-Origin": allowed.has(origin) ? origin : APP_URL,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Credentials": "true",
+    "Vary": "Origin",
+  };
 }
 
-const ALLOWED_ROLES = ["super_admin", "admin", "support"];
+const ALLOWED_ROLES = ["super_admin", "system_admin", "admin", "support"] as const;
+const ROLE_RANK: Record<string, number> = {
+    super_admin: 1,
+    system_admin: 2,
+    admin: 3,
+    support: 4,
+    viewer: 5,
+    user: 6,
+};
+
+function pickHighestRole(roles: string[]): string {
+    const sorted = roles
+        .filter(Boolean)
+        .sort((a, b) => (ROLE_RANK[a] ?? 999) - (ROLE_RANK[b] ?? 999));
+    return sorted[0] ?? "user";
+}
 
 Deno.serve(async (req) => {
+    const corsHeaders = buildCorsHeaders(req);
     if (req.method === "OPTIONS") {
         return new Response(null, { headers: corsHeaders });
     }
@@ -27,28 +55,27 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const serviceClient = await performPrivilegedWrite({
-        authHeader: req.headers.get("Authorization"),
-        action: "gateway:privileged-client-bootstrap",
-        execute: async (_ctx, client) => client,
-    });
-
-    // Verify JWT
-    const anonClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-        global: { headers: { Authorization: authHeader } },
-    });
-    const { data: { user }, error: authErr } = await anonClient.auth.getUser();
-    if (authErr || !user) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    // Check role
-    const callerRole = await getCallerRole(serviceClient, user.id);
-    if (!callerRole || !ALLOWED_ROLES.includes(callerRole)) {
-        return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
     try {
+        const { userId } = await requireJwt(authHeader);
+        const serviceClient = createPrivilegedClient();
+
+        // Check caller role (allow multiple rows in user_roles)
+        const { data: callerRoles, error: callerRoleErr } = await serviceClient
+            .from("user_roles")
+            .select("role, revoked_at")
+            .eq("user_id", userId)
+            .is("revoked_at", null);
+        if (callerRoleErr) throw callerRoleErr;
+
+        const callerRoleList = (callerRoles ?? []).map((r: any) => String(r.role));
+        const hasAccess = callerRoleList.some((r) => (ALLOWED_ROLES as readonly string[]).includes(r));
+        if (!hasAccess) {
+            return new Response(JSON.stringify({ error: "Forbidden" }), {
+                status: 403,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
+
         // List all users from auth
         const { data: authUsers, error: authUsersErr } = await serviceClient.auth.admin.listUsers();
         if (authUsersErr) throw authUsersErr;
@@ -56,22 +83,31 @@ Deno.serve(async (req) => {
         // Fetch all profiles + roles + workspaces
         const [profilesRes, rolesRes, workspacesRes] = await Promise.all([
             serviceClient.from("profiles").select("*"),
-            serviceClient.from("user_roles").select("user_id, role"),
+            serviceClient.from("user_roles").select("user_id, role, revoked_at"),
             serviceClient.from("workspaces").select("owner_id, plan, name"),
         ]);
 
         const profileMap = Object.fromEntries((profilesRes.data || []).map((p: any) => [p.id, p]));
-        const roleMap = Object.fromEntries((rolesRes.data || []).map((r: any) => [r.user_id, r.role]));
         const workspaceMap = Object.fromEntries((workspacesRes.data || []).map((w: any) => [w.owner_id, w]));
+
+        // roleMap must handle multiple roles per user (and revoked roles)
+        const rolesByUser: Record<string, string[]> = {};
+        for (const row of rolesRes.data ?? []) {
+            if (row.revoked_at) continue;
+            const uid = String(row.user_id);
+            if (!rolesByUser[uid]) rolesByUser[uid] = [];
+            rolesByUser[uid].push(String(row.role));
+        }
 
         const users = authUsers.users.map((u: any) => ({
             id: u.id,
             email: u.email,
             full_name: profileMap[u.id]?.full_name ?? null,
             created_at: u.created_at,
-            role: roleMap[u.id] ?? "user",
-            plan: workspaceMap[u.id]?.plan ?? "free",
+            role: pickHighestRole(rolesByUser[u.id] ?? []),
+            plan: workspaceMap[u.id]?.plan ?? "pro",
             suspended: u.banned_until ? new Date(u.banned_until) > new Date() : false,
+            last_sign_in: u.last_sign_in_at ?? null,
         }));
 
         return new Response(JSON.stringify({ users }), {

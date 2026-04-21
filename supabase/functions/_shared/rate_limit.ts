@@ -12,15 +12,17 @@ import { getSecret } from "./secrets.ts";
 // Protects: signup (5/min, 20/hour), login (10/min, 50/hour),
 //           search (30/min, 100/hour), enrich (10/min, 30/hour), evaluate (20/min, 60/hour)
 
-type Action = 'signup' | 'login' | 'search' | 'enrich' | 'evaluate' | 'general';
+type Action = 'signup' | 'login' | 'search' | 'enrich' | 'evaluate' | 'checkout' | 'webhook' | 'general';
 
 const LIMITS: Record<Action, { perMin: number; perHour: number }> = {
-    signup:   { perMin: 5,  perHour: 20  },
-    login:    { perMin: 10, perHour: 50  },
-    search:   { perMin: 30, perHour: 100 },
-    enrich:   { perMin: 10, perHour: 30  },
-    evaluate: { perMin: 20, perHour: 60  },
-    general:  { perMin: 60, perHour: 300 },
+    signup:   { perMin: 5,   perHour: 20   },
+    login:    { perMin: 10,  perHour: 50   },
+    search:   { perMin: 30,  perHour: 100  },
+    enrich:   { perMin: 10,  perHour: 30   },
+    evaluate: { perMin: 20,  perHour: 60   },
+    checkout: { perMin: 5,   perHour: 10   },  // Billing abuse prevention
+    webhook:  { perMin: 100, perHour: 2000 },  // Paddle webhook receiver
+    general:  { perMin: 60,  perHour: 300  },
 };
 
 export async function checkRateLimit(

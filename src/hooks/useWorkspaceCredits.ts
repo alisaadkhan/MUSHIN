@@ -1,57 +1,36 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { trackEvent } from "@/lib/analytics";
-import { useEffect, useRef } from "react";
 
 export function useWorkspaceCredits() {
   const { workspace } = useAuth();
-  const previousCredits = useRef<number | null>(null);
 
   const query = useQuery({
     queryKey: ["workspace-credits", workspace?.workspace_id],
     queryFn: async () => {
       if (!workspace) throw new Error("No workspace");
-      const { data, error } = await supabase
-        .from("workspaces")
-        .select("search_credits_remaining, enrichment_credits_remaining, credits_reset_at, plan, email_sends_remaining, ai_credits_remaining")
-        .eq("id", workspace.workspace_id)
-        .single();
+      // Legacy hook name preserved, but credits are now ledger-based.
+      // Return the same shape as before so existing screens don't explode
+      // while we migrate them, but the values come from the ledger.
+      const { data, error } = await supabase.rpc("get_my_credit_balances", {
+        p_workspace_id: workspace.workspace_id,
+      });
       if (error) throw error;
-      return data as {
-        search_credits_remaining: number;
-        enrichment_credits_remaining: number;
-        credits_reset_at: string;
-        plan: string;
-        email_sends_remaining: number;
-        ai_credits_remaining: number;
+      const rows = (data ?? []) as any[];
+      const get = (t: string) => Number(rows.find((r) => r.credit_type === t)?.balance ?? 0);
+      return {
+        search_credits_remaining: get("search"),
+        enrichment_credits_remaining: get("enrichment"),
+        email_sends_remaining: get("email"),
+        ai_credits_remaining: get("ai"),
+        credits_reset_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        plan: "ledger",
       };
     },
     enabled: !!workspace,
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
-
-  // Track when credits drop significantly (indicating usage)
-  useEffect(() => {
-    if (query.data && previousCredits.current !== null) {
-      const current = query.data.search_credits_remaining;
-      const previous = previousCredits.current;
-      
-      // If credits dropped by more than 10%, track it
-      if (current < previous * 0.9) {
-        trackEvent("credits_used", {
-          creditsRemaining: current,
-          creditsUsed: previous - current,
-          plan: query.data.plan
-        });
-      }
-    }
-    
-    if (query.data) {
-      previousCredits.current = query.data.search_credits_remaining;
-    }
-  }, [query.data]);
 
   return query;
 }

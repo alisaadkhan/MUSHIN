@@ -16,7 +16,7 @@ export default function PrivacyPage() {
           <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"><ArrowLeft className="h-4 w-4" /> Back</Link>
           <Link to="/" className="flex items-center gap-2 ml-auto">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary"><Zap className="h-3.5 w-3.5 text-primary-foreground" /></div>
-            <span className="font-bold"><span className="aurora-text">Influence</span>IQ</span>
+            <span className="font-bold tracking-[0.14em]">MUSHIN</span>
           </Link>
         </div>
       </nav>

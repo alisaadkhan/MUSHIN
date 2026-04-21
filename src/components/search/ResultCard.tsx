@@ -40,6 +40,10 @@ export interface SearchResult {
   engagement_benchmark_bucket?: string;
   _intent?: string;
   tags?: string[];
+  mushin_score?: number;
+  fake_follower_pct?: number;
+  enrichment_whatsapp?: string | null;
+  enrichment_linked_handles?: string[];
 }
 
 interface ResultCardProps {
@@ -87,6 +91,9 @@ export const ResultCard = React.memo(function ResultCard({
   const city = c.city_extracted || c.city;
   const scoreKey = `${c.platform} - ${c.username}`;
   const cachedScore = cachedScores[scoreKey];
+  const mushinScore = typeof c.mushin_score === "number" ? c.mushin_score : null;
+  const hasWhatsApp = Boolean(c.enrichment_whatsapp);
+  const linkedCount = Array.isArray(c.enrichment_linked_handles) ? c.enrichment_linked_handles.length : 0;
 
   return (
     <div
@@ -116,7 +123,10 @@ export const ResultCard = React.memo(function ResultCard({
           </div>
           <div className="overflow-hidden min-w-0 max-w-[200px]">
             <p className="text-sm font-medium text-foreground truncate" title={displayName}>{displayName}</p>
-            <p className="text-xs text-muted-foreground truncate" title={c.username.replace("@", "")}>@{c.username.replace("@", "")}</p>
+            {/* Phase 2 UX: show single name only (no handle line) */}
+            <p className="text-xs text-muted-foreground truncate">
+              {c.platform}{city ? ` · ${city}` : ""}
+            </p>
           </div>
         </div>
 
@@ -177,6 +187,15 @@ export const ResultCard = React.memo(function ResultCard({
         <span data-testid="card-platform" className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5 flex items-center gap-1">
           <PlatformIcon platform={c.platform} /> {c.platform}
         </span>
+        {mushinScore != null && (
+          <span
+            data-testid="card-mushin-score"
+            className="text-[10px] font-semibold rounded-full px-2 py-0.5 border bg-primary/10 text-primary border-primary/20"
+            title="MUSHIN Score (0–100)"
+          >
+            MUSHIN {mushinScore}
+          </span>
+        )}
         {c.niche && (
           <span
             data-testid="card-niche"
@@ -211,6 +230,24 @@ export const ResultCard = React.memo(function ResultCard({
             title="Verified contact email found in profile"
           >
             ✉ Contact
+          </span>
+        )}
+        {hasWhatsApp && (
+          <span
+            data-testid="card-whatsapp"
+            className="text-[10px] font-semibold rounded-full px-2 py-0.5 border bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+            title="Business WhatsApp/phone found in profile"
+          >
+            WA
+          </span>
+        )}
+        {linkedCount > 0 && (
+          <span
+            data-testid="card-linked-socials"
+            className="text-[10px] font-semibold rounded-full px-2 py-0.5 border bg-blue-500/10 text-blue-400 border-blue-500/20"
+            title="Cross-platform social links found"
+          >
+            Links {linkedCount}
           </span>
         )}
       </div>
@@ -337,33 +374,9 @@ export const ResultCard = React.memo(function ResultCard({
           </div>
         </div>
         <div>
-          <p className="text-xs text-muted-foreground">Relevance</p>
-          {c._search_score != null ? (
-            <div className="mt-1">
-              <p
-                className="text-sm font-semibold text-foreground data-mono cursor-help"
-                title={`Score: ${Math.round(c._search_score * 100)}%\nSignals: keyword match, snippet relevance, engagement, authenticity, recency${c._intent ? `, intent (${c._intent.replace("_", " ")})` : ""}`}
-              >
-                {Math.round(c._search_score * 100)}%
-              </p>
-              <div className="h-1 bg-muted/50 rounded-full mt-1 overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-200 ${
-                    c._search_score >= 0.65
-                      ? "bg-emerald-500"
-                      : c._search_score >= 0.35
-                      ? "bg-amber-400"
-                      : "bg-muted-foreground/40"
-                  }`}
-                  style={{ width: `${Math.round(c._search_score * 100)}%` }}
-                />
-              </div>
-              {cachedScore != null && (
-                <div className="flex justify-center mt-1.5">
-                  <EvaluationScoreBadge score={cachedScore} size="sm" />
-                </div>
-              )}
-            </div>
+          <p className="text-xs text-muted-foreground">Score</p>
+          {mushinScore != null ? (
+            <p className="text-sm font-semibold text-foreground data-mono mt-1">{mushinScore}/100</p>
           ) : cachedScore != null ? (
             <div className="flex justify-center mt-1">
               <EvaluationScoreBadge score={cachedScore} size="sm" />

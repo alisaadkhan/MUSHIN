@@ -35,13 +35,9 @@ export function useAdminPermissions(): AdminPermissions {
         queryKey: ["admin-role", user?.id],
         queryFn: async () => {
             if (!user) return null;
-            const { data, error } = await supabase
-                .from("user_roles")
-                .select("role")
-                .eq("user_id", user.id)
-                .maybeSingle();
+            const { data, error } = await supabase.rpc("get_my_role");
             if (error) return null;
-            return (data?.role as AdminRole) ?? "user";
+            return (String(data) as AdminRole) ?? "user";
         },
         enabled: !!user,
         staleTime: 60_000,
@@ -71,7 +67,7 @@ export function useAdminPermissions(): AdminPermissions {
         canModerateContent: isAdmin,
         canEditBlacklist: isAdmin,
         canEditConfig: isSuperAdmin,
-        canViewAuditLog: isSuperAdmin,
+        canViewAuditLog: isSupport,
         canManageAnnouncements: isAdmin,
     };
 }

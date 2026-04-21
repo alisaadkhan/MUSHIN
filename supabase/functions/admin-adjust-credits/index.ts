@@ -54,9 +54,9 @@ Deno.serve(async (req) => {
         await requireSystemAdmin(authHeader);
 
         const { workspace_id, credit_type, amount_delta, mode, new_balance, reason, target_user_id, idempotency_key } = await req.json();
-        if (!workspace_id || !credit_type || !reason) {
+        if (!workspace_id || !credit_type || !reason || !target_user_id) {
             return validationErrorResponse(
-                "workspace_id, credit_type, and reason are required",
+                "workspace_id, target_user_id, credit_type, and reason are required",
                 corsHeaders,
             );
         }
@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
             newBalance: new_balance == null ? undefined : Number(new_balance),
             reason,
             idempotencyKey: idempotency_key ?? undefined,
-            targetUserId: target_user_id ?? null,
+            targetUserId: target_user_id,
             ipAddress,
             userAgent,
         });
