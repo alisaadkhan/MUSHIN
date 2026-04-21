@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { invokeEdgeAuthed } from "@/lib/edge";
 import { BarChart2, Search, Users, CreditCard, RefreshCw } from "lucide-react";
 
 type PaddleSub = {
@@ -22,7 +23,7 @@ export default function AdminAnalytics() {
                     .from("paddle_subscriptions")
                     .select("user_id,plan_name,status,current_period_end,cancel_at_period_end")
                     .order("updated_at", { ascending: false }),
-                supabase.functions.invoke("admin-list-users"),
+                invokeEdgeAuthed("admin-list-users"),
             ]);
 
             const emailByUser: Record<string, string> = {};

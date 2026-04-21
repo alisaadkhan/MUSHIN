@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeEdgeAuthed } from '@/lib/edge';
 import {
   Users, CreditCard, Activity, AlertTriangle,
   TrendingUp, TrendingDown, Minus, ArrowRight,
@@ -93,7 +94,7 @@ export default function AdminDashboard() {
       const startIso = startOfDay.toISOString();
 
       const [usersRes, subsRes, wsRes, auditRes, suspendedRes, creditTodayRes] = await Promise.all([
-        supabase.functions.invoke('admin-list-users'),
+        invokeEdgeAuthed('admin-list-users'),
         supabase.from('subscriptions').select('id,plan,status', { count: 'exact' }),
         supabase.from('workspaces').select('id', { count: 'exact', head: true }),
         supabase

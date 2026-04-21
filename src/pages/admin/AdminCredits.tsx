@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useToast } from '@/hooks/use-toast';
+import { invokeEdgeAuthed } from '@/lib/edge';
 import {
   Search, RefreshCw, Loader2, Plus, Minus,
   ArrowUpRight, ArrowDownRight, ChevronRight,
@@ -358,7 +359,7 @@ export default function AdminCredits() {
       const [wsRes, balRes, usersRes] = await Promise.all([
         supabase.from('workspaces').select('id,owner_id,plan').limit(200),
         supabase.from('user_credit_balances').select('user_id,workspace_id,credit_type,balance').limit(5000),
-        supabase.functions.invoke('admin-list-users'),
+        invokeEdgeAuthed('admin-list-users'),
       ]);
       if (wsRes.error) throw wsRes.error;
       if (balRes.error) throw balRes.error;

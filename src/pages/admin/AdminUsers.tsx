@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { invokeEdgeAuthed } from '@/lib/edge';
 import {
   Search, UserX, UserCheck, Key, Shield, Loader2,
   ChevronDown, MoreHorizontal, RefreshCw, Mail, UserPlus
@@ -232,7 +233,7 @@ export default function AdminUsers() {
   const { data: users = [], isLoading, error, refetch } = useQuery<UserRow[]>({
     queryKey: ['admin-users-v2'],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke('admin-list-users');
+      const { data, error } = await invokeEdgeAuthed('admin-list-users');
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       return data.users ?? [];
