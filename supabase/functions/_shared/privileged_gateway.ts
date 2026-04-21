@@ -50,15 +50,14 @@ export function createUserClient(authHeader: string) {
 }
 
 export async function requireJwt(authHeader: string | null): Promise<{ userId: string; token: string }> {
-  if (!authHeader?.startsWith("Bearer ")) {
-    throw new Error("Unauthorized");
-  }
+  if (!authHeader) throw new Error("Missing Authorization header");
+  if (!authHeader.startsWith("Bearer ")) throw new Error("Invalid Authorization scheme");
 
   const token = authHeader.replace("Bearer ", "");
   const userClient = createUserClient(authHeader);
   const { data: { user }, error } = await userClient.auth.getUser(token);
 
-  if (error || !user) throw new Error("Unauthorized");
+  if (error || !user) throw new Error("Invalid or expired session token");
   return { userId: user.id, token };
 }
 
