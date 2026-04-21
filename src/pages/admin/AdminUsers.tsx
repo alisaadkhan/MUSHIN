@@ -259,8 +259,8 @@ export default function AdminUsers() {
       title: 'Failed to load users',
       description:
         (body?.error ? String(body.error) : null) ??
-        hint ??
         anyErr?.message ??
+        hint ??
         'Admin request failed',
       variant: 'destructive',
     });
@@ -273,7 +273,7 @@ export default function AdminUsers() {
 
   /* ── Actions ── */
   const callAdmin = async (fn: string, body: object) => {
-    const { data, error } = await supabase.functions.invoke(fn, { body });
+    const { data, error } = await invokeEdgeAuthed(fn, { body } as any);
     if (error) throw error;
     if (data?.error) throw new Error(data.error);
     return data;
