@@ -1,12 +1,10 @@
 import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { safeErrorResponse } from "../_shared/errors.ts";
-const corsHeaders = {
-    "Access-Control-Allow-Origin": Deno.env.get("APP_URL") || "https://mushin.app",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { buildCorsHeaders } from "../_shared/cors.ts";
 
 Deno.serve(async (req) => {
+    const corsHeaders = buildCorsHeaders(req);
     if (req.method === "OPTIONS") {
         return new Response(null, { headers: corsHeaders });
     }

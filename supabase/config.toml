@@ -52,6 +52,12 @@ verify_jwt = false
 [functions.admin-audit-log]
 verify_jwt = false
 
+[functions.admin-revoke-sessions]
+verify_jwt = false
+
+[functions.admin-force-password-reset]
+verify_jwt = false
+
 [functions.enrich-influencer]
 verify_jwt = true
 

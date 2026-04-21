@@ -1,8 +1,8 @@
 import { requireJwt, requireSystemAdmin, createPrivilegedClient } from "../_shared/privileged_gateway.ts";
 import { logAdminAction } from "../_shared/audit_logger.ts";
 import { safeErrorResponse, validationErrorResponse } from "../_shared/errors.ts";
-import { corsHeaders } from "../_shared/rate_limit.ts";
 import { extractClientIp } from "../_shared/security.ts";
+import { buildCorsHeaders } from "../_shared/cors.ts";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -12,6 +12,7 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = buildCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 

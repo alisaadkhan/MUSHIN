@@ -1,10 +1,7 @@
 import { performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { safeErrorResponse } from "../_shared/errors.ts";
-const corsHeaders = {
-    "Access-Control-Allow-Origin": Deno.env.get("APP_URL") || "https://mushin.app",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { buildCorsHeaders } from "../_shared/cors.ts";
 
 async function getCallerRole(serviceClient: any, userId: string): Promise<string | null> {
     const { data } = await serviceClient.from("user_roles").select("role").eq("user_id", userId).maybeSingle();
@@ -18,6 +15,7 @@ async function logAction(serviceClient: any, adminId: string, action: string, ta
 const VALID_ROLES = ["super_admin", "admin", "support", "viewer", "user"];
 
 Deno.serve(async (req) => {
+    const corsHeaders = buildCorsHeaders(req);
     if (req.method === "OPTIONS") {
         return new Response(null, { headers: corsHeaders });
     }
