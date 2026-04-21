@@ -241,9 +241,23 @@ export default function AdminUsers() {
 
   useEffect(() => {
     if (!error) return;
+    const anyErr = error as any;
+    const status = anyErr?.context?.status ?? anyErr?.status ?? null;
+    const body = anyErr?.context?.body ?? anyErr?.context?.responseBody ?? null;
+    const hint = status === 401
+      ? 'Unauthorized (sign in again).'
+      : status === 403
+        ? 'Forbidden (your account is not an admin/support role).'
+        : status
+          ? `Request failed (${status}).`
+          : null;
     toast({
       title: 'Failed to load users',
-      description: (error as any)?.message ?? 'Admin request failed',
+      description:
+        (body?.error ? String(body.error) : null) ??
+        hint ??
+        anyErr?.message ??
+        'Admin request failed',
       variant: 'destructive',
     });
   }, [error, toast]);

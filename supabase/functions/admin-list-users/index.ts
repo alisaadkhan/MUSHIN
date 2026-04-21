@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
 
         const callerRoleList = (callerRoles ?? [])
           .filter((r: any) => !r?.revoked_at)
-          .map((r: any) => String(r.role));
+          .map((r: any) => String(r.role).toLowerCase());
         const hasAccess = callerRoleList.some((r) => (ALLOWED_ROLES as readonly string[]).includes(r));
         if (!hasAccess) {
             return new Response(JSON.stringify({ error: "Forbidden" }), {
@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
             if ((row as any).revoked_at) continue;
             const uid = String(row.user_id);
             if (!rolesByUser[uid]) rolesByUser[uid] = [];
-            rolesByUser[uid].push(String(row.role));
+            rolesByUser[uid].push(String(row.role).toLowerCase());
         }
 
         const users = authUsers.users.map((u: any) => ({

@@ -33,7 +33,17 @@ export function createPrivilegedClient() {
 }
 
 export function createUserClient(authHeader: string) {
-  return createClient(getSupabaseUrl(), getRequiredEnv("SUPABASE_ANON_KEY"), {
+  // Prefer anon key for normal user-scoped Auth calls, but fall back to
+  // service role if SUPABASE_ANON_KEY isn't available in this runtime.
+  // This prevents privileged endpoints from failing with 500 due to missing env.
+  let key: string;
+  try {
+    key = getRequiredEnv("SUPABASE_ANON_KEY");
+  } catch {
+    key = getServiceRoleKey();
+  }
+
+  return createClient(getSupabaseUrl(), key, {
     global: { headers: { Authorization: authHeader } },
     auth: { autoRefreshToken: false, persistSession: false },
   });
