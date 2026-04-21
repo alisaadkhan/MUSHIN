@@ -1,10 +1,11 @@
 import { createPrivilegedClient, requireJwt, requireSystemAdmin } from "../_shared/privileged_gateway.ts";
 import { safeErrorResponse, validationErrorResponse } from "../_shared/errors.ts";
 import { logAdminAction } from "../_shared/audit_logger.ts";
-import { corsHeaders } from "../_shared/rate_limit.ts";
 import { extractClientIp } from "../_shared/security.ts";
+import { buildCorsHeaders } from "../_shared/cors.ts";
 
 Deno.serve(async (req) => {
+    const corsHeaders = buildCorsHeaders(req);
     if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
     const authHeader = req.headers.get("Authorization");

@@ -1,22 +1,24 @@
 import { adminAdjustCredits, isSuperAdmin, requireJwt, requireSystemAdmin } from "../_shared/privileged_gateway.ts";
 import { logAdminAction, logSystemAction } from "../_shared/audit_logger.ts";
 import { safeErrorResponse, validationErrorResponse } from "../_shared/errors.ts";
-import { checkRateLimit, corsHeaders } from "../_shared/rate_limit.ts";
+import { checkRateLimit } from "../_shared/rate_limit.ts";
 import { extractClientIp } from "../_shared/security.ts";
+import { buildCorsHeaders } from "../_shared/cors.ts";
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(body: unknown, status = 200, headers: Record<string, string>) {
     return new Response(JSON.stringify(body), {
         status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...headers, "Content-Type": "application/json" },
     });
 }
 
 Deno.serve(async (req) => {
+    const corsHeaders = buildCorsHeaders(req);
     if (req.method === "OPTIONS") {
         return new Response(null, { headers: corsHeaders });
     }
     if (req.method !== "POST") {
-        return jsonResponse({ error: "Method not allowed" }, 405);
+        return jsonResponse({ error: "Method not allowed" }, 405, corsHeaders);
     }
 
     const authHeader = req.headers.get("Authorization");
@@ -32,7 +34,7 @@ Deno.serve(async (req) => {
                 userAgent,
                 metadata: { endpoint: "admin-adjust-credits", status: "failed" },
             });
-            return jsonResponse({ error: "Unauthorized" }, 401);
+            return jsonResponse({ error: "Unauthorized" }, 401, corsHeaders);
         }
 
         const { userId } = await requireJwt(authHeader);
@@ -47,7 +49,7 @@ Deno.serve(async (req) => {
                     userAgent,
                     metadata: { retry_after: rate.retryAfter },
                 });
-                return jsonResponse({ error: "Too many requests" }, 429);
+                return jsonResponse({ error: "Too many requests" }, 429, corsHeaders);
             }
         }
 
@@ -94,7 +96,7 @@ Deno.serve(async (req) => {
             metadata: { credit_type, amount_delta, new_balance, mode: effectiveMode, reason, idempotency_key },
         });
 
-        return jsonResponse(result);
+        return jsonResponse(result, 200, corsHeaders);
     } catch (err) {
         if (err instanceof Error && err.message === "Forbidden") {
             try {
@@ -109,7 +111,7 @@ Deno.serve(async (req) => {
             } catch {
                 // Ignore nested auth/logging failures.
             }
-            return jsonResponse({ error: "Forbidden" }, 403);
+            return jsonResponse({ error: "Forbidden" }, 403, corsHeaders);
         }
 
         if (err instanceof Error && err.message === "Unauthorized") {
