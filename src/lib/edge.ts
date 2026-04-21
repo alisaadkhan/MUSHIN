@@ -14,11 +14,23 @@ export async function invokeEdgeAuthed<T = any>(
   const { data: sess } = await supabase.auth.getSession();
   const token = sess.session?.access_token;
 
+  // Fail loudly if there is no session yet (prevents confusing "Unauthorized" loops).
+  if (!token) {
+    return {
+      data: null as unknown as T,
+      error: {
+        message: "No active session. Please sign in at /admin/login.",
+        status: 401,
+        context: { status: 401, body: { error: "No active session. Please sign in at /admin/login." } },
+      },
+    };
+  }
+
   return await supabase.functions.invoke<T>(functionName, {
     ...(args ?? {}),
     headers: {
       ...(args as any)?.headers,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      Authorization: `Bearer ${token}`,
     },
   } as any);
 }
