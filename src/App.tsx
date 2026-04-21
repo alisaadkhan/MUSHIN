@@ -65,6 +65,7 @@ const AdminPermissions     = lazy(() => import("./pages/admin/AdminPermissions")
 const AdminSupportTickets  = lazy(() => import("./pages/admin/AdminSupportTickets"));
 const AdminCredits         = lazy(() => import("./pages/admin/AdminCredits"));
 const AdminSecurity        = lazy(() => import("./pages/admin/AdminSecurity"));
+const AdminRevenue         = lazy(() => import("./pages/admin/AdminRevenue"));
 
 // Minimal fallback shown while a lazy chunk is loading
 const PageShell = () => (
@@ -151,6 +152,7 @@ const App = () => {
                   <Route path="/admin/subscriptions" element={<AdminRoute requiredPermission="canManageUsers"><AdminSubscriptions /></AdminRoute>} />
                   <Route path="/admin/content" element={<AdminRoute requiredPermission="canModerateContent"><AdminContent /></AdminRoute>} />
                   <Route path="/admin/analytics" element={<AdminRoute><AdminAnalytics /></AdminRoute>} />
+                  <Route path="/admin/revenue" element={<AdminRoute><AdminRevenue /></AdminRoute>} />
                   <Route path="/admin/config" element={<AdminRoute requiredPermission="canEditConfig"><AdminConfig /></AdminRoute>} />
                   <Route path="/admin/audit-log" element={<AdminRoute requiredPermission="canViewAuditLog"><AdminAuditLog /></AdminRoute>} />
                   <Route path="/admin/security" element={<AdminRoute requiredPermission="canViewAuditLog"><AdminSecurity /></AdminRoute>} />

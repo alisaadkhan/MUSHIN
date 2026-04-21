@@ -21,6 +21,7 @@ export function AdminSidebar() {
       items: [
         { icon: LayoutDashboard, label: 'Dashboard',  path: '/admin' },
         { icon: BarChart2,       label: 'Analytics',  path: '/admin/analytics' },
+        { icon: CreditCard,      label: 'Revenue',    path: '/admin/revenue' },
       ],
     },
     {
