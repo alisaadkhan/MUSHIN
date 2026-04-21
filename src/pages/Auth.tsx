@@ -1,10 +1,15 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { MushInLogo } from '@/components/ui/MushInLogo';
+import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
+
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_DISABLE_CAPTCHA === 'true'
+  ? ''
+  : (import.meta.env.VITE_TURNSTILE_SITE_KEY ?? '');
 
 /* ── Google Icon ──────────────────────────────────────────── */
 const GoogleIcon = () => (
@@ -56,15 +61,30 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaError, setCaptchaError] = useState('');
+  const turnstileRef = useRef<TurnstileInstance>(null);
 
   const { signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
   const navigate = useNavigate();
+
+  // Reset CAPTCHA when switching between modes (tokens are not safe to reuse).
+  useEffect(() => {
+    if (!TURNSTILE_SITE_KEY) return;
+    turnstileRef.current?.reset();
+    setCaptchaToken('');
+    setCaptchaError('');
+  }, [mode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      if (TURNSTILE_SITE_KEY && !captchaToken) {
+        throw new Error('Please complete the security check.');
+      }
+
       if (mode === 'forgot') {
         const { error } = await resetPassword(email);
         if (error) throw error;
@@ -74,13 +94,13 @@ export default function Auth() {
       }
 
       if (mode === 'signup') {
-        const { error } = await signUp(email, password);
+        const { error } = await signUp(email, password, captchaToken || undefined);
         if (error) throw error;
         toast({ title: 'Account created', description: 'Verify your email to continue.' });
         return;
       }
 
-      const { error } = await signIn(email, password);
+      const { error } = await signIn(email, password, captchaToken || undefined);
       if (error) throw error;
       navigate('/dashboard');
     } catch (err: any) {
@@ -90,6 +110,10 @@ export default function Auth() {
         variant: 'destructive',
       });
     } finally {
+      if (TURNSTILE_SITE_KEY) {
+        turnstileRef.current?.reset();
+        setCaptchaToken('');
+      }
       setLoading(false);
     }
   };
@@ -184,6 +208,47 @@ export default function Auth() {
                 </button>
               }
             />
+          )}
+
+          {/* Cloudflare Turnstile */}
+          {!!TURNSTILE_SITE_KEY && (
+            <div className="pt-2 space-y-2">
+              {!captchaToken && !captchaError && (
+                <div className="h-[65px] rounded-md border border-white/10 bg-white/[0.03]" />
+              )}
+              <div
+                aria-hidden={!!captchaToken}
+                style={
+                  captchaToken
+                    ? { position: 'absolute', opacity: 0, pointerEvents: 'none', height: 0, overflow: 'hidden' }
+                    : undefined
+                }
+              >
+                <Turnstile
+                  ref={turnstileRef}
+                  siteKey={TURNSTILE_SITE_KEY}
+                  onSuccess={(token) => {
+                    setCaptchaToken(token);
+                    setCaptchaError('');
+                  }}
+                  onExpire={() => {
+                    setCaptchaToken('');
+                  }}
+                  onError={(code) => {
+                    setCaptchaToken('');
+                    setCaptchaError(code ? `Security check failed (${code}). Try again.` : 'Security check failed. Try again.');
+                  }}
+                  onUnsupported={() => {
+                    setCaptchaToken('');
+                    setCaptchaError('Security check is not supported in this browser.');
+                  }}
+                  options={{ theme: 'dark', size: 'normal' }}
+                />
+              </div>
+              {captchaError && (
+                <div className="text-[11px] text-red-400 leading-relaxed">{captchaError}</div>
+              )}
+            </div>
           )}
 
           {mode === 'signin' && (
