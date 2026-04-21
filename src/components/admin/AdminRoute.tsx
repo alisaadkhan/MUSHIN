@@ -1,6 +1,7 @@
 import { Navigate } from "react-router-dom";
 import { useAdminPermissions, AdminPermissions } from "@/hooks/useAdminPermissions";
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface AdminRouteProps {
     children: React.ReactNode;
@@ -8,9 +9,10 @@ interface AdminRouteProps {
 }
 
 export function AdminRoute({ children, requiredPermission }: AdminRouteProps) {
+    const { user, loading: authLoading } = useAuth();
     const perms = useAdminPermissions();
 
-    if (perms.isLoading) {
+    if (authLoading || perms.isLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-[#070707]">
                 <div className="flex flex-col items-center gap-3">
@@ -19,6 +21,11 @@ export function AdminRoute({ children, requiredPermission }: AdminRouteProps) {
                 </div>
             </div>
         );
+    }
+
+    // No active session → force staff login so edge functions get a real JWT.
+    if (!user) {
+        return <Navigate to="/admin/login" replace />;
     }
 
     if (!perms.isAnyAdmin) {
