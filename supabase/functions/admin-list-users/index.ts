@@ -139,6 +139,16 @@ Deno.serve(async (req) => {
           msg.includes("unauthorized") ? 401 :
           msg.includes("forbidden") ? 403 :
           500;
+        // For auth/permission errors it's safe (and useful) to return a specific message,
+        // even in production. It avoids "mystery 401" loops in the admin UI.
+        if (status === 401 || status === 403) {
+          const message = err instanceof Error ? err.message : (status === 401 ? "Unauthorized" : "Forbidden");
+          return new Response(JSON.stringify({ error: message }), {
+            status,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
         return safeErrorResponse(err, "[admin-list-users]", corsHeaders, status);
     }
 });

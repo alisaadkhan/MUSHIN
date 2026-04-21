@@ -26,12 +26,41 @@ export async function invokeEdgeAuthed<T = any>(
     };
   }
 
-  return await supabase.functions.invoke<T>(functionName, {
-    ...(args ?? {}),
+  // Use direct fetch so we ALWAYS have status + response body (supabase-js sometimes
+  // collapses non-2xx into a generic error without exposing the response payload).
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${functionName}`;
+  const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+  const res = await fetch(url, {
+    method: "POST",
     headers: {
-      ...(args as any)?.headers,
+      "Content-Type": "application/json",
+      apikey: publishableKey,
       Authorization: `Bearer ${token}`,
+      ...(args as any)?.headers,
     },
-  } as any);
+    body: (args as any)?.body ? JSON.stringify((args as any).body) : undefined,
+  });
+
+  const text = await res.text();
+  let json: any = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = { error: text || `Non-JSON response (${res.status})` };
+  }
+
+  if (!res.ok) {
+    return {
+      data: null as unknown as T,
+      error: {
+        message: json?.error ?? `Edge Function error (${res.status})`,
+        status: res.status,
+        context: { status: res.status, body: json },
+      },
+    };
+  }
+
+  return { data: json as T, error: null };
 }
 
