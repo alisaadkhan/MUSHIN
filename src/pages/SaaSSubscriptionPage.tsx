@@ -29,7 +29,7 @@ export default function SaaSSubscriptionPage() {
         <p>This SaaS Subscription Agreement governs the terms of service, billing cycles, and specific deliverables provided to clients subscribing to the MUSHIN platform. It supplements the general Terms of Service.</p>
 
         <h2>2. Subscription Tiers and Features</h2>
-        <p>Your chosen subscription tier dictates usage limits, API access, and feature availability. Downgrading may result in data loss or reduced access.</p>
+        <p>Your chosen subscription tier dictates usage limits and feature availability. Downgrading may result in data loss or reduced access.</p>
 
         <h2>3. Renewal and Cancellation</h2>
         <p>Subscriptions automatically renew unless canceled prior to the next billing date. Prorated refunds are not issued for mid-cycle cancellations.</p>

@@ -11,6 +11,13 @@ const ALLOWED_PREVIEW_ORIGINS = new Set(
 
 function buildCorsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("origin") ?? "";
+  let isVercel = false;
+  try {
+    const host = new URL(origin).hostname;
+    isVercel = host === "vercel.app" || host.endsWith(".vercel.app");
+  } catch {
+    isVercel = false;
+  }
   const allowed = new Set<string>([
     APP_URL,
     "http://localhost:5173",
@@ -19,7 +26,7 @@ function buildCorsHeaders(req: Request): Record<string, string> {
   ]);
 
   return {
-    "Access-Control-Allow-Origin": allowed.has(origin) ? origin : APP_URL,
+    "Access-Control-Allow-Origin": allowed.has(origin) || isVercel ? origin : APP_URL,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Credentials": "true",

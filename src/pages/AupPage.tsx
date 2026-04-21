@@ -26,7 +26,7 @@ export default function AupPage() {
         <p className="text-muted-foreground">Last updated: April 2026</p>
 
         <h2>1. Prohibited Actions</h2>
-        <p>Users may not use MUSHIN to scrape, extract, or mine data programmatically beyond the provided API constraints. Malicious activities, including DDoS attacks or spreading malware, will result in immediate termination.</p>
+        <p>Users may not use MUSHIN to scrape, extract, or mine data programmatically beyond the platform’s intended use. Malicious activities, including DDoS attacks or spreading malware, will result in immediate termination.</p>
 
         <h2>2. Data Usage</h2>
         <p>The analytics and metrics provided by MUSHIN may not be resold or redistributed without a specific Enterprise Data License.</p>

@@ -132,7 +132,7 @@ export function IntegrationsTab() {
           <div className="flex items-center gap-2 mb-2">
             {hubspotConfigured ? (
               <span className="flex items-center gap-1 text-xs text-green-500">
-                <CheckCircle2 className="h-3.5 w-3.5" /> API key configured
+                <CheckCircle2 className="h-3.5 w-3.5" /> Token configured
               </span>
             ) : (
               <span className="flex items-center gap-1 text-xs text-muted-foreground">
