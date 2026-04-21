@@ -76,12 +76,17 @@ Deno.serve(async (req) => {
         // Check caller role (allow multiple rows in user_roles)
         const { data: callerRoles, error: callerRoleErr } = await serviceClient
             .from("user_roles")
-            .select("role, revoked_at")
+            // Back-compat: older schemas may not have revoked_at/granted_at columns.
+            // Selecting "*" avoids hard failures on missing columns.
+            .select("*")
             .eq("user_id", userId)
-            .is("revoked_at", null);
+            // If revoked_at doesn't exist, this filter is ignored by PostgREST? (it will error).
+            // So we do NOT apply `.is('revoked_at', null)` and instead filter in JS below.
         if (callerRoleErr) throw callerRoleErr;
 
-        const callerRoleList = (callerRoles ?? []).map((r: any) => String(r.role));
+        const callerRoleList = (callerRoles ?? [])
+          .filter((r: any) => !r?.revoked_at)
+          .map((r: any) => String(r.role));
         const hasAccess = callerRoleList.some((r) => (ALLOWED_ROLES as readonly string[]).includes(r));
         if (!hasAccess) {
             return new Response(JSON.stringify({ error: "Forbidden" }), {
@@ -97,7 +102,8 @@ Deno.serve(async (req) => {
         // Fetch all profiles + roles + workspaces
         const [profilesRes, rolesRes, workspacesRes] = await Promise.all([
             serviceClient.from("profiles").select("*"),
-            serviceClient.from("user_roles").select("user_id, role, revoked_at"),
+            // Back-compat: select * for schemas without revoked_at.
+            serviceClient.from("user_roles").select("*"),
             serviceClient.from("workspaces").select("owner_id, plan, name"),
         ]);
 
@@ -107,7 +113,7 @@ Deno.serve(async (req) => {
         // roleMap must handle multiple roles per user (and revoked roles)
         const rolesByUser: Record<string, string[]> = {};
         for (const row of rolesRes.data ?? []) {
-            if (row.revoked_at) continue;
+            if ((row as any).revoked_at) continue;
             const uid = String(row.user_id);
             if (!rolesByUser[uid]) rolesByUser[uid] = [];
             rolesByUser[uid].push(String(row.role));
@@ -128,6 +134,11 @@ Deno.serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
     } catch (err: any) {
-        return safeErrorResponse(err, "[admin-list-users]", corsHeaders);
+        const msg = (err instanceof Error ? err.message : String(err ?? "")).toLowerCase();
+        const status =
+          msg.includes("unauthorized") ? 401 :
+          msg.includes("forbidden") ? 403 :
+          500;
+        return safeErrorResponse(err, "[admin-list-users]", corsHeaders, status);
     }
 });
