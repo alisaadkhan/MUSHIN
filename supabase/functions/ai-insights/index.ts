@@ -111,20 +111,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Budget Kill-Switch
+    // Budget Kill-Switch (server-side cost controls)
     const budgetStatus = await enforceBudgetKillSwitch(membership.workspace_id, 1);
     if (budgetStatus) return budgetStatus;
 
-    const { data: ws } = await adminClient
-      .from("workspaces")
-      .select("ai_credits_remaining")
-      .eq("id", membership.workspace_id)
-      .single();
-
-    if (!callerIsSuperAdmin && (!ws || ws.ai_credits_remaining <= 0)) {
-      return new Response(JSON.stringify({ error: "AI credits exhausted. Upgrade your plan to continue using AI features.", code: "CREDITS_EXHAUSTED" }), {
-        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // Ledger-based credit gate (single source of truth)
+    if (!callerIsSuperAdmin) {
+      const { data: bal, error: balErr } = await adminClient.rpc("get_user_credit_balance", {
+        p_user_id: userId,
+        p_workspace_id: membership.workspace_id,
+        p_credit_type: "ai",
       });
+      if (balErr) throw balErr;
+      if ((bal ?? 0) <= 0) {
+        return new Response(JSON.stringify({ error: "AI credits exhausted. Upgrade your plan to continue using AI features.", code: "CREDITS_EXHAUSTED" }), {
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const { type, data } = await req.json();
@@ -149,7 +152,15 @@ Deno.serve(async (req) => {
 
     // Deduct credit BEFORE AI call to prevent race condition double-spend.
     if (!callerIsSuperAdmin) {
-      const { error: creditErr } = await adminClient.rpc("consume_ai_credit", { ws_id: membership.workspace_id });
+      const { error: creditErr } = await adminClient.rpc("consume_user_credits", {
+        p_user_id: userId,
+        p_workspace_id: membership.workspace_id,
+        p_credit_type: "ai",
+        p_amount: 1,
+        p_action: "ai_insights",
+        p_idempotency_key: null,
+        p_metadata: { endpoint: "ai-insights" },
+      });
       if (creditErr) {
         console.error("[ai-insights] Pre-deduction failed:", creditErr);
         return new Response(JSON.stringify({ error: "Credit deduction failed. Please try again.", code: "CREDIT_DEDUCT_FAILED" }), {
@@ -180,7 +191,15 @@ Deno.serve(async (req) => {
       console.error("[ai-insights] AI call failed:", aiErr.message);
       // Restore credit on AI failure
       if (!callerIsSuperAdmin) {
-        const { error: restoreErr } = await adminClient.rpc("restore_ai_credit", { ws_id: membership.workspace_id });
+        const { error: restoreErr } = await adminClient.rpc("grant_user_credits", {
+          p_user_id: userId,
+          p_workspace_id: membership.workspace_id,
+          p_credit_type: "ai",
+          p_amount: 1,
+          p_action: "ai_insights_refund",
+          p_idempotency_key: null,
+          p_metadata: { reason: "ai_error" },
+        });
         if (restoreErr) console.error("[ai-insights] Credit restore failed:", restoreErr);
       }
       const isRateLimit = aiErr.message?.includes("429");

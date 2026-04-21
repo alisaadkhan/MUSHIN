@@ -27,11 +27,9 @@ export function MarketingFooter() {
                 Product
               </div>
               <div className="space-y-2">
-                {['Features', 'Pricing', 'API', 'Changelog'].map((l) => (
-                  <div key={l} className="text-zinc-500 hover:text-white transition-colors cursor-pointer">
-                    {l}
-                  </div>
-                ))}
+                <Link to="/" className="block text-zinc-500 hover:text-white transition-colors">Features</Link>
+                <Link to="/pricing" className="block text-zinc-500 hover:text-white transition-colors">Pricing</Link>
+                <Link to="/blog" className="block text-zinc-500 hover:text-white transition-colors">Changelog</Link>
               </div>
             </div>
 
@@ -40,7 +38,7 @@ export function MarketingFooter() {
                 Company
               </div>
               <div className="space-y-2">
-                <Link to="/about" className="block text-zinc-500 hover:text-white transition-colors">About</Link>
+                <Link to="/" className="block text-zinc-500 hover:text-white transition-colors">About</Link>
                 <Link to="/blog"  className="block text-zinc-500 hover:text-white transition-colors">Blog</Link>
                 <span className="block text-zinc-500 cursor-default">Careers</span>
                 <span className="block text-zinc-500 cursor-default">Press</span>

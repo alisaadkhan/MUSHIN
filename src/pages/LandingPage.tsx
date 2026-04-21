@@ -1087,11 +1087,30 @@ export default function LandingPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-8 text-sm">
               <div>
                 <div className="text-white/60 font-semibold uppercase tracking-widest text-[10px] mb-3">Product</div>
-                <div className="space-y-2">{['Features','Pricing','API','Changelog'].map(l => <div key={l} className="text-zinc-500 hover:text-white transition-colors cursor-pointer">{l}</div>)}</div>
+                <div className="space-y-2">
+                  <button
+                    className="block text-left text-zinc-500 hover:text-white transition-colors"
+                    onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
+                  >
+                    Features
+                  </button>
+                  <Link to="/pricing" className="block text-zinc-500 hover:text-white transition-colors">Pricing</Link>
+                  <Link to="/blog" className="block text-zinc-500 hover:text-white transition-colors">Changelog</Link>
+                </div>
               </div>
               <div>
                 <div className="text-white/60 font-semibold uppercase tracking-widest text-[10px] mb-3">Company</div>
-                <div className="space-y-2">{['About','Blog','Careers','Press'].map(l => <Link key={l} to={l === 'About' ? '/about' : l === 'Blog' ? '/blog' : '#'} className="block text-zinc-500 hover:text-white transition-colors">{l}</Link>)}</div>
+                <div className="space-y-2">
+                  <button
+                    className="block text-left text-zinc-500 hover:text-white transition-colors"
+                    onClick={() => document.getElementById("about")?.scrollIntoView({ behavior: "smooth" })}
+                  >
+                    About
+                  </button>
+                  <Link to="/blog" className="block text-zinc-500 hover:text-white transition-colors">Blog</Link>
+                  <span className="block text-zinc-500 cursor-default">Careers</span>
+                  <span className="block text-zinc-500 cursor-default">Press</span>
+                </div>
               </div>
               <div>
                 <div className="text-white/60 font-semibold uppercase tracking-widest text-[10px] mb-3">Legal</div>

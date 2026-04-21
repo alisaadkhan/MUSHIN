@@ -21,6 +21,14 @@ export async function enforceBudgetKillSwitch(
   estimatedCost: number
 ): Promise<Response | null> {
   try {
+    // Hard kill-switch for expensive endpoints (server-side only).
+    if (Deno.env.get("KILL_SWITCH_EXPENSIVE_ENDPOINTS") === "true") {
+      return new Response(
+        JSON.stringify({ error: "Service temporarily unavailable.", code: "KILL_SWITCH" }),
+        { status: 503, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     // Attempting to fetch cost metrics 
     const { data, error } = await supabaseAdmin
       .from('workspaces') // or workspace_billing depending on schema
@@ -30,8 +38,13 @@ export async function enforceBudgetKillSwitch(
 
     if (error) {
        console.error("Budget check error:", error);
-       // Fail open if workspace billing info is missing in current schema iteration
-       return null;
+       // SECURITY: Fail CLOSED in production for expensive endpoints.
+       const isDev = Deno.env.get("ENVIRONMENT") === "development";
+       if (isDev) return null;
+       return new Response(
+         JSON.stringify({ error: "Service temporarily unavailable.", code: "BUDGET_CHECK_UNAVAILABLE" }),
+         { status: 503, headers: { "Content-Type": "application/json" } },
+       );
     }
 
     // Example naive budget logic. In a real system you'd read `spent_this_month` vs `budget_cap`.
@@ -53,6 +66,11 @@ export async function enforceBudgetKillSwitch(
     return null;
   } catch (err) {
     console.error("Budget verification crash:", err);
-    return null; // fail-open so apps don't crash hard if billing lookup times out
+    const isDev = Deno.env.get("ENVIRONMENT") === "development";
+    if (isDev) return null;
+    return new Response(
+      JSON.stringify({ error: "Service temporarily unavailable.", code: "BUDGET_CHECK_FAILED" }),
+      { status: 503, headers: { "Content-Type": "application/json" } },
+    );
   }
 }
