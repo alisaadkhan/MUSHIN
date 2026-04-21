@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { MushInLogo } from '@/components/ui/MushInLogo';
 import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
+import { authRememberMe } from '@/integrations/supabase/client';
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_DISABLE_CAPTCHA === 'true'
   ? ''
@@ -61,6 +62,7 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => authRememberMe.get());
   const [captchaToken, setCaptchaToken] = useState('');
   const [captchaError, setCaptchaError] = useState('');
   const turnstileRef = useRef<TurnstileInstance>(null);
@@ -81,6 +83,8 @@ export default function Auth() {
     setLoading(true);
 
     try {
+      authRememberMe.set(rememberMe);
+
       if (TURNSTILE_SITE_KEY && !captchaToken) {
         throw new Error('Please complete the security check.');
       }
@@ -179,6 +183,7 @@ export default function Auth() {
         <form onSubmit={handleSubmit} className="space-y-3">
           <AuthInput
             type="email"
+            name="email"
             placeholder="Email address"
             value={email}
             onChange={e => setEmail(e.target.value)}
@@ -190,6 +195,7 @@ export default function Auth() {
           {mode !== 'forgot' && (
             <AuthInput
               type={showPw ? 'text' : 'password'}
+              name="password"
               placeholder="Password"
               value={password}
               onChange={e => setPassword(e.target.value)}
@@ -252,7 +258,16 @@ export default function Auth() {
           )}
 
           {mode === 'signin' && (
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 text-[12px] text-white/35 select-none cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 rounded border border-white/15 bg-white/5 checked:bg-purple-500 checked:border-purple-500"
+                />
+                Remember me
+              </label>
               <button
                 type="button"
                 onClick={() => setMode('forgot')}
@@ -260,6 +275,20 @@ export default function Auth() {
               >
                 Forgot password?
               </button>
+            </div>
+          )}
+
+          {mode === 'signup' && (
+            <div className="flex items-center justify-start">
+              <label className="flex items-center gap-2 text-[12px] text-white/35 select-none cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 rounded border border-white/15 bg-white/5 checked:bg-purple-500 checked:border-purple-500"
+                />
+                Remember me
+              </label>
             </div>
           )}
 

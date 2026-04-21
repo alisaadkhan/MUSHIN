@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff, Loader2, ShieldAlert, Headphones } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { authRememberMe } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { MushInLogo } from "@/components/ui/MushInLogo";
 
@@ -40,6 +41,7 @@ export default function StaffLogin() {
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => authRememberMe.get());
 
   useEffect(() => {
     // If already authenticated, route based on role
@@ -62,6 +64,7 @@ export default function StaffLogin() {
     e.preventDefault();
     setLoading(true);
     try {
+      authRememberMe.set(rememberMe);
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
 
@@ -145,6 +148,7 @@ export default function StaffLogin() {
         <form onSubmit={handleSubmit} className="space-y-3">
           <StaffInput
             type="email"
+            name="email"
             placeholder={mode === "support" ? "Support email" : "Admin email"}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -155,6 +159,7 @@ export default function StaffLogin() {
 
           <StaffInput
             type={showPw ? "text" : "password"}
+            name="password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -172,6 +177,18 @@ export default function StaffLogin() {
               </button>
             }
           />
+
+          <div className="flex items-center justify-between pt-1">
+            <label className="flex items-center gap-2 text-[12px] text-white/35 select-none cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 rounded border border-white/15 bg-white/5 checked:bg-white checked:border-white"
+              />
+              Remember me
+            </label>
+          </div>
 
           <button
             type="submit"

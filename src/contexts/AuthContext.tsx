@@ -74,6 +74,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let lastTokenRefreshAt = 0;
 
+    // Hydrate immediately (removes "wait a few seconds then it works" on first load)
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        setSession(data.session);
+        setUser(data.session.user);
+      }
+      setLoading(false);
+    }).catch(() => setLoading(false));
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         if (event === 'SIGNED_OUT') {

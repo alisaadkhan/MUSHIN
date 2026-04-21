@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import {
   Search, UserX, UserCheck, Key, Shield, Loader2,
@@ -217,6 +218,7 @@ function CreateUserDialog({ onClose, onSuccess }: CreateUserDialogProps) {
 
 /* ── Main Page ──────────────────────────────────────────────── */
 export default function AdminUsers() {
+  const { session } = useAuth();
   const perms = useAdminPermissions();
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -235,6 +237,7 @@ export default function AdminUsers() {
       if (data?.error) throw new Error(data.error);
       return data.users ?? [];
     },
+    enabled: !!session?.access_token,
     staleTime: 30_000,
     retry: false,
   });

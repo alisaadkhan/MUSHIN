@@ -20,14 +20,83 @@ if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
+const REMEMBER_ME_KEY = 'mushin.rememberMe';
+
+function getRememberMePref(): boolean {
+  if (typeof window === 'undefined') return true;
+  const v = window.localStorage.getItem(REMEMBER_ME_KEY);
+  // Default to "remember me" = true (best UX; matches Supabase default behaviour).
+  if (v == null) return true;
+  return v === 'true';
+}
+
+function setRememberMePref(remember: boolean) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(REMEMBER_ME_KEY, remember ? 'true' : 'false');
+}
+
+// Auth storage that dynamically routes to localStorage (remember=true)
+// or sessionStorage (remember=false).
+const dynamicAuthStorage: Storage = {
+  get length() {
+    try {
+      return (getRememberMePref() ? window.localStorage : window.sessionStorage).length;
+    } catch {
+      return 0;
+    }
+  },
+  clear() {
+    (getRememberMePref() ? window.localStorage : window.sessionStorage).clear();
+  },
+  getItem(key: string) {
+    try {
+      return (getRememberMePref() ? window.localStorage : window.sessionStorage).getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  key(index: number) {
+    try {
+      return (getRememberMePref() ? window.localStorage : window.sessionStorage).key(index);
+    } catch {
+      return null;
+    }
+  },
+  removeItem(key: string) {
+    try {
+      // Remove from both to avoid "ghost" sessions when toggling.
+      window.localStorage.removeItem(key);
+      window.sessionStorage.removeItem(key);
+    } catch {
+      // ignore
+    }
+  },
+  setItem(key: string, value: string) {
+    try {
+      // Write only to the chosen storage; clear the other to avoid conflicts.
+      const target = getRememberMePref() ? window.localStorage : window.sessionStorage;
+      const other = getRememberMePref() ? window.sessionStorage : window.localStorage;
+      other.removeItem(key);
+      target.setItem(key, value);
+    } catch {
+      // ignore
+    }
+  },
+};
+
 export const supabase = createClient<Database>(
   SUPABASE_URL,
   SUPABASE_PUBLISHABLE_KEY,
   {
     auth: {
-      storage: localStorage,
+      storage: typeof window === 'undefined' ? undefined : dynamicAuthStorage,
       persistSession: true,
       autoRefreshToken: true,
     },
   }
 );
+
+export const authRememberMe = {
+  get: getRememberMePref,
+  set: setRememberMePref,
+};
