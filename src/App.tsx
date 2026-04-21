@@ -38,6 +38,7 @@ const PrivacyPage          = lazy(() => import("./pages/PrivacyPage"));
 const TermsPage            = lazy(() => import("./pages/TermsPage"));
 const CookiePolicyPage     = lazy(() => import("./pages/CookiePolicyPage"));
 const RefundPolicyPage     = lazy(() => import("./pages/RefundPolicyPage"));
+const PricingPage          = lazy(() => import("./pages/PricingPage"));
 const SaaSSubscriptionPage = lazy(() => import('./pages/SaaSSubscriptionPage'));
 const EulaPage             = lazy(() => import('./pages/EulaPage'));
 const DpaPage              = lazy(() => import('./pages/DpaPage'));
@@ -130,6 +131,7 @@ const App = () => {
                   <Route path="/billing" element={<ProtectedPage><BillingPage /></ProtectedPage>} />
                   <Route path="/analytics" element={<ProtectedPage><AnalyticsPage /></ProtectedPage>} />
                   <Route path="/about" element={<AboutPage />} />
+                  <Route path="/pricing" element={<PricingPage />} />
                   <Route path="/privacy" element={<PrivacyPage />} />
                   <Route path="/terms" element={<TermsPage />} />
                   <Route path="/cookies" element={<CookiePolicyPage />} />
