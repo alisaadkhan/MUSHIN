@@ -38,19 +38,19 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.admin-list-users]
-verify_jwt = true
+verify_jwt = false
 
 [functions.admin-suspend-user]
-verify_jwt = true
+verify_jwt = false
 
 [functions.admin-adjust-credits]
-verify_jwt = true
+verify_jwt = false
 
 [functions.admin-promote-user]
-verify_jwt = true
+verify_jwt = false
 
 [functions.admin-audit-log]
-verify_jwt = true
+verify_jwt = false
 
 [functions.enrich-influencer]
 verify_jwt = true
