@@ -51,10 +51,15 @@ export async function invokeEdgeAuthed<T = any>(
   }
 
   if (!res.ok) {
+    const fallbackMsg =
+      (typeof json?.error === "string" && json.error.trim() ? json.error : null) ??
+      (text?.trim() ? text.trim().slice(0, 280) : null) ??
+      `Edge Function error (${res.status})`;
+
     return {
       data: null as unknown as T,
       error: {
-        message: json?.error ?? `Edge Function error (${res.status})`,
+        message: fallbackMsg,
         status: res.status,
         context: { status: res.status, body: json },
       },

@@ -151,7 +151,12 @@ Deno.serve(async (req) => {
     } catch (err: any) {
         const msg = (err instanceof Error ? err.message : String(err ?? "")).toLowerCase();
         const status =
-          msg.includes("unauthorized") ? 401 :
+          msg.includes("unauthorized") ||
+          msg.includes("missing authorization") ||
+          msg.includes("invalid authorization") ||
+          msg.includes("empty bearer token") ||
+          msg.includes("expired session token") ||
+          msg.includes("invalid or expired session token") ? 401 :
           msg.includes("forbidden") ? 403 :
           500;
         // For auth/permission errors it's safe (and useful) to return a specific message,
