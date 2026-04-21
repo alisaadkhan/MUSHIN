@@ -65,8 +65,23 @@ Deno.serve(async (req) => {
     }
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!authHeader) {
+        return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+    }
+    if (!authHeader.startsWith("Bearer ")) {
+        return new Response(JSON.stringify({ error: "Invalid Authorization scheme" }), {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+    }
+    if (authHeader.length <= "Bearer ".length) {
+        return new Response(JSON.stringify({ error: "Empty Bearer token" }), {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
     }
 
     try {
