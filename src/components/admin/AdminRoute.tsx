@@ -41,29 +41,8 @@ export function AdminRoute({ children, requiredPermission }: AdminRouteProps) {
     const authAt = useMemo(() => readTs("admin_auth_at"), [user?.id]);
     const lastActivity = useMemo(() => readTs("admin_last_activity"), [user?.id]);
 
-    if (authLoading || perms.isLoading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-[#070707]">
-                <div className="flex flex-col items-center gap-3">
-                    <div className="h-8 w-8 rounded-full border-2 border-violet-500 border-t-transparent animate-spin" />
-                    <p className="text-muted-foreground text-sm">Checking permissions…</p>
-                </div>
-            </div>
-        );
-    }
-
-    // No active session → force staff login so edge functions get a real JWT.
-    if (!user) {
-        return <Navigate to="/admin/login" replace />;
-    }
-
-    if (!perms.isAnyAdmin) {
-        return <Navigate to="/dashboard" replace />;
-    }
-
-    // Admin-only "re-auth" policy:
-    // - After 2 minutes of inactivity: lock the admin area (local sign-out → requires password).
-    // - After 10 minutes since last admin unlock: global sign-out (all devices), then require password.
+    // Admin-only "re-auth" policy MUST be registered unconditionally (hooks rule).
+    // All runtime gating happens inside the effect body.
     useEffect(() => {
         if (!user || !perms.isAnyAdmin) return;
 
@@ -136,6 +115,26 @@ export function AdminRoute({ children, requiredPermission }: AdminRouteProps) {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.id, perms.isAnyAdmin, authAt, location.pathname]);
+
+    if (authLoading || perms.isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[#070707]">
+                <div className="flex flex-col items-center gap-3">
+                    <div className="h-8 w-8 rounded-full border-2 border-violet-500 border-t-transparent animate-spin" />
+                    <p className="text-muted-foreground text-sm">Checking permissions…</p>
+                </div>
+            </div>
+        );
+    }
+
+    // No active session → force staff login so edge functions get a real JWT.
+    if (!user) {
+        return <Navigate to="/admin/login" replace />;
+    }
+
+    if (!perms.isAnyAdmin) {
+        return <Navigate to="/dashboard" replace />;
+    }
 
     if (locked) {
         return <Navigate to="/admin/login" replace />;

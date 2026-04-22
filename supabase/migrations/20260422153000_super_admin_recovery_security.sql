@@ -21,10 +21,7 @@ BEGIN;
 -- 1) PITR readiness documentation (Supabase manages WAL/PITR at the platform level)
 -- ----------------------------------------------------------------------------
 COMMENT ON SCHEMA public IS
-  'Recovery notes: Supabase PITR uses WAL-based backups (platform feature). ' ||
-  'For full DB rewind, use Supabase Dashboard PITR/backup restore to a timestamp. ' ||
-  'For targeted rollback of critical tables, use `public.restore_table_to_timestamp(...)` ' ||
-  '(super_admin only), which replays table history tables created by this migration.';
+  'Recovery notes: Supabase PITR uses WAL-based backups (platform feature). For full DB rewind, use Supabase Dashboard PITR/backup restore to a timestamp. For targeted rollback of critical tables, use public.restore_table_to_timestamp(...) (super_admin only), which replays table history tables created by this migration.';
 
 -- ----------------------------------------------------------------------------
 -- 2) Super-admin predicate (do not assume system_admin implies super_admin)
@@ -87,8 +84,7 @@ ALTER TABLE public.audit_logs
   ADD COLUMN IF NOT EXISTS new_data jsonb;
 
 COMMENT ON COLUMN public.audit_logs.action IS
-  'Action name. For trigger-based table auditing this stores TG_OP (INSERT/UPDATE/DELETE). ' ||
-  'For application-level events (LOGIN, credits.adjust, etc.) this may store a domain action.';
+  'Action name. For trigger-based table auditing this stores TG_OP (INSERT/UPDATE/DELETE). For application-level events (LOGIN, credits.adjust, etc.) this may store a domain action.';
 
 COMMENT ON COLUMN public.audit_logs.table_name IS
   'When present, the audited table name for trigger-based auditing.';

@@ -6,7 +6,7 @@ import { useAdminPermissions } from "@/hooks/useAdminPermissions";
 
 /**
  * SupportRoute — allows access only if the authenticated user holds
- * a staff system role ('support', 'admin', 'super_admin', 'system_admin').
+ * a staff system role ('support_staff' or legacy 'support', plus admin roles).
  * Unauthenticated users are sent to /support/login.
  * Authenticated users without the required role are sent to /dashboard.
  */
@@ -30,7 +30,7 @@ export function SupportRoute({ children }: { children: ReactNode }) {
   }
 
   const role = perms.role ?? "";
-  const hasAccess = ["support", "admin", "super_admin", "system_admin"].includes(role);
+  const hasAccess = ["support_staff", "support", "admin", "super_admin", "system_admin"].includes(role);
 
   if (!hasAccess) {
     return <Navigate to="/dashboard" replace />;

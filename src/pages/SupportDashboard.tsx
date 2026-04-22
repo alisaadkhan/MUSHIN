@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Search,
@@ -198,16 +197,11 @@ export default function SupportDashboard() {
     setSelected(null);
 
     try {
-      const { data, error } = await supabase.rpc("support_lookup_user", { p_email: `%${query.trim()}%` });
+      const { data, error } = await invokeEdgeAuthed<{ users: UserRecord[] }>("support-users-search", {
+        body: { query: query.trim() },
+      } as any);
       if (error) throw error;
-      setResults((data as UserRecord[]) ?? []);
-
-      // Log the support action
-      await supabase.from("support_actions_log").insert({
-        support_id: user!.id,
-        action: "user_lookup",
-        metadata: { query: query.trim(), result_count: (data as any[])?.length ?? 0 },
-      });
+      setResults(((data as any)?.users ?? []) as UserRecord[]);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Lookup failed";
       toast({ title: "Search failed", description: msg, variant: "destructive" });
@@ -219,43 +213,25 @@ export default function SupportDashboard() {
 
   const handleViewUser = async (record: UserRecord) => {
     setSelected(record);
-    // Log user view
-    await supabase.from("support_actions_log").insert({
-      support_id: user!.id,
-      action: "view_user",
-      target_user_id: record.id,
-      metadata: { email: record.email },
-    });
+    // Logged server-side by support APIs; keep UI non-blocking.
   };
 
   const handleSignOut = async () => {
     await signOut();
   };
 
-  const logSupportAction = async (action: string, targetUserId?: string | null, metadata?: Record<string, unknown>) => {
-    try {
-      if (!user) return;
-      await supabase.from("support_actions_log").insert({
-        support_id: user.id,
-        action,
-        target_user_id: targetUserId ?? null,
-        metadata: metadata ?? {},
-      });
-    } catch {
-      // best-effort: logging should never block the UI
-    }
+  const logSupportAction = async () => {
+    // Deprecated: support panel uses edge APIs that log server-side.
   };
 
   const { data: recentTickets = [], isLoading: ticketsLoading, error: ticketsError } = useQuery<any[]>({
     queryKey: ["support-recent-tickets"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("support_tickets")
-        .select("id,ticket_number,subject,status,priority,created_at,user_id")
-        .order("created_at", { ascending: false })
-        .limit(50);
+      const { data, error } = await invokeEdgeAuthed<{ tickets: any[] }>("support-tickets", {
+        body: { action: "list", status: "all", limit: 50 },
+      } as any);
       if (error) throw error;
-      return data ?? [];
+      return ((data as any)?.tickets ?? []) as any[];
     },
     staleTime: 15_000,
     retry: false,
@@ -270,15 +246,11 @@ export default function SupportDashboard() {
   const { data: inboxTickets = [], isLoading: inboxLoading, error: inboxError, refetch: refetchInbox } = useQuery<TicketRow[]>({
     queryKey: ["support-inbox", inboxFilter],
     queryFn: async () => {
-      let q = supabase
-        .from("support_tickets")
-        .select("*, profiles!user_id(full_name)")
-        .order("created_at", { ascending: false })
-        .limit(200);
-      if (inboxFilter !== "all") q = q.eq("status", inboxFilter);
-      const { data, error } = await q;
+      const { data, error } = await invokeEdgeAuthed<{ tickets: TicketRow[] }>("support-tickets", {
+        body: { action: "list", status: inboxFilter, limit: 200 },
+      } as any);
       if (error) throw error;
-      return (data ?? []) as TicketRow[];
+      return (((data as any)?.tickets ?? []) as TicketRow[]) ?? [];
     },
     enabled: !!supportPerms?.canViewTickets,
     staleTime: 15_000,
@@ -310,13 +282,19 @@ export default function SupportDashboard() {
   const { data: ticketReplies = [], isLoading: repliesLoading } = useQuery<TicketReplyRow[]>({
     queryKey: ["support-ticket-replies", expandedTicket],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("support_ticket_replies")
-        .select("*")
-        .eq("ticket_id", expandedTicket!)
-        .order("created_at", { ascending: true });
+      const { data, error } = await invokeEdgeAuthed<{ messages: any[] }>("support-tickets", {
+        body: { action: "messages", ticket_id: expandedTicket! },
+      } as any);
       if (error) throw error;
-      return (data ?? []) as TicketReplyRow[];
+      // Map new support_messages shape into the existing UI shape (is_admin inferred).
+      return (((data as any)?.messages ?? []) as any[]).map((m) => ({
+        id: m.id,
+        ticket_id: m.ticket_id,
+        author_id: m.author_id,
+        is_admin: m.visibility !== "user",
+        body: m.body,
+        created_at: m.created_at,
+      })) as TicketReplyRow[];
     },
     enabled: !!expandedTicket && !!supportPerms?.canViewTickets,
     staleTime: 15_000,
@@ -326,16 +304,8 @@ export default function SupportDashboard() {
   const { data: staff = [] } = useQuery<Array<{ id: string; full_name: string | null }>>({
     queryKey: ["support-staff-directory"],
     queryFn: async () => {
-      const { data: roles, error } = await supabase
-        .from("user_roles")
-        .select("user_id, role")
-        .in("role", ["support", "admin", "super_admin", "system_admin"]);
-      if (error) throw error;
-      const ids = Array.from(new Set((roles ?? []).map((r: any) => r.user_id).filter(Boolean)));
-      if (ids.length === 0) return [];
-      const { data: profiles, error: pErr } = await supabase.from("profiles").select("id, full_name").in("id", ids);
-      if (pErr) throw pErr;
-      return (profiles ?? []) as any;
+      // TODO: expose a dedicated edge endpoint for staff directory.
+      return [];
     },
     enabled: !!supportPerms?.canAssignTickets,
     staleTime: 60_000,
@@ -350,9 +320,10 @@ export default function SupportDashboard() {
   const updateTicket = async (ticketId: string, updates: Partial<TicketRow>, action: string, meta?: Record<string, unknown>) => {
     setUpdatingTicket(ticketId);
     try {
-      const { error } = await supabase.from("support_tickets").update(updates as any).eq("id", ticketId);
+      const { error } = await invokeEdgeAuthed("support-tickets", {
+        body: { action: "update", ticket_id: ticketId, updates, reason: action },
+      } as any);
       if (error) throw error;
-      await logSupportAction(action, (expanded?.user_id ?? null) as any, { ticket_id: ticketId, ...meta });
       await refetchInbox();
       toast({ title: "Updated" });
     } catch (err: any) {
@@ -387,15 +358,15 @@ export default function SupportDashboard() {
     }
     setSavingNote(true);
     try {
-      const { error } = await supabase
-        .from("support_tickets")
-        .update({ admin_notes: internalNoteDraft.trim() || null })
-        .eq("id", expanded.id);
+      const { error } = await invokeEdgeAuthed("support-tickets", {
+        body: {
+          action: "post_message",
+          ticket_id: expanded.id,
+          visibility: "internal",
+          body: internalNoteDraft.trim(),
+        },
+      } as any);
       if (error) throw error;
-      await logSupportAction("ticket_internal_note", expanded.user_id, {
-        ticket_id: expanded.id,
-        len: internalNoteDraft.trim().length,
-      });
       await refetchInbox();
       toast({ title: "Internal note saved" });
     } catch (err: any) {
@@ -410,15 +381,15 @@ export default function SupportDashboard() {
     if (!replyDraft.trim()) return;
     setSavingReply(true);
     try {
-      const { error } = await supabase.from("support_ticket_replies").insert({
-        ticket_id: expanded.id,
-        author_id: user!.id,
-        body: replyDraft.trim(),
-        is_admin: true,
-      });
+      const { error } = await invokeEdgeAuthed("support-tickets", {
+        body: {
+          action: "post_message",
+          ticket_id: expanded.id,
+          visibility: "user",
+          body: replyDraft.trim(),
+        },
+      } as any);
       if (error) throw error;
-
-      await logSupportAction("ticket_reply", expanded.user_id, { ticket_id: expanded.id });
       setReplyDraft("");
       await refetchInbox();
       toast({ title: "Reply sent" });
