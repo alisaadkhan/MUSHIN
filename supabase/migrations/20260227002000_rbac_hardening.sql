@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS user_roles (
   role        text        NOT NULL,
   UNIQUE (user_id, role)
 );
-
 DO $$ 
 BEGIN 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='user_roles' AND column_name='granted_by') THEN
@@ -39,9 +38,7 @@ BEGIN
     ALTER TABLE public.profiles ADD COLUMN email text;
   END IF;
 END $$;
-
 ALTER TABLE user_roles ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "superadmin_read_roles" ON user_roles;
 CREATE POLICY "superadmin_read_roles" ON user_roles
   FOR SELECT TO authenticated
@@ -54,7 +51,6 @@ CREATE POLICY "superadmin_read_roles" ON user_roles
       AND ur2.revoked_at IS NULL
     )
   );
-
 DROP POLICY IF EXISTS "superadmin_grant_roles" ON user_roles;
 CREATE POLICY "superadmin_grant_roles" ON user_roles
   FOR INSERT TO authenticated
@@ -66,7 +62,6 @@ CREATE POLICY "superadmin_grant_roles" ON user_roles
       AND ur2.revoked_at IS NULL
     )
   );
-
 DROP POLICY IF EXISTS "superadmin_revoke_roles" ON user_roles;
 CREATE POLICY "superadmin_revoke_roles" ON user_roles
   FOR UPDATE TO authenticated
@@ -79,7 +74,6 @@ CREATE POLICY "superadmin_revoke_roles" ON user_roles
     )
   )
   WITH CHECK (true);
-
 CREATE OR REPLACE FUNCTION get_my_role()
 RETURNS text LANGUAGE plpgsql SECURITY DEFINER STABLE AS $$
 DECLARE
@@ -102,7 +96,6 @@ BEGIN
   RETURN COALESCE(v_role, 'user');
 END;
 $$;
-
 CREATE TABLE IF NOT EXISTS user_suspensions (
   id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id       uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
@@ -112,9 +105,7 @@ CREATE TABLE IF NOT EXISTS user_suspensions (
   lifted_at     timestamptz,
   lift_reason   text
 );
-
 ALTER TABLE user_suspensions ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "admin_manage_suspensions" ON user_suspensions;
 CREATE POLICY "admin_manage_suspensions" ON user_suspensions
   FOR ALL TO authenticated
@@ -126,12 +117,10 @@ CREATE POLICY "admin_manage_suspensions" ON user_suspensions
       AND revoked_at IS NULL
     )
   );
-
 DROP POLICY IF EXISTS "user_read_own_suspension" ON user_suspensions;
 CREATE POLICY "user_read_own_suspension" ON user_suspensions
   FOR SELECT TO authenticated
   USING (user_id = auth.uid());
-
 CREATE TABLE IF NOT EXISTS revoked_sessions (
   id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id       uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -139,9 +128,7 @@ CREATE TABLE IF NOT EXISTS revoked_sessions (
   reason        text,
   revoked_at    timestamptz NOT NULL DEFAULT now()
 );
-
 ALTER TABLE revoked_sessions ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "admin_manage_revocations" ON revoked_sessions;
 CREATE POLICY "admin_manage_revocations" ON revoked_sessions
   FOR ALL TO authenticated
@@ -153,7 +140,5 @@ CREATE POLICY "admin_manage_revocations" ON revoked_sessions
       AND revoked_at IS NULL
     )
   );
-
 CREATE INDEX IF NOT EXISTS idx_user_roles_user_id ON user_roles (user_id, revoked_at);
 CREATE INDEX IF NOT EXISTS idx_user_suspensions_user_id ON user_suspensions (user_id);
-

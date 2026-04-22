@@ -6,7 +6,6 @@
 
 -- 1. Extensions
 CREATE EXTENSION IF NOT EXISTS "vector";
-
 -- 2. influencer_profiles
 CREATE TABLE IF NOT EXISTS public.influencer_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -43,7 +42,6 @@ CREATE TABLE IF NOT EXISTS public.influencer_profiles (
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE(platform, username)
 );
-
 -- 3. influencer_posts
 CREATE TABLE IF NOT EXISTS public.influencer_posts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -59,7 +57,6 @@ CREATE TABLE IF NOT EXISTS public.influencer_posts (
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE(profile_id, platform_post_id)
 );
-
 -- 4. follower_history
 CREATE TABLE IF NOT EXISTS public.follower_history (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -67,7 +64,6 @@ CREATE TABLE IF NOT EXISTS public.follower_history (
   follower_count bigint NOT NULL,
   recorded_at timestamptz DEFAULT now()
 );
-
 -- 5. linked_accounts
 CREATE TABLE IF NOT EXISTS public.linked_accounts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -81,7 +77,6 @@ CREATE TABLE IF NOT EXISTS public.linked_accounts (
   created_at timestamptz DEFAULT now(),
   UNIQUE(profile_id_a, platform_b, username_b)
 );
-
 -- 6. Basic Indexes
 CREATE INDEX IF NOT EXISTS idx_ip_platform_username ON public.influencer_profiles(platform, username);
 CREATE INDEX IF NOT EXISTS idx_ip_primary_niche ON public.influencer_profiles(primary_niche);

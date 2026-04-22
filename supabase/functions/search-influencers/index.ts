@@ -14,6 +14,7 @@ import { expandSerperQueries, extractContactEmail, detectSocialLinks } from "../
 import { extractInstagramFollowers, extractInstagramEngagement } from "../_shared/instagram.ts";
 import { extractTikTokFollowers, extractTikTokEngagement } from "../_shared/tiktok.ts";
 import { extractYouTubeSubscribers, fetchYouTubeSubscriberCount, extractYouTubeProfileImage } from "../_shared/youtube.ts";
+import { logUserActivity } from "../_shared/activity_logger.ts";
 const YOUTUBE_API_KEY = Deno.env.get("YOUTUBE_API_KEY");
 let redis: Redis | null = null;
 if (Deno.env.get("UPSTASH_REDIS_REST_URL") && Deno.env.get("UPSTASH_REDIS_REST_TOKEN")) {
@@ -148,6 +149,53 @@ Deno.serve(async (req) => {
     const idempotencyKey = getIdempotencyKey(req);
     let remainingCredits: number | null = null;
 
+    async function ensureSearchCreditsOrThrow(args: { query: string; platform: string; location: string | null; followerRange: string | null; engagementRange: string | null }) {
+      if (callerIsSuperAdmin) return;
+      const { data: bal, error: balErr } = await serviceClient.rpc("get_user_credit_balance", {
+        p_user_id: userData.user.id,
+        p_workspace_id: workspaceId,
+        p_credit_type: "search",
+      });
+      if (balErr) throw balErr;
+      if (Number(bal ?? 0) < 1) {
+        const e: any = new Error("Insufficient credits");
+        e.code = "insufficient_credits";
+        throw e;
+      }
+    }
+
+    async function debitSearchCredit(args: { query: string; platform: string; location: string | null; followerRange: string | null; engagementRange: string | null; source: "cache" | "db" | "serper"; resultCount: number }) {
+      if (callerIsSuperAdmin) return;
+      const { data: debitRes, error: debitErr } = await serviceClient.rpc("consume_user_credits", {
+        p_user_id: userData.user.id,
+        p_workspace_id: workspaceId,
+        p_credit_type: "search",
+        p_amount: 1,
+        p_action: "search",
+        p_idempotency_key: `search-influencers:${idempotencyKey}`,
+        p_metadata: {
+          endpoint: "search-influencers",
+          query: args.query,
+          platform: args.platform,
+          location: args.location,
+          follower_range: args.followerRange,
+          engagement_range: args.engagementRange,
+          source: args.source,
+          result_count: args.resultCount,
+        },
+      });
+      if (debitErr) {
+        console.error("[search-influencers] credit debit error:", debitErr);
+        throw debitErr;
+      }
+      if (!debitRes?.success) {
+        const e: any = new Error("Insufficient credits");
+        e.code = "insufficient_credits";
+        throw e;
+      }
+      remainingCredits = typeof debitRes?.balance_after === "number" ? debitRes.balance_after : null;
+    }
+
     // 1. Behavioral Anomaly Detection
     // If a workspace does more than 30 searches in 5 minutes, flag as anomalous
     const fiveMinsAgo = new Date(Date.now() - 5 * 60000).toISOString();
@@ -178,36 +226,14 @@ Deno.serve(async (req) => {
     const location = typeof rawLocation === "string"
       ? rawLocation.replace(/[^a-zA-Z\s-]/g, "").trim().slice(0, 50)
       : "";
-
-    // Ledger-only credit debit (single source of truth)
-    if (!callerIsSuperAdmin) {
-      const { data: debitRes, error: debitErr } = await serviceClient.rpc("consume_user_credits", {
-        p_user_id: userData.user.id,
-        p_workspace_id: workspaceId,
-        p_credit_type: "search",
-        p_amount: 1,
-        p_action: "search",
-        p_idempotency_key: `search-influencers:${idempotencyKey}`,
-        p_metadata: {
-          endpoint: "search-influencers",
-          query,
-          platform,
-          location: location || null,
-          follower_range: followerRange ?? null,
-          engagement_range: engagementRange ?? null,
-        },
-      });
-      if (debitErr) {
-        console.error("[search-influencers] credit debit error:", debitErr);
-        return new Response(JSON.stringify({ error: "Credit system unavailable" }),
-          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      if (!debitRes?.success) {
-        return new Response(JSON.stringify({ error: "Insufficient credits", code: "insufficient_credits" }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      remainingCredits = typeof debitRes?.balance_after === "number" ? debitRes.balance_after : null;
-    }
+    // Credit gate (no deduction yet): prevent wasted work when balance is 0.
+    await ensureSearchCreditsOrThrow({
+      query,
+      platform,
+      location: location || null,
+      followerRange: followerRange ?? null,
+      engagementRange: engagementRange ?? null,
+    });
 
     const cacheKey = `search:${query.toLowerCase().trim()}:${platform}:${location || "any"}:${followerRange || "any"}`;
     if (redis) {
@@ -219,6 +245,23 @@ Deno.serve(async (req) => {
             action: "search", admin_user_id: userData.user.id,
             details: { query, platform, location, latency_ms: Math.round(t1 - t0), cached: true }
           }); // { error } silently ignored ΓÇö audit log best-effort
+          await debitSearchCredit({
+            query,
+            platform,
+            location: location || null,
+            followerRange: followerRange ?? null,
+            engagementRange: engagementRange ?? null,
+            source: "cache",
+            resultCount: Array.isArray(cached) ? cached.length : 0,
+          });
+          await logUserActivity({
+            req,
+            userId: userData.user.id,
+            workspaceId: workspaceId as string,
+            actionType: "search_run",
+            status: "success",
+            metadata: { module: "search-influencers", source: "cache", query, platform, location: location || null },
+          });
           return new Response(JSON.stringify({ results: cached, cached: true }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
@@ -388,6 +431,23 @@ Deno.serve(async (req) => {
           redis.set(cacheKey, JSON.stringify(scoredDbResults), { ex: 1800 }).catch(() => null);
         }
 
+        await debitSearchCredit({
+          query,
+          platform,
+          location: location || null,
+          followerRange: followerRange ?? null,
+          engagementRange: engagementRange ?? null,
+          source: "db",
+          resultCount: scoredDbResults.length,
+        });
+        await logUserActivity({
+          req,
+          userId: userData.user.id,
+          workspaceId: workspaceId as string,
+          actionType: "search_run",
+          status: "success",
+          metadata: { module: "search-influencers", source: "db", query, platform, location: location || null, result_count: scoredDbResults.length },
+        });
         return new Response(
           JSON.stringify({
             results: scoredDbResults,
@@ -1127,6 +1187,23 @@ Deno.serve(async (req) => {
       details: { query, platform, location, latency_ms: Math.round(t1 - t0), result_count: enrichedResults.length, cached: false }
     }); // { error } silently ignored
 
+    await debitSearchCredit({
+      query,
+      platform,
+      location: location || null,
+      followerRange: followerRange ?? null,
+      engagementRange: engagementRange ?? null,
+      source: "serper",
+      resultCount: sortedResults.length,
+    });
+    await logUserActivity({
+      req,
+      userId: userData.user.id,
+      workspaceId: workspaceId as string,
+      actionType: "search_run",
+      status: "success",
+      metadata: { module: "search-influencers", source: "serper", query, platform, location: location || null, result_count: sortedResults.length },
+    });
     return new Response(
       JSON.stringify({
         results: sortedResults,
@@ -1145,6 +1222,19 @@ Deno.serve(async (req) => {
     );
 
   } catch (err: any) {
+    if (err?.code === "insufficient_credits") {
+      return new Response(JSON.stringify({ error: "Insufficient credits", code: "insufficient_credits" }),
+        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    // Best-effort activity log on error (avoid leaking internals to user)
+    await logUserActivity({
+      req,
+      userId: null,
+      workspaceId: null,
+      actionType: "search_failed",
+      status: "error",
+      metadata: { module: "search-influencers" },
+    });
     console.error("Unexpected error:", err);
     return new Response(JSON.stringify({ error: "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });

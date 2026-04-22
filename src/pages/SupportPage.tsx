@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { invokeEdgeAuthed } from "@/lib/edge";
 import { LifeBuoy, Plus, X, MessageSquare, Clock, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Send, Loader2 } from "lucide-react";
 
 type TicketStatus = "open" | "in_progress" | "resolved" | "closed";
@@ -113,14 +114,16 @@ export default function SupportPage() {
     }
     setCreating(true);
     try {
-      const { error } = await supabase.from("support_tickets").insert({
-        user_id: user!.id,
-        subject: newSubject.trim(),
-        description: newDescription.trim(),
-        priority: newPriority,
-        category: newCategory,
-      });
+      const { data, error } = await invokeEdgeAuthed("support-create-ticket", {
+        body: {
+          subject: newSubject.trim(),
+          description: newDescription.trim(),
+          priority: newPriority,
+          category: newCategory,
+        },
+      } as any);
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       toast({ title: "Ticket submitted", description: "We'll get back to you within 24 hours." });
       setNewSubject("");
       setNewDescription("");

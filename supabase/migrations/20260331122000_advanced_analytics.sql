@@ -4,7 +4,6 @@
 ALTER TABLE public.profiles
 ADD COLUMN IF NOT EXISTS is_suspicious BOOLEAN DEFAULT FALSE,
 ADD COLUMN IF NOT EXISTS is_restricted BOOLEAN DEFAULT FALSE;
-
 -- 2. Telemetry Tables
 CREATE TABLE IF NOT EXISTS public.user_activity_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -18,7 +17,6 @@ CREATE TABLE IF NOT EXISTS public.user_activity_logs (
     duration_seconds INTEGER,
     timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
 CREATE TABLE IF NOT EXISTS public.api_usage_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
@@ -29,12 +27,10 @@ CREATE TABLE IF NOT EXISTS public.api_usage_logs (
     status_code INTEGER,
     timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
 -- Indexing for Dashboard Performance
 CREATE INDEX IF NOT EXISTS idx_user_activity_user_ts ON public.user_activity_logs(user_id, timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_api_usage_endpoint_ts ON public.api_usage_logs(endpoint, timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_api_usage_workspace ON public.api_usage_logs(workspace_id);
-
 -- 3. Idempotent Refunds
 CREATE TABLE IF NOT EXISTS public.refund_idempotency_keys (
     idempotency_key TEXT PRIMARY KEY,
@@ -42,7 +38,6 @@ CREATE TABLE IF NOT EXISTS public.refund_idempotency_keys (
     refund_type TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
 -- Update restore_ai_credit to support idempotency natively
 CREATE OR REPLACE FUNCTION public.restore_ai_credit(ws_id UUID, i_key TEXT DEFAULT NULL)
 RETURNS void
@@ -70,7 +65,6 @@ BEGIN
     WHERE id = ws_id;
 END;
 $$;
-
 -- Update restore_email_credit to support idempotency
 CREATE OR REPLACE FUNCTION public.restore_email_credit(ws_id UUID, i_key TEXT DEFAULT NULL)
 RETURNS void
@@ -97,12 +91,10 @@ BEGIN
     WHERE id = ws_id;
 END;
 $$;
-
 -- 4. RLS Policies
 ALTER TABLE public.user_activity_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.api_usage_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.refund_idempotency_keys ENABLE ROW LEVEL SECURITY;
-
 -- Service role can do everything
 DROP POLICY IF EXISTS "Service role full access user_activity" ON public.user_activity_logs;
 DROP POLICY IF EXISTS "Service role full access api_usage" ON public.api_usage_logs;
@@ -110,17 +102,14 @@ DROP POLICY IF EXISTS "Service role full access idempotency" ON public.refund_id
 CREATE POLICY "Service role full access user_activity" ON public.user_activity_logs FOR ALL USING (true);
 CREATE POLICY "Service role full access api_usage" ON public.api_usage_logs FOR ALL USING (true);
 CREATE POLICY "Service role full access idempotency" ON public.refund_idempotency_keys FOR ALL USING (true);
-
 -- System admins can read telemetry
 DROP POLICY IF EXISTS "System admins can read user_activity" ON public.user_activity_logs;
 DROP POLICY IF EXISTS "System admins can read api_usage" ON public.api_usage_logs;
 CREATE POLICY "System admins can read user_activity" ON public.user_activity_logs FOR SELECT USING (public.is_system_admin(auth.uid()));
 CREATE POLICY "System admins can read api_usage" ON public.api_usage_logs FOR SELECT USING (public.is_system_admin(auth.uid()));
-
 -- 5. Data Retention pruning via pg_cron
 -- Remove older user activity (90 days) and api usage (30 days) to prevent bloat
 CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA pg_catalog;
-
 DO $do$
 BEGIN
     -- Delete older analytics daily at 3 AM UTC

@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Mail, Lock, Eye, EyeOff, Loader2, ShieldAlert, Headphones } from "lucide-react";
+import { Hash, Mail, Lock, Eye, EyeOff, Loader2, ShieldAlert, Headphones } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { authRememberMe } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { MushInLogo } from "@/components/ui/MushInLogo";
+import { consumePasswordAuthSlot } from "@/lib/authRateLimit";
 
 type PortalMode = "admin" | "support";
+
+const STAFF_EMAIL_DOMAIN = "staff.mushin.local";
 
 function detectModeFromPath(pathname: string): PortalMode {
   if (pathname.startsWith("/support")) return "support";
@@ -37,24 +40,18 @@ export default function StaffLogin() {
   const location = useLocation();
   const mode = detectModeFromPath(location.pathname);
 
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isResetMode, setIsResetMode] = useState(false);
   const [rememberMe, setRememberMe] = useState(() => authRememberMe.get());
 
   useEffect(() => {
-    // If already authenticated, route based on role
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) return;
-      const { data: roleText, error } = await supabase.rpc("get_my_role");
-      if (error || !roleText) return;
-      const role = String(roleText);
-
-      if (role === "support") navigate("/support/dashboard", { replace: true });
-      else navigate("/admin", { replace: true });
-    });
-  }, [navigate]);
+    // Intentionally DO NOT auto-redirect when a session exists.
+    // Staff portals should always require an explicit login action to continue,
+    // otherwise /admin/login and /support/login feel “redirect-y”.
+  }, [navigate, mode]);
 
   const allowedRoles = mode === "support"
     ? ["support", "admin", "super_admin", "system_admin"]
@@ -64,7 +61,25 @@ export default function StaffLogin() {
     e.preventDefault();
     setLoading(true);
     try {
+      const email = mode === "support"
+        ? `${identifier.trim().toLowerCase()}@${STAFF_EMAIL_DOMAIN}`
+        : identifier.trim();
+
+      if (isResetMode) {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/update-password`
+        });
+        if (error) throw error;
+        toast({ title: "Reset link sent", description: "Check your email for instructions." });
+        setIsResetMode(false);
+        return;
+      }
+
       authRememberMe.set(rememberMe);
+
+      const gate = await consumePasswordAuthSlot();
+      if (!gate.ok) throw new Error(gate.message);
+
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
 
@@ -82,11 +97,21 @@ export default function StaffLogin() {
         );
       }
 
+      // Admin portal: start an "admin unlock" timer (used to require re-auth).
+      if (mode === "admin") {
+        try {
+          sessionStorage.setItem("admin_auth_at", String(Date.now()));
+          sessionStorage.setItem("admin_last_activity", String(Date.now()));
+        } catch {
+          // ignore
+        }
+      }
+
       if (role === "support") navigate("/support/dashboard");
       else navigate("/admin");
     } catch (err: any) {
       toast({
-        title: "Access denied",
+        title: isResetMode ? "Error sending reset link" : "Access denied",
         description: err?.message ?? "Invalid credentials.",
         variant: "destructive",
       });
@@ -147,47 +172,68 @@ export default function StaffLogin() {
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <StaffInput
-            type="email"
-            name="email"
-            placeholder={mode === "support" ? "Support email" : "Admin email"}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            type={mode === "support" ? "text" : "email"}
+            name={mode === "support" ? "staffId" : "email"}
+            placeholder={mode === "support" ? "Staff ID" : "Admin email"}
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
             required
-            autoComplete="email"
-            icon={<Mail size={14} />}
+            autoComplete={mode === "support" ? "username" : "email"}
+            icon={mode === "support" ? <Hash size={14} /> : <Mail size={14} />}
           />
 
-          <StaffInput
-            type={showPw ? "text" : "password"}
-            name="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            autoComplete="current-password"
-            icon={<Lock size={14} />}
-            right={
-              <button
-                type="button"
-                onClick={() => setShowPw((v) => !v)}
-                className="text-white/25 hover:text-white/50 transition-colors"
-                tabIndex={-1}
-              >
-                {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-            }
-          />
+          {!isResetMode && (
+            <StaffInput
+              type={showPw ? "text" : "password"}
+              name="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+              icon={<Lock size={14} />}
+              right={
+                <button
+                  type="button"
+                  onClick={() => setShowPw((v) => !v)}
+                  className="text-white/25 hover:text-white/50 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              }
+            />
+          )}
 
           <div className="flex items-center justify-between pt-1">
-            <label className="flex items-center gap-2 text-[12px] text-white/35 select-none cursor-pointer">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="h-4 w-4 rounded border border-white/15 bg-white/5 checked:bg-white checked:border-white"
-              />
-              Remember me
-            </label>
+            {!isResetMode ? (
+              <>
+                <label className="flex items-center gap-2 text-[12px] text-white/35 select-none cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="h-4 w-4 rounded border border-white/15 bg-white/5 checked:bg-white checked:border-white"
+                  />
+                  Remember me
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsResetMode(true)}
+                  className="text-[12px] text-white/35 hover:text-white/60 transition-colors"
+                >
+                  Forgot password?
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsResetMode(false)}
+                className="text-[12px] text-white/35 hover:text-white/60 transition-colors"
+              >
+                ← Back to login
+              </button>
+            )}
           </div>
 
           <button
@@ -197,7 +243,7 @@ export default function StaffLogin() {
                         transition-colors duration-150 flex items-center justify-center gap-2
                         disabled:opacity-50 disabled:cursor-not-allowed ${buttonClass}`}
           >
-            {loading ? <Loader2 size={15} className="animate-spin" /> : "Continue"}
+            {loading ? <Loader2 size={15} className="animate-spin" /> : (isResetMode ? "Send Reset Link" : "Continue")}
           </button>
         </form>
 

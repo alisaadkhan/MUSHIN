@@ -184,4 +184,4 @@ END;
 $$;
 REVOKE EXECUTE ON FUNCTION public.restore_ai_credit(uuid) FROM anon;
 GRANT  EXECUTE ON FUNCTION public.restore_ai_credit(uuid) TO service_role;
--- Note: authenticated role does NOT get restore — only service_role (edge functions) may invoke this.;
+-- Note: authenticated role does NOT get restore — only service_role (edge functions) may invoke this.;;

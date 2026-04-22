@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   LifeBuoy, MessageSquare, Clock, CheckCircle2, AlertCircle,
   ChevronDown, ChevronUp, Send, Loader2, XCircle, Search, Filter
@@ -15,6 +16,7 @@ type TicketPriority = "low" | "medium" | "high" | "urgent";
 
 interface Ticket {
   id: string;
+  ticket_number?: number | null;
   user_id: string;
   subject: string;
   description: string;
@@ -22,6 +24,8 @@ interface Ticket {
   status: TicketStatus;
   category: string;
   admin_notes: string | null;
+  assigned_to?: string | null;
+  assigned_at?: string | null;
   created_at: string;
   updated_at: string;
   profiles?: { full_name: string | null; avatar_url: string | null };
@@ -51,6 +55,7 @@ const priorityColors: Record<TicketPriority, string> = {
 };
 
 export default function AdminSupportTickets() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [expandedTicket, setExpandedTicket] = useState<string | null>(null);
@@ -78,6 +83,28 @@ export default function AdminSupportTickets() {
       return data as Ticket[];
     },
     refetchInterval: 60_000,
+  });
+
+  const { data: staff = [] } = useQuery<{ id: string; full_name: string | null }[]>({
+    queryKey: ["admin-support-staff"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("user_id, role")
+        .in("role", ["support", "admin", "super_admin"]);
+      if (error) throw error;
+
+      const ids = Array.from(new Set((data ?? []).map((r: any) => r.user_id).filter(Boolean)));
+      if (ids.length === 0) return [];
+
+      const { data: profiles, error: pErr } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", ids);
+      if (pErr) throw pErr;
+      return (profiles ?? []) as any;
+    },
+    staleTime: 60_000,
   });
 
   const { data: replies = [] } = useQuery<TicketReply[]>({
@@ -119,7 +146,7 @@ export default function AdminSupportTickets() {
     if (!replyText.trim()) return;
     setSendingReply(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
       const { error } = await supabase.from("support_ticket_replies").insert({
         ticket_id: ticketId,
         author_id: user!.id,
@@ -145,6 +172,20 @@ export default function AdminSupportTickets() {
     }
   };
 
+  const handleAssign = async (ticketId: string, assigneeId: string | null) => {
+    try {
+      const { error } = await supabase
+        .from("support_tickets")
+        .update({ assigned_to: assigneeId, assigned_at: assigneeId ? new Date().toISOString() : null })
+        .eq("id", ticketId);
+      if (error) throw error;
+      toast({ title: assigneeId ? "Ticket assigned" : "Assignment cleared" });
+      qc.invalidateQueries({ queryKey: ["admin-support-tickets"] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
   const filtered = tickets.filter((t) =>
     search ? t.subject.toLowerCase().includes(search.toLowerCase()) : true
   );
@@ -156,6 +197,12 @@ export default function AdminSupportTickets() {
     acc[t.status] = (acc[t.status] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
+
+  const staffById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of staff) m.set(s.id, s.full_name ?? s.id.slice(0, 8) + "…");
+    return m;
+  }, [staff]);
 
   return (
     <div className="space-y-6">
@@ -226,6 +273,11 @@ export default function AdminSupportTickets() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 flex-wrap">
                       <p className="text-sm font-medium text-foreground">{ticket.subject}</p>
+                      {typeof ticket.ticket_number === "number" && (
+                        <Badge className="text-[10px] bg-muted/20 text-muted-foreground border-border px-2 rounded-md font-normal">
+                          #{ticket.ticket_number}
+                        </Badge>
+                      )}
                       <Badge className={`text-[10px] border font-normal rounded-md px-2 ${priorityColors[ticket.priority]}`}>
                         {ticket.priority}
                       </Badge>
@@ -233,6 +285,12 @@ export default function AdminSupportTickets() {
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {(ticket.profiles as any)?.full_name || "Unknown"} · {ticket.category.replace("_", " ")} · {formatDate(ticket.created_at)}
                     </p>
+                    {ticket.assigned_to && (
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Assigned to <span className="text-slate-200">{staffById.get(ticket.assigned_to) ?? `${ticket.assigned_to.slice(0, 8)}…`}</span>
+                        {ticket.assigned_at ? <span className="text-muted-foreground/70"> · {formatDate(ticket.assigned_at)}</span> : null}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Badge className={`text-[10px] border font-normal rounded-md px-2 ${statusColors[ticket.status]}`}>
@@ -244,6 +302,36 @@ export default function AdminSupportTickets() {
 
                 {isExpanded && (
                   <div className="border-t border-border/50 px-6 py-5 space-y-5">
+                    {/* Assignment */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-muted-foreground font-medium">Assigned to:</span>
+                      <select
+                        value={ticket.assigned_to ?? ""}
+                        onChange={(e) => handleAssign(ticket.id, e.target.value || null)}
+                        className="h-8 px-2 rounded-lg bg-[#070707] border border-border text-xs text-foreground focus:outline-none focus:border-violet-500"
+                      >
+                        <option value="">Unassigned</option>
+                        {staff.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.full_name || s.id.slice(0, 8) + "…"}
+                          </option>
+                        ))}
+                      </select>
+                      {user?.id && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs rounded-lg"
+                          onClick={() => handleAssign(ticket.id, user.id)}
+                        >
+                          Assign to me
+                        </Button>
+                      )}
+                      <span className="text-[10px] text-muted-foreground ml-auto">
+                        {ticket.assigned_to ? `by ${staffById.get(ticket.assigned_to) ?? "staff"}${ticket.assigned_at ? ` · ${formatDate(ticket.assigned_at)}` : ""}` : ""}
+                      </span>
+                    </div>
+
                     <div className="bg-muted/10 rounded-xl p-4">
                       <p className="text-sm text-foreground whitespace-pre-wrap">{ticket.description}</p>
                     </div>

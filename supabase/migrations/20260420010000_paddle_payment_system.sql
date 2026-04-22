@@ -29,14 +29,11 @@ CREATE TABLE IF NOT EXISTS public.paddle_subscriptions (
     status IN ('active', 'trialing', 'past_due', 'canceled', 'paused')
   )
 );
-
 ALTER TABLE public.paddle_subscriptions ENABLE ROW LEVEL SECURITY;
-
 -- Users can only read their own subscription
 CREATE POLICY "users_read_own_subscription" ON public.paddle_subscriptions
   FOR SELECT
   USING (auth.uid() = user_id);
-
 -- No direct inserts/updates from client — all writes go through Edge Functions
 -- (service role key only)
 
@@ -52,9 +49,7 @@ CREATE TABLE IF NOT EXISTS public.paddle_webhooks_log (
   payload           jsonb DEFAULT '{}',
   processing_error  text
 );
-
 ALTER TABLE public.paddle_webhooks_log ENABLE ROW LEVEL SECURITY;
-
 -- No user access — only service role (Edge Functions)
 -- Admins can read via their privileged role
 CREATE POLICY "admin_read_webhook_log" ON public.paddle_webhooks_log
@@ -66,7 +61,6 @@ CREATE POLICY "admin_read_webhook_log" ON public.paddle_webhooks_log
       AND role IN ('admin', 'super_admin')
     )
   );
-
 -- ────────────────────────────────────────────────
 -- 3. usage_limits table (if not already exists)
 --    Tracks per-user monthly quota consumption
@@ -83,12 +77,9 @@ CREATE TABLE IF NOT EXISTS public.usage_limits (
   alert_100_sent  boolean NOT NULL DEFAULT false,
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
-
 ALTER TABLE public.usage_limits ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "users_read_own_usage" ON public.usage_limits
   FOR SELECT USING (auth.uid() = user_id);
-
 -- ────────────────────────────────────────────────
 -- 4. Function: sync_usage_limits_from_subscription
 --    Called after webhook updates subscription to update plan limits
@@ -120,9 +111,7 @@ BEGIN
         updated_at    = now();
 END;
 $$;
-
 REVOKE ALL ON FUNCTION public.sync_usage_limits_from_subscription FROM anon, authenticated;
-
 -- ────────────────────────────────────────────────
 -- 5. Function: reset_monthly_usage (called by cron)
 --    Resets counters at the start of each billing period
@@ -146,22 +135,17 @@ BEGIN
   WHERE user_id = p_user_id;
 END;
 $$;
-
 -- ────────────────────────────────────────────────
 -- 6. Indexes
 -- ────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_paddle_subs_user_id
   ON public.paddle_subscriptions(user_id);
-
 CREATE INDEX IF NOT EXISTS idx_paddle_subs_status
   ON public.paddle_subscriptions(status);
-
 CREATE INDEX IF NOT EXISTS idx_paddle_webhooks_event_id
   ON public.paddle_webhooks_log(paddle_event_id);
-
 CREATE INDEX IF NOT EXISTS idx_usage_limits_user_id
   ON public.usage_limits(user_id);
-
 -- ────────────────────────────────────────────────
 -- 7. Auto-update timestamp trigger
 -- ────────────────────────────────────────────────
@@ -169,7 +153,6 @@ CREATE OR REPLACE FUNCTION public.set_updated_at()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN NEW.updated_at = now(); RETURN NEW; END;
 $$;
-
 DO $$
 BEGIN
   IF NOT EXISTS (

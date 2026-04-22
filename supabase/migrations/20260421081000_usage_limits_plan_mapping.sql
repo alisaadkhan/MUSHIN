@@ -32,6 +32,4 @@ BEGIN
         updated_at    = now();
 END;
 $$;
-
 REVOKE ALL ON FUNCTION public.sync_usage_limits_from_subscription(uuid, text) FROM anon, authenticated;
-

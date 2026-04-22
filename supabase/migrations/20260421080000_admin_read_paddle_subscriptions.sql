@@ -4,9 +4,7 @@
 -- ============================================================
 
 ALTER TABLE public.paddle_subscriptions ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS admin_support_read_paddle_subscriptions ON public.paddle_subscriptions;
 CREATE POLICY admin_support_read_paddle_subscriptions ON public.paddle_subscriptions
   FOR SELECT
   USING (public.is_support_or_admin() OR public.is_system_admin(auth.uid()));
-

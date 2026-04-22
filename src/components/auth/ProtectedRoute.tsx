@@ -1,13 +1,25 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+// Max time to wait for profile to load before unblocking the UI
+const PROFILE_LOAD_TIMEOUT_MS = 6000;
+
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, loading, needsEmailVerification, profile, profileError, refreshProfile } = useAuth();
   const location = useLocation();
+  // Safety valve: if profile never arrives (e.g. RPC hangs), unblock after timeout
+  const [profileTimedOut, setProfileTimedOut] = useState(false);
 
+  useEffect(() => {
+    if (!user || profile || profileError || needsEmailVerification) return;
+    const t = setTimeout(() => setProfileTimedOut(true), PROFILE_LOAD_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, [user, profile, profileError, needsEmailVerification]);
+
+  // Auth session is still being resolved
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -41,8 +53,8 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
     );
   }
 
-  // Profile still loading (user exists but profile not yet fetched)
-  if (!needsEmailVerification && profile === null) {
+  // Profile still loading — show spinner but cap wait time
+  if (!needsEmailVerification && profile === null && !profileTimedOut) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -50,7 +62,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
     );
   }
 
-  // Onboarding gate
+  // Onboarding gate (skip if profile timed out — don't gate on missing data)
   if (profile && !profile.onboarding_completed && location.pathname !== "/onboarding") {
     return <Navigate to="/onboarding" replace />;
   }

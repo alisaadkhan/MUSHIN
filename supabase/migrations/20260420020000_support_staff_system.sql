@@ -25,7 +25,6 @@ EXCEPTION
     -- app_role type doesn't exist as enum; roles stored as text — no action needed
     NULL;
 END $$;
-
 -- ────────────────────────────────────────────────
 -- 2. Support audit log — every support action is logged
 -- ────────────────────────────────────────────────
@@ -37,9 +36,7 @@ CREATE TABLE IF NOT EXISTS public.support_actions_log (
   metadata      jsonb DEFAULT '{}',
   created_at    timestamptz NOT NULL DEFAULT now()
 );
-
 ALTER TABLE public.support_actions_log ENABLE ROW LEVEL SECURITY;
-
 -- ────────────────────────────────────────────────
 -- 3. Helper function (must come before any view/policy that uses it)
 -- ────────────────────────────────────────────────
@@ -58,7 +55,6 @@ AS $$
     AND role IN ('support', 'admin', 'super_admin')
   );
 $$;
-
 -- get_user_email_safe: SECURITY DEFINER — queries auth.users safely
 -- Must be defined BEFORE the view that calls it.
 CREATE OR REPLACE FUNCTION public.get_user_email_safe(target_user_id uuid)
@@ -82,10 +78,8 @@ BEGIN
   RETURN v_email;
 END;
 $$;
-
 REVOKE ALL ON FUNCTION public.get_user_email_safe FROM anon;
 GRANT EXECUTE ON FUNCTION public.get_user_email_safe TO authenticated;
-
 -- ────────────────────────────────────────────────
 -- 4. Support view — safe, read-only user lookup
 --    Defined AFTER the functions it depends on.
@@ -107,11 +101,9 @@ SELECT
   COALESCE(ul.monthly_limit, 50) AS monthly_limit
 FROM public.profiles p
 LEFT JOIN public.usage_limits ul ON ul.user_id = p.id;
-
 -- Revoke public access; grant to authenticated (RLS enforced via base tables)
 REVOKE ALL ON public.support_user_view FROM anon, authenticated;
 GRANT SELECT ON public.support_user_view TO authenticated;
-
 -- ────────────────────────────────────────────────
 -- 5. RPC for support: look up a user by email
 -- ────────────────────────────────────────────────
@@ -146,10 +138,8 @@ BEGIN
   LIMIT 10;
 END;
 $$;
-
 REVOKE ALL ON FUNCTION public.support_lookup_user FROM anon;
 GRANT EXECUTE ON FUNCTION public.support_lookup_user TO authenticated;
-
 -- ────────────────────────────────────────────────
 -- 6. RLS policies — support can READ user profiles
 -- ────────────────────────────────────────────────
@@ -162,7 +152,6 @@ CREATE POLICY "support_staff_insert_log" ON public.support_actions_log
     auth.uid() = support_id
     AND public.is_support_or_admin()
   );
-
 DROP POLICY IF EXISTS "support_read_own_log" ON public.support_actions_log;
 CREATE POLICY "support_read_own_log" ON public.support_actions_log
   FOR SELECT
@@ -174,7 +163,6 @@ CREATE POLICY "support_read_own_log" ON public.support_actions_log
       AND ur.role IN ('admin', 'super_admin')
     )
   );
-
 -- Allow support to SELECT profiles (for user lookup)
 DO $$
 BEGIN
@@ -188,7 +176,6 @@ BEGIN
       USING (public.is_support_or_admin());
   END IF;
 END $$;
-
 -- Support can view subscriptions for context (read-only)
 DO $$
 BEGIN
@@ -204,15 +191,12 @@ BEGIN
     END IF;
   END IF;
 END $$;
-
 -- ────────────────────────────────────────────────
 -- 7. Indexes for performance
 -- ────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_support_actions_log_support_id
   ON public.support_actions_log(support_id);
-
 CREATE INDEX IF NOT EXISTS idx_support_actions_log_target_user
   ON public.support_actions_log(target_user_id);
-
 CREATE INDEX IF NOT EXISTS idx_support_actions_log_created_at
   ON public.support_actions_log(created_at DESC);

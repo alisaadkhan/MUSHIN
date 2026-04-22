@@ -22,14 +22,16 @@ Deno.serve(async (req) => {
         const serviceClient = createPrivilegedClient();
         if (suspend) {
             // Ban user for 100 years
-            await serviceClient.auth.admin.updateUserById(target_user_id, {
+            const { error } = await serviceClient.auth.admin.updateUserById(target_user_id, {
                 ban_duration: "876000h",
             });
+            if (error) throw error;
         } else {
             // Unban
-            await serviceClient.auth.admin.updateUserById(target_user_id, {
+            const { error } = await serviceClient.auth.admin.updateUserById(target_user_id, {
                 ban_duration: "none",
             });
+            if (error) throw error;
         }
 
         await logAdminAction({

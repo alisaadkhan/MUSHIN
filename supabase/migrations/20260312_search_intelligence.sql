@@ -98,17 +98,27 @@ CREATE INDEX IF NOT EXISTS idx_ic_search_vector
   ON public.influencers_cache USING GIN(search_vector);
 CREATE INDEX IF NOT EXISTS idx_ip_search_vector
   ON public.influencer_profiles USING GIN(search_vector);
--- Trigram indexes for fuzzy name / username matching
-CREATE INDEX IF NOT EXISTS idx_ic_username_trgm
-  ON public.influencers_cache USING GIN(username gin_trgm_ops);
--- display_name trigram index (only if column is non-null — partial index is fine)
-CREATE INDEX IF NOT EXISTS idx_ic_displayname_trgm
-  ON public.influencers_cache USING GIN(display_name gin_trgm_ops)
-  WHERE display_name IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_ip_username_trgm
-  ON public.influencer_profiles USING GIN(username gin_trgm_ops);
-CREATE INDEX IF NOT EXISTS idx_ip_fullname_trgm
-  ON public.influencer_profiles USING GIN(full_name gin_trgm_ops);
+-- Trigram indexes for fuzzy name / username matching.
+-- `pg_trgm` may be installed under `extensions`, so try both opclass locations.
+DO $$
+BEGIN
+  BEGIN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_ic_username_trgm ON public.influencers_cache USING GIN(username extensions.gin_trgm_ops)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_ic_displayname_trgm ON public.influencers_cache USING GIN(display_name extensions.gin_trgm_ops) WHERE display_name IS NOT NULL';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_ip_username_trgm ON public.influencer_profiles USING GIN(username extensions.gin_trgm_ops)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_ip_fullname_trgm ON public.influencer_profiles USING GIN(full_name extensions.gin_trgm_ops)';
+  EXCEPTION WHEN undefined_object THEN
+    BEGIN
+      EXECUTE 'CREATE INDEX IF NOT EXISTS idx_ic_username_trgm ON public.influencers_cache USING GIN(username gin_trgm_ops)';
+      EXECUTE 'CREATE INDEX IF NOT EXISTS idx_ic_displayname_trgm ON public.influencers_cache USING GIN(display_name gin_trgm_ops) WHERE display_name IS NOT NULL';
+      EXECUTE 'CREATE INDEX IF NOT EXISTS idx_ip_username_trgm ON public.influencer_profiles USING GIN(username gin_trgm_ops)';
+      EXECUTE 'CREATE INDEX IF NOT EXISTS idx_ip_fullname_trgm ON public.influencer_profiles USING GIN(full_name gin_trgm_ops)';
+    EXCEPTION WHEN undefined_object THEN
+      NULL;
+    END;
+  END;
+END;
+$$;
 -- Composite index for quality-score-based listings
 CREATE INDEX IF NOT EXISTS idx_ic_quality_scores
   ON public.influencers_cache (authenticity_score DESC, engagement_quality_score DESC)

@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS public.creator_tags (
 );
 -- RLS: read-only for authenticated users; write only via service role
 ALTER TABLE public.creator_tags ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "creator_tags_read" ON public.creator_tags;
 CREATE POLICY "creator_tags_read" ON public.creator_tags
     FOR SELECT TO authenticated USING (true);
 -- Fast tag lookup
@@ -46,18 +47,37 @@ ALTER TABLE public.influencer_profiles
     DROP COLUMN IF EXISTS embedding;
 -- 2c. Add new 1024-dim column
 ALTER TABLE public.influencer_profiles
-    ADD COLUMN IF NOT EXISTS embedding VECTOR(1024);
+    ADD COLUMN IF NOT EXISTS embedding extensions.vector(1024);
 -- 2d. Recreate HNSW index for fast cosine similarity search
-CREATE INDEX IF NOT EXISTS idx_ip_embedding_hnsw
-    ON public.influencer_profiles
-    USING hnsw (embedding vector_cosine_ops)
-    WITH (m = 16, ef_construction = 64);
+DO $$
+BEGIN
+  BEGIN
+    EXECUTE $q$
+      CREATE INDEX IF NOT EXISTS idx_ip_embedding_hnsw
+      ON public.influencer_profiles
+      USING hnsw (embedding extensions.vector_cosine_ops)
+      WITH (m = 16, ef_construction = 64)
+    $q$;
+  EXCEPTION WHEN undefined_object THEN
+    BEGIN
+      EXECUTE $q$
+        CREATE INDEX IF NOT EXISTS idx_ip_embedding_hnsw
+        ON public.influencer_profiles
+        USING hnsw (embedding vector_cosine_ops)
+        WITH (m = 16, ef_construction = 64)
+      $q$;
+    EXCEPTION WHEN undefined_object THEN
+      NULL;
+    END;
+  END;
+END;
+$$;
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 3. Update match_influencers() to use 1024-dim vectors
 -- ─────────────────────────────────────────────────────────────────────────────
-DROP FUNCTION IF EXISTS public.match_influencers(VECTOR, FLOAT, INT, TEXT);
+DROP FUNCTION IF EXISTS public.match_influencers(extensions.vector, FLOAT, INT, TEXT);
 CREATE OR REPLACE FUNCTION public.match_influencers(
-    query_embedding  VECTOR(1024),
+    query_embedding  extensions.vector(1024),
     match_threshold  FLOAT    DEFAULT 0.5,
     match_count      INT      DEFAULT 20,
     filter_platform  TEXT     DEFAULT NULL
@@ -88,12 +108,12 @@ AS $$
         p.avatar_url,
         p.primary_niche,
         p.city,
-        1 - (p.embedding <=> query_embedding) AS similarity
+        1 - extensions.cosine_distance(p.embedding, query_embedding) AS similarity
     FROM public.influencer_profiles p
     WHERE p.embedding IS NOT NULL
       AND (filter_platform IS NULL OR p.platform = filter_platform)
-      AND 1 - (p.embedding <=> query_embedding) >= match_threshold
-    ORDER BY p.embedding <=> query_embedding
+      AND 1 - extensions.cosine_distance(p.embedding, query_embedding) >= match_threshold
+    ORDER BY extensions.cosine_distance(p.embedding, query_embedding)
     LIMIT match_count;
 $$;
 -- ─────────────────────────────────────────────────────────────────────────────

@@ -72,28 +72,7 @@ export function AppSidebar({ isOpen = true, onClose }: AppSidebarProps) {
       </div>
 
       <nav className="flex-1 overflow-y-auto p-3 space-y-6">
-        {/* Admin link */}
-        {isAnyAdmin && (
-          <div>
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.12em] px-3 mb-2">Admin</p>
-            <ul className="space-y-0.5">
-              <li>
-                <Link
-                  to="/admin"
-                  onClick={onClose}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                    location.pathname.startsWith("/admin")
-                      ? "bg-primary/10 text-primary font-semibold border border-primary/20"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  }`}
-                >
-                  <ShieldCheck size={16} strokeWidth={1.5} />
-                  Admin Panel
-                </Link>
-              </li>
-            </ul>
-          </div>
-        )}
+
 
         {navGroups.map((group) => (
           <div key={group.label}>
@@ -109,7 +88,10 @@ export function AppSidebar({ isOpen = true, onClose }: AppSidebarProps) {
                   <li key={item.path}>
                     <Link
                       to={item.path}
-                      onClick={onClose}
+                      onClick={() => {
+                        // Keep sidebar open on desktop; close only on mobile after navigation.
+                        if (onClose && window.innerWidth < 1024) onClose();
+                      }}
                       className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
                         active
                           ? "bg-primary/10 text-primary font-semibold border border-primary/20"

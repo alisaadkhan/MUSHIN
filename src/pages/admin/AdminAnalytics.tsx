@@ -1,8 +1,18 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { format, parseISO, startOfMonth, startOfWeek } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { invokeEdgeAuthed } from "@/lib/edge";
 import { BarChart2, Search, Users, CreditCard, RefreshCw } from "lucide-react";
+import {
+    Bar,
+    BarChart,
+    CartesianGrid,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from "recharts";
 
 type PaddleSub = {
     user_id: string;
@@ -12,11 +22,23 @@ type PaddleSub = {
     cancel_at_period_end: boolean;
 };
 
+type BucketMode = "day" | "week" | "month";
+
+function bucketLabel(iso: string, mode: BucketMode): string {
+    const d = parseISO(iso);
+    if (mode === "day") return format(d, "yyyy-MM-dd");
+    if (mode === "week") return format(startOfWeek(d, { weekStartsOn: 1 }), "yyyy-MM-dd");
+    return format(startOfMonth(d), "yyyy-MM");
+}
+
 export default function AdminAnalytics() {
+    const [signupBucket, setSignupBucket] = useState<BucketMode>("week");
+
     const { data, isLoading } = useQuery({
-        queryKey: ["admin-analytics"],
+        queryKey: ["admin-analytics", signupBucket],
         queryFn: async () => {
-            const [searches, users, paddleSubs, userList] = await Promise.all([
+            const since = new Date(Date.now() - 120 * 864e5).toISOString();
+            const [searches, users, paddleSubs, userList, profilesTs] = await Promise.all([
                 supabase.from("search_history").select("id,created_at", { count: "exact" }),
                 supabase.from("profiles").select("id,created_at", { count: "exact" }),
                 supabase
@@ -24,6 +46,7 @@ export default function AdminAnalytics() {
                     .select("user_id,plan_name,status,current_period_end,cancel_at_period_end")
                     .order("updated_at", { ascending: false }),
                 invokeEdgeAuthed("admin-list-users"),
+                supabase.from("profiles").select("created_at").gte("created_at", since).limit(8000),
             ]);
 
             const emailByUser: Record<string, string> = {};
@@ -31,15 +54,30 @@ export default function AdminAnalytics() {
                 if (u?.id && u?.email) emailByUser[u.id] = u.email;
             }
 
+            const adminUserCount = Array.isArray(userList.data?.users) ? userList.data.users.length : null;
+
             const planCounts: Record<string, number> = {};
-            (paddleSubs.data || []).forEach((s: any) => {
+            (paddleSubs.data || []).forEach((s: { plan_name?: string }) => {
                 const k = s.plan_name || "unknown";
                 planCounts[k] = (planCounts[k] || 0) + 1;
             });
+
+            const signupMap: Record<string, number> = {};
+            for (const row of profilesTs.data ?? []) {
+                const iso = (row as { created_at?: string }).created_at;
+                if (!iso) continue;
+                const k = bucketLabel(iso, signupBucket);
+                signupMap[k] = (signupMap[k] || 0) + 1;
+            }
+            const signupSeries = Object.entries(signupMap)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([period, signups]) => ({ period, signups }));
+
             return {
                 totalSearches: searches.count ?? 0,
-                totalUsers: users.count ?? 0,
+                totalUsers: adminUserCount ?? users.count ?? 0,
                 planCounts,
+                signupSeries,
                 subscriptions: (paddleSubs.data ?? []).map((s: PaddleSub) => ({
                     ...s,
                     email: emailByUser[s.user_id] ?? null,
@@ -87,6 +125,46 @@ export default function AdminAnalytics() {
                         <p className="text-sm text-muted-foreground">{s.label}</p>
                     </div>
                 ))}
+            </div>
+
+            <div className="glass-card rounded-2xl p-6">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <h2 className="text-base font-semibold text-foreground">New signups (profiles)</h2>
+                    <div className="flex gap-1 rounded-lg border border-border p-0.5">
+                        {(["day", "week", "month"] as const).map((m) => (
+                            <button
+                                key={m}
+                                type="button"
+                                onClick={() => setSignupBucket(m)}
+                                className={`px-3 py-1 rounded-md text-xs capitalize ${
+                                    signupBucket === m ? "bg-violet-600 text-white" : "text-muted-foreground hover:text-foreground"
+                                }`}
+                            >
+                                {m}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                {isLoading || !data?.signupSeries ? (
+                    <p className="text-muted-foreground text-sm">Loading chart…</p>
+                ) : data.signupSeries.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">No signup timestamps in range.</p>
+                ) : (
+                    <div className="h-64 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={data.signupSeries}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.4} />
+                                <XAxis dataKey="period" tick={{ fontSize: 10 }} stroke="#888" />
+                                <YAxis allowDecimals={false} tick={{ fontSize: 10 }} stroke="#888" />
+                                <Tooltip
+                                    contentStyle={{ background: "#0a0a0a", border: "1px solid #333" }}
+                                    labelStyle={{ color: "#ccc" }}
+                                />
+                                <Bar dataKey="signups" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                )}
             </div>
 
             <div className="glass-card rounded-2xl p-6">

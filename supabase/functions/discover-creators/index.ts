@@ -17,13 +17,20 @@ import {
   requireJwt,
   requireWorkspaceMembership,
 } from "../_shared/privileged_gateway.ts";
+import { enforceGlobalRateLimit } from "../_shared/global_rate_limit.ts";
+import { buildCorsHeaders as sharedBuildCorsHeaders } from "../_shared/cors.ts";
+import { logUserActivity } from "../_shared/activity_logger.ts";
 
 // ── Constants ────────────────────────────────────────────────
 const STALE_HOURS          = 24;
 const CACHE_MIN_RESULTS    = 5;    // serve cache if ≥ 5 fresh results exist
-const SERPER_MAX_RESULTS   = 10;   // results per Serper query
+const SERPER_MAX_RESULTS   = 15;   // results per Serper query
+const MAX_DORKS            = 12;     // cap parallel Serper calls
+const CACHE_RPC_LIMIT      = 48;   // candidates from DB before client-side cap
+const RESULT_TARGET_MIN    = 20;    // min creators returned (when enough data exists)
+const RESULT_TARGET_MAX    = 30;    // max creators returned per search
 const APIFY_TIMEOUT_SECS   = 90;   // max time to wait for Apify actor run
-const MAX_HANDLES_PER_BATCH = 20;  // Apify scrape batch size
+const MAX_HANDLES_PER_BATCH = 28;  // Apify scrape batch size (fits ~30-result target)
 const LIVE_SEARCH_CREDIT_COST = 1; // search credits per live OSINT run
 
 // Apify actor IDs
@@ -52,6 +59,8 @@ interface SearchFilters {
   hasEmail?:          boolean;
   hasWhatsApp?:       boolean;
   verifiedOnly?:      boolean;
+  /** platform:handle keys from the client to reduce repeat surfaced creators */
+  exclude_handles?:   string[];
 }
 
 interface TimingLog {
@@ -79,37 +88,50 @@ async function sha256(data: string): Promise<string> {
     .join("");
 }
 
-function corsHeaders(): Record<string, string> {
-  // Deprecated: use buildCorsHeaders(req) for origin pinning
-  return {
-    "Access-Control-Allow-Origin":  "",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, idempotency-key, x-idempotency-key",
-  };
+function buildCorsHeaders(req: Request): Record<string, string> {
+  return sharedBuildCorsHeaders(req);
 }
 
-const PREVIEW_ORIGINS_DC: Set<string> = new Set(
-  (Deno.env.get("ALLOWED_PREVIEW_ORIGINS") ?? "")
-    .split(",").map((s: string) => s.trim()).filter(Boolean)
-);
+function normalizePlatformHandleKey(platform: string, handle: string): string {
+  const p = (platform || "instagram").toLowerCase();
+  const h = (handle || "").toLowerCase().replace(/^@/, "").trim();
+  return `${p}:${h}`;
+}
 
-function buildCorsHeaders(req: Request): Record<string, string> {
-  const origin = req.headers.get("Origin") ?? "";
-  const appUrl = Deno.env.get("APP_URL") || "https://mushin.app";
-  const allowed = new Set<string>([
-    appUrl,
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:3000",
-    ...PREVIEW_ORIGINS_DC,
-  ]);
-  return {
-    "Access-Control-Allow-Origin": allowed.has(origin) ? origin : "",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, idempotency-key, x-idempotency-key",
-    "Access-Control-Allow-Credentials": "true",
-  };
+function excludeSetFromRequest(filters: SearchFilters): Set<string> {
+  const set = new Set<string>();
+  const raw = filters.exclude_handles;
+  if (!Array.isArray(raw)) return set;
+  const defaultPlatform = (filters.platforms?.[0] ?? "instagram").toLowerCase();
+  for (const item of raw.slice(0, 120)) {
+    const s = String(item).trim().toLowerCase();
+    if (!s) continue;
+    if (s.includes(":")) {
+      const idx = s.indexOf(":");
+      const pl = s.slice(0, idx);
+      const h = s.slice(idx + 1).replace(/^@/, "");
+      if (pl && h) set.add(normalizePlatformHandleKey(pl, h));
+    } else {
+      set.add(normalizePlatformHandleKey(defaultPlatform, s));
+    }
+  }
+  return set;
+}
+
+function filterCreatorsByExclude(rows: unknown[], ex: Set<string>): unknown[] {
+  if (!ex.size || !Array.isArray(rows)) return rows;
+  return rows.filter((row) => {
+    const r = row as Record<string, unknown>;
+    const platform = String(r.platform ?? "instagram");
+    const handle = String(r.handle ?? r.username ?? "");
+    const key = normalizePlatformHandleKey(platform, handle);
+    return !ex.has(key);
+  });
+}
+
+function pickResultCount(seed: number, min: number, max: number): number {
+  const span = max - min + 1;
+  return min + (Math.abs(seed) % span);
 }
 
 function jsonResponse(req: Request, data: unknown, status = 200): Response {
@@ -242,7 +264,7 @@ async function checkCache(
     p_has_email:        filters.hasEmail          ?? false,
     p_has_whatsapp:     filters.hasWhatsApp       ?? false,
     p_verified_only:    filters.verifiedOnly      ?? false,
-    p_limit:            50,
+    p_limit:            CACHE_RPC_LIMIT,
     p_stale_hours:      STALE_HOURS,
   });
 
@@ -307,12 +329,13 @@ function buildDorkQueries(filters: SearchFilters): { query: string; platform: st
     }
   }
 
-  return queries.slice(0, 8); // cap total Serper calls to 8
+  return queries.slice(0, MAX_DORKS);
 }
 
 async function runSerper(
   dorks: { query: string; platform: string }[],
-  apiKey: string
+  apiKey: string,
+  excludeKeys: Set<string>,
 ): Promise<{ handle: string; platform: string; profileUrl: string; query: string }[]> {
   const results: { handle: string; platform: string; profileUrl: string; query: string }[] = [];
   const seen = new Set<string>();
@@ -349,6 +372,7 @@ async function runSerper(
 
           const dedupKey = `${platform}:${handle}`;
           if (seen.has(dedupKey)) continue;
+          if (excludeKeys.has(dedupKey)) continue;
           seen.add(dedupKey);
 
           // Basic heuristic: skip very short handles or obvious non-creator pages
@@ -1037,8 +1061,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return jsonResponse(req, { error: "Invalid JSON body" }, 400);
   }
 
-  // Phase 2: enforce 10k+ default server-side
-  filters.minFollowers = Math.max(10_000, Number(filters.minFollowers ?? 10_000));
+  const qRaw = (filters.query ?? "").trim();
+  if (qRaw.length > 200) {
+    return jsonResponse(req, { error: "query too long (max 200 characters)" }, 400);
+  }
+  if (filters.platforms && filters.platforms.length > 4) {
+    return jsonResponse(req, { error: "too many platforms (max 4)" }, 400);
+  }
+
+  const excludeKeys = excludeSetFromRequest(filters);
+
+  // Enforce a sane lower bound server-side (UI "Any size" should be >= 1k)
+  filters.minFollowers = Math.max(1_000, Number(filters.minFollowers ?? 1_000));
 
   // Canonical hash for deduplication / caching
   const queryHash = await sha256(JSON.stringify({
@@ -1058,6 +1092,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
     userId = auth.userId;
     const membership = await requireWorkspaceMembership(userId, null);
     workspaceId = membership.workspaceId;
+
+    const rl = await enforceGlobalRateLimit({
+      userId,
+      ipAddress,
+      endpoint: "discover-creators",
+      isAdmin: false,
+      isSuperAdmin: false,
+    });
+    if (!rl.allowed) {
+      return jsonResponse(
+        req,
+        { error: "Rate limit exceeded", retry_after: rl.retryAfter },
+        429,
+      );
+    }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     return jsonResponse(req, { error: "Unauthorized", detail: message }, 401);
@@ -1132,13 +1181,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // ────────────────────────────────────────────────────────
     // 2. SERPER — DISCOVERY
     // ────────────────────────────────────────────────────────
+    const shuffleSeed = await seedToInt(`${queryHash}:${idempotencyKey ?? crypto.randomUUID()}`);
     const serperStart = Date.now();
     const dorks       = buildDorkQueries(filters);
     serperCalls       = dorks.length;
     console.log(`[discover] running ${dorks.length} Serper dorks...`);
 
-    const discoveredHandlesRaw = await runSerper(dorks, serperKey);
-    const shuffleSeed = await seedToInt(`${queryHash}:${idempotencyKey ?? crypto.randomUUID()}`);
+    const discoveredHandlesRaw = await runSerper(dorks, serperKey, excludeKeys);
     const discoveredHandles = seededShuffle(discoveredHandlesRaw, shuffleSeed);
     serperResultsRaw = discoveredHandles.length;
     timing.serperMs  = Date.now() - serperStart;
@@ -1156,10 +1205,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
         timing, resultCount: cacheResult.hitCount,
         error: "serper_no_results",
       });
+      const wantStale = pickResultCount(shuffleSeed, RESULT_TARGET_MIN, RESULT_TARGET_MAX);
+      let staleOut = filterCreatorsByExclude(cacheResult.data ?? [], excludeKeys);
+      staleOut = seededShuffle(staleOut as unknown[], shuffleSeed ^ 0xdeadbeef).slice(
+        0,
+        Math.min(wantStale, staleOut.length),
+      );
       return jsonResponse(req, {
-        creators: cacheResult.data,
+        creators: staleOut,
         source:   "cache_stale",
-        count:    cacheResult.hitCount,
+        count:    staleOut.length,
         warning:  "Live discovery returned no results. Serving stale cache.",
         timing:   { total_ms: timing.totalMs },
       });
@@ -1238,6 +1293,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     }
 
+    const wantN = pickResultCount(shuffleSeed, RESULT_TARGET_MIN, RESULT_TARGET_MAX);
+    let creatorsOut = filterCreatorsByExclude(finalResult.data ?? [], excludeKeys);
+    creatorsOut = seededShuffle(creatorsOut as unknown[], shuffleSeed ^ 0x9e3779b9).slice(
+      0,
+      Math.min(wantN, creatorsOut.length),
+    );
+
     await logQuery(supabase, {
       userId,
       workspaceId,
@@ -1245,13 +1307,31 @@ Deno.serve(async (req: Request): Promise<Response> => {
       cacheHitCount: cacheResult.hitCount,
       liveDiscoveryCount: finalResult.hitCount,
       serperCalls, serperResultsRaw, apifyRuns, apifyProfilesScraped,
-      timing, resultCount: finalResult.hitCount,
+      timing, resultCount: creatorsOut.length,
+    });
+
+    await logUserActivity({
+      req,
+      userId,
+      workspaceId,
+      actionType: "search_run",
+      status: "success",
+      metadata: {
+        module: "discover-creators",
+        query_hash: queryHash,
+        platforms: filters.platforms ?? [],
+        cities: filters.cities ?? [],
+        result_count: creatorsOut.length,
+        serper_calls: serperCalls,
+        apify_runs: apifyRuns,
+        timing_ms: timing.totalMs,
+      },
     });
 
     return jsonResponse(req, {
-      creators: seededShuffle(finalResult.data, shuffleSeed),
+      creators: creatorsOut,
       source:   "live",
-      count:    finalResult.hitCount,
+      count:    creatorsOut.length,
       credits: creditDebit.debited
         ? { debited: LIVE_SEARCH_CREDIT_COST, balance_after: creditDebit.balanceAfter }
         : { debited: 0 },
@@ -1276,6 +1356,22 @@ Deno.serve(async (req: Request): Promise<Response> => {
       cacheHitCount: 0, liveDiscoveryCount: 0,
       serperCalls, serperResultsRaw, apifyRuns, apifyProfilesScraped,
       timing, resultCount: 0, error: message,
+    });
+
+    await logUserActivity({
+      req,
+      userId,
+      workspaceId,
+      actionType: "search_run",
+      status: "error",
+      metadata: {
+        module: "discover-creators",
+        query_hash: queryHash,
+        error: message,
+        serper_calls: serperCalls,
+        apify_runs: apifyRuns,
+        timing_ms: timing.totalMs,
+      },
     });
 
     return jsonResponse(req, { error: "Internal error", detail: message }, 500);

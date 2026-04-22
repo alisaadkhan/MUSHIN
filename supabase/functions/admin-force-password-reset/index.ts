@@ -29,16 +29,65 @@ Deno.serve(async (req) => {
         }
 
         // Send reset email via Admin API
-        const { error: resetError } = await serviceClient.auth.admin.generateLink({
+        const redirectTo =
+          (Deno.env.get("SITE_URL") || Deno.env.get("APP_URL") || "").replace(/\/$/, "") + "/update-password";
+
+        const { data: linkData, error: linkError } = await serviceClient.auth.admin.generateLink({
             type: 'recovery',
-            email: targetUser.user.email
+            email: targetUser.user.email,
+            options: redirectTo ? { redirectTo } : undefined,
         });
-        
-        // Wait, generateLink only returns the link. To actually dispatch the Supabase template email, we should use resetPasswordForEmail without the admin wrapper.
-        const { error: dispatchError } = await serviceClient.auth.resetPasswordForEmail(targetUser.user.email);
-        
-        if (dispatchError) {
-            throw dispatchError;
+
+        if (linkError) throw linkError;
+
+        // Preferred: let Supabase send the recovery email (if email provider configured).
+        // Some projects reject this call when executed from service_role; if that happens we fall back to Resend.
+        let dispatched = false;
+        try {
+            const { error: dispatchError } = await serviceClient.auth.resetPasswordForEmail(targetUser.user.email, {
+                redirectTo: redirectTo || undefined,
+            });
+            if (dispatchError) throw dispatchError;
+            dispatched = true;
+        } catch (e) {
+            console.warn("[admin-force-password-reset] resetPasswordForEmail failed; falling back to Resend:", e);
+        }
+
+        if (!dispatched) {
+            const resendKey = Deno.env.get("RESEND_API_KEY");
+            const fromEmail = Deno.env.get("RESEND_FROM_EMAIL") || Deno.env.get("FROM_EMAIL");
+            const recoveryLink = (linkData as any)?.properties?.action_link as string | undefined;
+
+            if (!resendKey || !fromEmail || !recoveryLink) {
+                // Don't fail the admin action if we generated the link; return it for manual delivery.
+                // This avoids "internal server error" toasts when SMTP isn't configured.
+                return new Response(JSON.stringify({ success: true, dispatched: false, recovery_link: recoveryLink ?? null }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                });
+            }
+
+            const resp = await fetch("https://api.resend.com/emails", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${resendKey}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    from: fromEmail,
+                    to: targetUser.user.email,
+                    subject: "Reset your password",
+                    html: `
+                      <p>You requested a password reset.</p>
+                      <p><a href="${recoveryLink}">Click here to reset your password</a></p>
+                      <p>If you did not request this, you can ignore this email.</p>
+                    `,
+                }),
+            });
+            if (!resp.ok) {
+                const txt = await resp.text().catch(() => "");
+                throw new Error(`Resend failed (${resp.status}): ${txt}`);
+            }
+            dispatched = true;
         }
 
         await logAdminAction({
@@ -50,7 +99,7 @@ Deno.serve(async (req) => {
             userAgent,
         });
 
-        return new Response(JSON.stringify({ success: true }), {
+        return new Response(JSON.stringify({ success: true, dispatched }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
     } catch (err: any) {

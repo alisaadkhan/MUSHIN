@@ -50,6 +50,7 @@ CREATE INDEX IF NOT EXISTS idx_creator_tags_platform_tag
 -- Returns profiles that contain any of the provided tags OR match the niche text.
 -- Used as the primary DB lookup before resorting to Serper.
 
+DROP FUNCTION IF EXISTS public.tag_match_influencers(TEXT, TEXT[], TEXT, BIGINT, BIGINT, FLOAT, TEXT, INT);
 CREATE OR REPLACE FUNCTION public.tag_match_influencers(
     p_platform       TEXT,
     p_tags           TEXT[]    DEFAULT '{}',

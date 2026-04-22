@@ -85,16 +85,21 @@ Deno.serve(async (req) => {
             userAgent,
         });
 
-        await logAdminAction({
-            actorUserId: userId,
-            targetUserId: target_user_id ?? null,
-            workspaceId: workspace_id,
-            actionType: "admin:credits:adjust:api",
-            actionDescription: "Admin credits adjustment request completed",
-            ipAddress,
-            userAgent,
-            metadata: { credit_type, amount_delta, new_balance, mode: effectiveMode, reason, idempotency_key },
-        });
+        // Best-effort audit log (never fail the primary operation)
+        try {
+            await logAdminAction({
+                actorUserId: userId,
+                targetUserId: target_user_id ?? null,
+                workspaceId: workspace_id,
+                actionType: "admin:credits:adjust:api",
+                actionDescription: "Admin credits adjustment request completed",
+                ipAddress,
+                userAgent,
+                metadata: { credit_type, amount_delta, new_balance, mode: effectiveMode, reason, idempotency_key },
+            });
+        } catch (e) {
+            console.error("[admin-adjust-credits] audit log failed:", e);
+        }
 
         return jsonResponse(result, 200, corsHeaders);
     } catch (err) {
@@ -122,7 +127,7 @@ Deno.serve(async (req) => {
                 userAgent,
                 metadata: { endpoint: "admin-adjust-credits", status: "failed" },
             });
-            return jsonResponse({ error: "Unauthorized" }, 401);
+            return jsonResponse({ error: "Unauthorized" }, 401, corsHeaders);
         }
 
         return safeErrorResponse(err, "[admin-adjust-credits]", corsHeaders);

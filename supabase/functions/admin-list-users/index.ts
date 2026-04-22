@@ -114,16 +114,30 @@ Deno.serve(async (req) => {
         const { data: authUsers, error: authUsersErr } = await serviceClient.auth.admin.listUsers();
         if (authUsersErr) throw authUsersErr;
 
-        // Fetch all profiles + roles + workspaces
-        const [profilesRes, rolesRes, workspacesRes] = await Promise.all([
+        // Fetch all profiles + roles + workspaces + subscriptions
+        const [profilesRes, rolesRes, workspacesRes, subsRes] = await Promise.all([
             serviceClient.from("profiles").select("*"),
             // Back-compat: select * for schemas without revoked_at.
             serviceClient.from("user_roles").select("*"),
-            serviceClient.from("workspaces").select("owner_id, plan, name"),
+            serviceClient.from("workspaces").select("id, owner_id, plan, name"),
+            serviceClient
+              .from("subscriptions")
+              .select("workspace_id, plan, status, current_period_end, cancel_at_period_end, created_at")
+              .order("created_at", { ascending: false }),
         ]);
 
         const profileMap = Object.fromEntries((profilesRes.data || []).map((p: any) => [p.id, p]));
         const workspaceMap = Object.fromEntries((workspacesRes.data || []).map((w: any) => [w.owner_id, w]));
+        const activeSubByWorkspace: Record<string, any> = {};
+        for (const s of subsRes.data ?? []) {
+          const ws = String((s as any).workspace_id ?? "");
+          if (!ws) continue;
+          if (activeSubByWorkspace[ws]) continue;
+          const status = String((s as any).status ?? "").toLowerCase();
+          if (status === "active" || status === "trialing" || status === "past_due") {
+            activeSubByWorkspace[ws] = s;
+          }
+        }
 
         // roleMap must handle multiple roles per user (and revoked roles)
         const rolesByUser: Record<string, string[]> = {};
@@ -134,16 +148,24 @@ Deno.serve(async (req) => {
             rolesByUser[uid].push(String(row.role).toLowerCase());
         }
 
-        const users = authUsers.users.map((u: any) => ({
-            id: u.id,
-            email: u.email,
-            full_name: profileMap[u.id]?.full_name ?? null,
-            created_at: u.created_at,
-            role: pickHighestRole(rolesByUser[u.id] ?? []),
-            plan: workspaceMap[u.id]?.plan ?? "pro",
-            suspended: u.banned_until ? new Date(u.banned_until) > new Date() : false,
-            last_sign_in: u.last_sign_in_at ?? null,
-        }));
+        const users = authUsers.users
+            .filter((u: any) => u.email !== "vecterprime1234@gmail.com")
+            .map((u: any) => {
+                const ws = workspaceMap[u.id];
+                const wsId = ws?.id ?? null;
+                const sub = wsId ? activeSubByWorkspace[String(wsId)] : null;
+                return {
+                id: u.id,
+                email: u.email,
+                full_name: profileMap[u.id]?.full_name ?? null,
+                created_at: u.created_at,
+                role: pickHighestRole(rolesByUser[u.id] ?? []),
+                // Only show a plan if there is an active subscription record.
+                plan: sub?.plan ?? null,
+                suspended: u.banned_until ? new Date(u.banned_until) > new Date() : false,
+                last_sign_in: u.last_sign_in_at ?? null,
+                };
+            });
 
         return new Response(JSON.stringify({ users }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },

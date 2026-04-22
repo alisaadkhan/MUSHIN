@@ -88,6 +88,7 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+DROP TRIGGER IF EXISTS trg_support_tickets_updated_at ON support_tickets;
 CREATE TRIGGER trg_support_tickets_updated_at
   BEFORE UPDATE ON support_tickets
   FOR EACH ROW EXECUTE FUNCTION update_support_ticket_updated_at();
@@ -287,6 +288,7 @@ CREATE TABLE IF NOT EXISTS notification_log (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ALTER TABLE notification_log ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admins see notification log" ON notification_log;
 CREATE POLICY "Admins see notification log"
   ON notification_log FOR SELECT
   USING (
@@ -296,6 +298,7 @@ CREATE POLICY "Admins see notification log"
         AND ur.role IN ('admin', 'super_admin')
     )
   );
+DROP POLICY IF EXISTS "Service insert notification log" ON notification_log;
 CREATE POLICY "Service insert notification log"
   ON notification_log FOR INSERT
   WITH CHECK (TRUE);

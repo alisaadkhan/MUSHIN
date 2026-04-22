@@ -272,6 +272,7 @@ END;
 $$;
 -- View: training data for future ML niche model
 -- Export this to retrain the classifier when you have 500+ corrections
+DROP VIEW IF EXISTS public.niche_training_data;
 CREATE OR REPLACE VIEW public.niche_training_data AS
 SELECT 
   id,

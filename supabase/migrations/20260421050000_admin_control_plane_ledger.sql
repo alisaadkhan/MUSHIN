@@ -125,11 +125,9 @@ BEGIN
   );
 END;
 $$;
-
 REVOKE ALL ON FUNCTION public.admin_mutate_user_credits_ledger(uuid, uuid, public.mushin_credit_type, text, integer, integer, text, uuid, text, jsonb) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.admin_mutate_user_credits_ledger(uuid, uuid, public.mushin_credit_type, text, integer, integer, text, uuid, text, jsonb) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_mutate_user_credits_ledger(uuid, uuid, public.mushin_credit_type, text, integer, integer, text, uuid, text, jsonb) TO service_role;
-
 -- 2) Admin view: credit ledger (read-only)
 CREATE OR REPLACE VIEW public.admin_credit_ledger_view
   WITH (security_invoker = true)
@@ -149,10 +147,8 @@ SELECT
   ct.metadata
 FROM public.credit_transactions ct
 WHERE public.is_system_admin(auth.uid());
-
 REVOKE ALL ON public.admin_credit_ledger_view FROM PUBLIC;
 GRANT SELECT ON public.admin_credit_ledger_view TO authenticated, service_role;
-
 -- 3) Security alerts table (lightweight flags surface)
 CREATE TABLE IF NOT EXISTS public.security_alerts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -164,7 +160,6 @@ CREATE TABLE IF NOT EXISTS public.security_alerts (
   ip_address text,
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb
 );
-
 -- Backward compatible: if table existed from older migrations, ensure required columns exist
 ALTER TABLE public.security_alerts
   ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
@@ -180,21 +175,16 @@ ALTER TABLE public.security_alerts
   ADD COLUMN IF NOT EXISTS ip_address text;
 ALTER TABLE public.security_alerts
   ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb;
-
 ALTER TABLE public.security_alerts ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS security_alerts_select_support_admin ON public.security_alerts;
 CREATE POLICY security_alerts_select_support_admin ON public.security_alerts
   FOR SELECT
   USING (public.is_support_or_admin() OR public.is_system_admin(auth.uid()));
-
 DROP POLICY IF EXISTS security_alerts_insert_service_role ON public.security_alerts;
 CREATE POLICY security_alerts_insert_service_role ON public.security_alerts
   FOR INSERT
   WITH CHECK (auth.role() = 'service_role');
-
 REVOKE UPDATE, DELETE ON public.security_alerts FROM anon, authenticated;
 CREATE INDEX IF NOT EXISTS idx_security_alerts_created_at ON public.security_alerts(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_security_alerts_user ON public.security_alerts(user_id);
 CREATE INDEX IF NOT EXISTS idx_security_alerts_workspace ON public.security_alerts(workspace_id);
-

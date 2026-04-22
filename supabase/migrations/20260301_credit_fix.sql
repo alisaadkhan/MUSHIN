@@ -53,8 +53,35 @@ ALTER TABLE public.enrichment_jobs ADD COLUMN IF NOT EXISTS last_error text;
 ALTER TABLE public.enrichment_jobs ADD COLUMN IF NOT EXISTS result jsonb;
 ALTER TABLE public.enrichment_jobs ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 ALTER TABLE public.enrichment_jobs ADD COLUMN IF NOT EXISTS next_attempt_at timestamptz NOT NULL DEFAULT now();
--- Fix enum issue if the column was created as enrichment_status enum
-ALTER TABLE public.enrichment_jobs ALTER COLUMN status TYPE text USING status::text;
+-- Fix enum issue if the column was created as an enum.
+-- Some environments have views depending on `enrichment_jobs.status`; alter safely.
+DO $$
+DECLARE
+  v_type regtype;
+BEGIN
+  SELECT a.atttypid::regtype
+    INTO v_type
+  FROM pg_attribute a
+  WHERE a.attrelid = 'public.enrichment_jobs'::regclass
+    AND a.attname = 'status'
+    AND a.attnum > 0
+    AND NOT a.attisdropped;
+
+  IF v_type IS NOT NULL AND v_type::text <> 'text' THEN
+    DROP VIEW IF EXISTS public.dashboard_job_queue_sizes;
+    EXECUTE 'ALTER TABLE public.enrichment_jobs ALTER COLUMN status TYPE text USING status::text';
+    CREATE OR REPLACE VIEW public.dashboard_job_queue_sizes AS
+    SELECT
+      date_trunc('minute', now()) AS bucket,
+      ej.status,
+      count(*)::bigint AS queue_size
+    FROM public.enrichment_jobs ej
+    GROUP BY ej.status;
+    REVOKE ALL ON public.dashboard_job_queue_sizes FROM PUBLIC;
+    GRANT SELECT ON public.dashboard_job_queue_sizes TO authenticated, service_role;
+  END IF;
+END;
+$$;
 CREATE INDEX IF NOT EXISTS idx_enrichment_jobs_status ON public.enrichment_jobs(status, next_attempt_at);
 CREATE INDEX IF NOT EXISTS idx_enrichment_jobs_workspace ON public.enrichment_jobs(workspace_id);
 -- Audience analysis table — for enhanced bot detection results

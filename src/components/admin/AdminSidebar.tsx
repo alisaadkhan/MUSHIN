@@ -3,7 +3,7 @@ import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import {
   LayoutDashboard, Users, CreditCard, BarChart2,
   Settings, ScrollText, Megaphone, ShieldCheck,
-  ArrowLeft, LifeBuoy, Coins, ShieldAlert, BookOpen,
+  ArrowLeft, LifeBuoy, Coins, ShieldAlert, UserCog, Key
 } from 'lucide-react';
 import { MushInLogo } from '@/components/ui/MushInLogo';
 
@@ -28,28 +28,28 @@ export function AdminSidebar() {
       label: 'Management',
       show: perms.isSupport,
       items: [
-        { icon: Users,     label: 'Users',         path: '/admin/users' },
-        { icon: CreditCard,label: 'Subscriptions', path: '/admin/subscriptions' },
-        { icon: Coins,     label: 'Credits',       path: '/admin/credits' },
-        { icon: ShieldAlert, label: 'Content',     path: '/admin/content' },
+        { icon: Users,       label: 'Users',         path: '/admin/users' },
+        { icon: UserCog,     label: 'Staff',         path: '/admin/staff' },
+        { icon: CreditCard,  label: 'Subscriptions', path: '/admin/subscriptions' },
+        { icon: Coins,       label: 'Credits',       path: '/admin/credits' },
       ],
     },
     {
       label: 'Communication',
       show: true,
       items: [
-        { icon: Megaphone, label: 'Announcements',    path: '/admin/announcements' },
-        { icon: LifeBuoy,  label: 'Support Tickets',  path: '/admin/support' },
+        { icon: Megaphone, label: 'Announcements',   path: '/admin/announcements' },
+        { icon: LifeBuoy,  label: 'Support Tickets', path: '/admin/support' },
       ],
     },
     {
       label: 'System',
       show: perms.isSupport,
       items: [
-        { icon: ScrollText,  label: 'Audit Log',    path: '/admin/audit-log' },
-        { icon: ShieldAlert, label: 'Security',     path: '/admin/security' },
-        { icon: ShieldCheck, label: 'Permissions',  path: '/admin/permissions' },
-        { icon: Settings,    label: 'Config',       path: '/admin/config' },
+        { icon: ScrollText,  label: 'Audit Log',   path: '/admin/audit-log' },
+        { icon: ShieldAlert, label: 'Security',    path: '/admin/security' },
+        { icon: ShieldCheck, label: 'Permissions', path: '/admin/permissions' },
+        { icon: Settings,    label: 'Config',      path: '/admin/config' },
       ],
     },
   ];
@@ -83,51 +83,46 @@ export function AdminSidebar() {
         </div>
       )}
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-5">
+      {/* Nav groups */}
+      <nav className="flex-1 overflow-y-auto py-3 space-y-4 px-2">
         {groups.filter(g => g.show).map(group => (
           <div key={group.label}>
-            <p className="text-[9px] font-bold text-white/20 uppercase tracking-[0.14em] px-3 mb-1">
+            <p className="px-2 mb-1 text-[9px] font-semibold uppercase tracking-widest text-white/25">
               {group.label}
             </p>
-            <ul className="space-y-px">
-              {group.items.map(item => {
-                const active = location.pathname === item.path;
-                return (
-                  <li key={item.path}>
-                    <Link
-                      to={item.path}
-                      className={`flex items-center gap-2.5 px-3 py-1.5 rounded text-[13px] transition-colors duration-100 ${
-                        active
-                          ? 'bg-white/8 text-white font-medium'
-                          : 'text-white/40 hover:text-white/70 hover:bg-white/4'
-                      }`}
-                    >
-                      <item.icon
-                        size={13}
-                        strokeWidth={active ? 2 : 1.5}
-                        className={active ? 'text-white' : 'text-white/40'}
-                      />
-                      {item.label}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+            {group.items.map(item => {
+              const active = location.pathname === item.path;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`flex items-center gap-2.5 px-2 py-1.5 rounded text-[12px] font-medium transition-colors ${
+                    active
+                      ? 'bg-white/8 text-white'
+                      : 'text-white/40 hover:text-white/70 hover:bg-white/4'
+                  }`}
+                >
+                  <item.icon size={13} className="shrink-0" />
+                  {item.label}
+                </Link>
+              );
+            })}
           </div>
         ))}
       </nav>
 
-      {/* Back to app */}
-      <div className="p-3 border-t border-white/5">
+      {/* Footer Links */}
+      <div className="px-2 py-3 border-t border-white/6 space-y-1">
         <Link
-          to="/dashboard"
-          className="flex items-center gap-2 px-3 py-1.5 rounded text-[12px] text-white/25 hover:text-white/50 hover:bg-white/4 transition-colors"
+          to="/update-password"
+          state={{ requireOld: true }}
+          className="flex items-center gap-2 px-2 py-1.5 rounded text-[11px] text-white/30 hover:text-white/60 hover:bg-white/4 transition-colors"
         >
-          <ArrowLeft size={11} />
-          Back to app
+          <Key size={12} />
+          Change Password
         </Link>
       </div>
+
     </aside>
   );
 }

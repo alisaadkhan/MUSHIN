@@ -111,21 +111,18 @@ BEGIN
   LIMIT 1;
 
   v_new_hash := encode(
-    extensions.digest(
-      convert_to(
-        coalesce(v_prev_hash, '') || '|' ||
-        coalesce(p_actor_user_id::text, '') || '|' ||
-        coalesce(p_target_user_id::text, '') || '|' ||
-        coalesce(p_workspace_id::text, '') || '|' ||
-        coalesce(p_action_type, '') || '|' ||
-        coalesce(p_action_description, '') || '|' ||
-        coalesce(p_ip_address, '') || '|' ||
-        coalesce(p_user_agent, '') || '|' ||
-        coalesce(p_metadata_json::text, '') || '|' ||
-        extract(epoch from now())::text,
-        'utf8'
-      ),
-      'sha256'::text
+    digest(
+      coalesce(v_prev_hash, '') || '|' ||
+      coalesce(p_actor_user_id::text, '') || '|' ||
+      coalesce(p_target_user_id::text, '') || '|' ||
+      coalesce(p_workspace_id::text, '') || '|' ||
+      coalesce(p_action_type, '') || '|' ||
+      coalesce(p_action_description, '') || '|' ||
+      coalesce(p_ip_address, '') || '|' ||
+      coalesce(p_user_agent, '') || '|' ||
+      coalesce(p_metadata_json::text, '') || '|' ||
+      extract(epoch from now())::text,
+      'sha256'
     ),
     'hex'
   );

@@ -55,7 +55,6 @@ BEGIN
   VALUES (ws_id, 'search', 1, jsonb_build_object('timestamp', now()));
 END;
 $$;
-
 -- 2. Ensure consume_ai_credit function is working correctly
 CREATE OR REPLACE FUNCTION public.consume_ai_credit(ws_id uuid)
 RETURNS void
@@ -103,7 +102,6 @@ BEGIN
   VALUES (ws_id, 'ai_search', 1, jsonb_build_object('timestamp', now()));
 END;
 $$;
-
 -- 3. Ensure consume_enrichment_credit function is working correctly
 CREATE OR REPLACE FUNCTION public.consume_enrichment_credit(ws_id uuid)
 RETURNS void
@@ -151,26 +149,21 @@ BEGIN
   VALUES (ws_id, 'enrichment', 1, jsonb_build_object('timestamp', now()));
 END;
 $$;
-
 -- 4. Grant execute permissions correctly
 -- Revoke from everyone first
 REVOKE EXECUTE ON FUNCTION public.consume_search_credit(uuid) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.consume_search_credit(uuid) FROM authenticated;
 REVOKE EXECUTE ON FUNCTION public.consume_search_credit(uuid) FROM anon;
-
 REVOKE EXECUTE ON FUNCTION public.consume_ai_credit(uuid) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.consume_ai_credit(uuid) FROM authenticated;
 REVOKE EXECUTE ON FUNCTION public.consume_ai_credit(uuid) FROM anon;
-
 REVOKE EXECUTE ON FUNCTION public.consume_enrichment_credit(uuid) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.consume_enrichment_credit(uuid) FROM authenticated;
 REVOKE EXECUTE ON FUNCTION public.consume_enrichment_credit(uuid) FROM anon;
-
 -- Grant to service_role (for edge functions)
 GRANT EXECUTE ON FUNCTION public.consume_search_credit(uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.consume_ai_credit(uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.consume_enrichment_credit(uuid) TO service_role;
-
 -- 5. Add helper function to get workspace credits (for frontend display)
 CREATE OR REPLACE FUNCTION public.get_workspace_credits()
 RETURNS TABLE (
@@ -204,11 +197,9 @@ BEGIN
   WHERE w.id = v_ws_id;
 END;
 $$;
-
 -- Grant execute to authenticated users
 REVOKE EXECUTE ON FUNCTION public.get_workspace_credits() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_workspace_credits() TO authenticated;
-
 -- 6. Fix credits_usage RLS policy (already in previous migration, but ensure it's correct)
 DROP POLICY IF EXISTS "Workspace members can view credits" ON public.credits_usage;
 CREATE POLICY "Workspace members can view credits" ON public.credits_usage
@@ -220,16 +211,15 @@ CREATE POLICY "Workspace members can view credits" ON public.credits_usage
       AND wm.user_id = auth.uid()
     )
   );
-
 DROP POLICY IF EXISTS "Service role can insert credits" ON public.credits_usage;
 CREATE POLICY "Service role can insert credits" ON public.credits_usage
   FOR INSERT
-  WITH CHECK (true); -- Service role handles authorization
+  WITH CHECK (true);
+-- Service role handles authorization
 
 -- 7. Add index for better performance
 CREATE INDEX IF NOT EXISTS idx_credits_usage_workspace_created 
   ON public.credits_usage(workspace_id, created_at DESC);
-
 -- ============================================================
 -- Verification Queries
 -- ============================================================
@@ -245,4 +235,4 @@ CREATE INDEX IF NOT EXISTS idx_credits_usage_workspace_created
 -- WHERE routine_name IN ('consume_search_credit', 'consume_ai_credit', 'consume_enrichment_credit', 'get_workspace_credits');
 
 -- Test credit deduction (replace WITH_YOUR_WORKSPACE_ID):
--- SELECT * FROM public.get_workspace_credits();
+-- SELECT * FROM public.get_workspace_credits();;

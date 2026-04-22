@@ -1,19 +1,21 @@
 import { getAdminAuditLogs, requireJwt, requireSystemAdmin } from "../_shared/privileged_gateway.ts";
 import { logAdminAction, logSystemAction } from "../_shared/audit_logger.ts";
 import { safeErrorResponse } from "../_shared/errors.ts";
-import { checkRateLimit, corsHeaders } from "../_shared/rate_limit.ts";
+import { checkRateLimit } from "../_shared/rate_limit.ts";
 import { extractClientIp } from "../_shared/security.ts";
+import { buildCorsHeaders } from "../_shared/cors.ts";
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...buildCorsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
 Deno.serve(async (req: Request) => {
+  const corsHeaders = buildCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  if (req.method !== "GET") return jsonResponse({ error: "Method not allowed" }, 405);
+  if (req.method !== "GET") return jsonResponse(req, { error: "Method not allowed" }, 405);
 
   const authHeader = req.headers.get("Authorization");
   const ipAddress = extractClientIp(req.headers.get("x-forwarded-for"));
@@ -28,7 +30,7 @@ Deno.serve(async (req: Request) => {
         ipAddress,
         userAgent,
       });
-      return jsonResponse({ error: "Too many requests" }, 429);
+      return jsonResponse(req, { error: "Too many requests" }, 429);
     }
 
     if (!authHeader?.startsWith("Bearer ")) {
@@ -39,7 +41,7 @@ Deno.serve(async (req: Request) => {
         userAgent,
         metadata: { endpoint: "admin-get-audit-log", status: "failed" },
       });
-      return jsonResponse({ error: "Unauthorized" }, 401);
+      return jsonResponse(req, { error: "Unauthorized" }, 401);
     }
 
     const { userId: actorUserId } = await requireJwt(authHeader);
@@ -68,7 +70,7 @@ Deno.serve(async (req: Request) => {
       metadata: { limit, actor_user_id, workspace_id, action_type },
     });
 
-    return jsonResponse(result);
+    return jsonResponse(req, result);
   } catch (err) {
     if (err instanceof Error && err.message === "Forbidden") {
       try {
@@ -83,7 +85,7 @@ Deno.serve(async (req: Request) => {
       } catch {
         // Ignore nested failures.
       }
-      return jsonResponse({ error: "Forbidden" }, 403);
+      return jsonResponse(req, { error: "Forbidden" }, 403);
     }
 
     if (err instanceof Error && err.message === "Unauthorized") {
@@ -94,7 +96,7 @@ Deno.serve(async (req: Request) => {
         userAgent,
         metadata: { endpoint: "admin-get-audit-log", status: "failed" },
       });
-      return jsonResponse({ error: "Unauthorized" }, 401);
+      return jsonResponse(req, { error: "Unauthorized" }, 401);
     }
 
     return safeErrorResponse(err, "[admin-get-audit-log]", corsHeaders);

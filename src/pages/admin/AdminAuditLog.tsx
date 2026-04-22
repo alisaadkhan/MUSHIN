@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { invokeEdgeAuthed } from '@/lib/edge';
 import { Search, RefreshCw, Loader2, Download } from 'lucide-react';
 
 /* ── Types ─────────────────────────────────────────────────── */
@@ -89,6 +90,7 @@ function DetailPanel({ entry, onClose }: { entry: AuditEntry; onClose: () => voi
 const ACTION_CATEGORIES = ['all', 'credits', 'user', 'session', 'role', 'system'] as const;
 
 export default function AdminAuditLog() {
+  const { session } = useAuth();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<string>('all');
   const [detail, setDetail] = useState<AuditEntry | null>(null);
@@ -97,6 +99,7 @@ export default function AdminAuditLog() {
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['audit-log', page, category],
+    enabled: !!session?.access_token,
     queryFn: async () => {
       const params = new URLSearchParams();
       params.set('limit', String(PAGE_SIZE));
@@ -105,11 +108,15 @@ export default function AdminAuditLog() {
         params.set('action_type', category);
       }
 
-      const { data, error } = await supabase.functions.invoke(`admin-get-audit-log?${params.toString()}`, {
-        method: 'GET',
-      });
+      const { data, error } = await invokeEdgeAuthed<{ logs: AuditEntry[]; error?: string }>(
+        'admin-get-audit-log',
+        {
+          method: 'GET',
+          search: params.toString(),
+        },
+      );
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (data?.error) throw new Error(String(data.error));
 
       const entries = (data?.logs ?? []) as AuditEntry[];
       return { entries, total: entries.length };

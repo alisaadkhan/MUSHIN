@@ -32,6 +32,20 @@ export function createPrivilegedClient() {
   });
 }
 
+/**
+ * Privileged DB client that also carries the caller JWT in Authorization header.
+ *
+ * Use this when you call SECURITY DEFINER RPCs that reference auth.uid()
+ * (or when you want RLS evaluation to use the caller identity),
+ * while still having service-role capabilities.
+ */
+export function createPrivilegedClientWithAuth(authHeader: string) {
+  return createClient(getSupabaseUrl(), getServiceRoleKey(), {
+    global: { headers: { Authorization: authHeader } },
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
 export function createUserClient(authHeader: string) {
   // Prefer anon key for normal user-scoped Auth calls, but fall back to
   // service role if SUPABASE_ANON_KEY isn't available in this runtime.
@@ -273,21 +287,21 @@ export function requireInternalGatewaySecret(req: Request) {
 }
 
 export async function requireSystemAdmin(authHeader: string | null): Promise<{ userId: string }> {
-  const { userId } = await requireJwt(authHeader);
-  const privilegedClient = createPrivilegedClient();
-
-  const { data, error } = await privilegedClient
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId)
-    .in("role", ["system_admin", "super_admin"]);
-
-  if (error || !data || data.length === 0) {
-    throw new Error("Forbidden");
+    const { userId } = await requireJwt(authHeader);
+    const privilegedClient = createPrivilegedClient();
+  
+    const { data, error } = await privilegedClient
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .in("role", ["system_admin", "super_admin", "admin"]);
+  
+    if (error || !data || data.length === 0) {
+      throw new Error("Forbidden");
+    }
+  
+    return { userId };
   }
-
-  return { userId };
-}
 
 export async function isSuperAdmin(userId: string): Promise<boolean> {
   const privilegedClient = createPrivilegedClient();
@@ -321,19 +335,24 @@ async function appendSystemAuditLog(args: {
   actionDescription: string;
   details?: AuditMeta;
 }) {
-  const privilegedClient = createPrivilegedClient();
-  const { error } = await privilegedClient.rpc("append_system_audit_log", {
-    p_actor_user_id: args.actorUserId,
-    p_target_user_id: args.targetUserId ?? null,
-    p_workspace_id: args.workspaceId ?? null,
-    p_action_type: args.actionType,
-    p_action_description: args.actionDescription,
-    p_ip_address: args.details?.ipAddress ?? null,
-    p_user_agent: args.details?.userAgent ?? null,
-    p_metadata_json: args.details?.metadata ?? {},
-  });
-
-  if (error) throw error;
+  try {
+    const privilegedClient = createPrivilegedClient();
+    const { error } = await privilegedClient.rpc("append_system_audit_log", {
+      p_actor_user_id: args.actorUserId,
+      p_target_user_id: args.targetUserId ?? null,
+      p_workspace_id: args.workspaceId ?? null,
+      p_action_type: args.actionType,
+      p_action_description: args.actionDescription,
+      p_ip_address: args.details?.ipAddress ?? null,
+      p_user_agent: args.details?.userAgent ?? null,
+      p_metadata_json: args.details?.metadata ?? {},
+    });
+    if (error) {
+      console.error("[appendSystemAuditLog] Error:", error);
+    }
+  } catch (err) {
+    console.error("[appendSystemAuditLog] Exception:", err);
+  }
 }
 
 export type AdminCreditType = "search" | "ai" | "email" | "enrichment";

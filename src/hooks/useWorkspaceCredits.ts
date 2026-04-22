@@ -28,8 +28,8 @@ export function useWorkspaceCredits() {
       };
     },
     enabled: !!workspace,
-    staleTime: 30_000,
-    refetchInterval: 60_000,
+    staleTime: 5_000,
+    refetchInterval: 10_000,
   });
 
   return query;

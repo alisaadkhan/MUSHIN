@@ -1,16 +1,45 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAdminPermissions, AdminPermissions } from "@/hooks/useAdminPermissions";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AdminRouteProps {
     children: React.ReactNode;
     requiredPermission?: keyof Omit<AdminPermissions, "role" | "isLoading">;
 }
 
+const ADMIN_INACTIVITY_MS = 2 * 60 * 1000; // 2 minutes
+const ADMIN_MAX_SESSION_MS = 10 * 60 * 1000; // 10 minutes (force global sign-out)
+
+function readTs(key: string): number | null {
+    try {
+        const raw = sessionStorage.getItem(key);
+        if (!raw) return null;
+        const n = Number(raw);
+        return Number.isFinite(n) ? n : null;
+    } catch {
+        return null;
+    }
+}
+
+function writeNow(key: string) {
+    try {
+        sessionStorage.setItem(key, String(Date.now()));
+    } catch {
+        // ignore
+    }
+}
+
 export function AdminRoute({ children, requiredPermission }: AdminRouteProps) {
     const { user, loading: authLoading } = useAuth();
     const perms = useAdminPermissions();
+    const location = useLocation();
+    const [locked, setLocked] = useState(false);
+
+    const authAt = useMemo(() => readTs("admin_auth_at"), [user?.id]);
+    const lastActivity = useMemo(() => readTs("admin_last_activity"), [user?.id]);
 
     if (authLoading || perms.isLoading) {
         return (
@@ -30,6 +59,86 @@ export function AdminRoute({ children, requiredPermission }: AdminRouteProps) {
 
     if (!perms.isAnyAdmin) {
         return <Navigate to="/dashboard" replace />;
+    }
+
+    // Admin-only "re-auth" policy:
+    // - After 2 minutes of inactivity: lock the admin area (local sign-out → requires password).
+    // - After 10 minutes since last admin unlock: global sign-out (all devices), then require password.
+    useEffect(() => {
+        if (!user || !perms.isAnyAdmin) return;
+
+        // If user never logged in via admin portal this session, require going through /admin/login once.
+        if (!authAt) {
+            setLocked(true);
+            return;
+        }
+
+        let rafPending = false;
+        const bump = () => {
+            if (rafPending) return;
+            rafPending = true;
+            requestAnimationFrame(() => {
+                rafPending = false;
+                writeNow("admin_last_activity");
+            });
+        };
+
+        const events: Array<keyof DocumentEventMap> = [
+            "mousemove",
+            "mousedown",
+            "keydown",
+            "scroll",
+            "touchstart",
+            "wheel",
+        ];
+        for (const ev of events) document.addEventListener(ev, bump, { passive: true });
+
+        const timer = window.setInterval(async () => {
+            const now = Date.now();
+            const a = readTs("admin_auth_at");
+            const la = readTs("admin_last_activity") ?? a;
+
+            // Hard limit: global sign-out (every device)
+            if (a && now - a > ADMIN_MAX_SESSION_MS) {
+                setLocked(true);
+                try {
+                    await supabase.auth.signOut({ scope: "global" });
+                } finally {
+                    try {
+                        sessionStorage.removeItem("admin_auth_at");
+                        sessionStorage.removeItem("admin_last_activity");
+                    } catch { /* ignore */ }
+                }
+                return;
+            }
+
+            // Inactivity: local lock
+            if (la && now - la > ADMIN_INACTIVITY_MS) {
+                setLocked(true);
+                try {
+                    await supabase.auth.signOut();
+                } finally {
+                    try {
+                        sessionStorage.removeItem("admin_auth_at");
+                        sessionStorage.removeItem("admin_last_activity");
+                    } catch { /* ignore */ }
+                }
+                return;
+            }
+        }, 2000);
+
+        // Always bump on route change inside admin (counts as activity).
+        bump();
+
+        return () => {
+            window.clearInterval(timer);
+            for (const ev of events) document.removeEventListener(ev, bump);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.id, perms.isAnyAdmin, authAt, location.pathname]);
+
+    if (locked) {
+        return <Navigate to="/admin/login" replace />;
     }
 
     if (requiredPermission && !perms[requiredPermission]) {

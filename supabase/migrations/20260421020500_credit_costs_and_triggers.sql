@@ -19,21 +19,17 @@ CREATE TABLE IF NOT EXISTS public.credit_costs (
   updated_at  timestamptz NOT NULL DEFAULT now(),
   created_at  timestamptz NOT NULL DEFAULT now()
 );
-
 ALTER TABLE public.credit_costs ENABLE ROW LEVEL SECURITY;
-
 -- Readable by authenticated users (to show pricing in UI)
 DROP POLICY IF EXISTS "credit_costs_read" ON public.credit_costs;
 CREATE POLICY "credit_costs_read" ON public.credit_costs
   FOR SELECT TO authenticated
   USING (true);
-
 -- Writable only by service role by default
 DROP POLICY IF EXISTS "credit_costs_service_write" ON public.credit_costs;
 CREATE POLICY "credit_costs_service_write" ON public.credit_costs
   FOR ALL TO service_role
   USING (true) WITH CHECK (true);
-
 -- Default pricing (adjust any time)
 INSERT INTO public.credit_costs (action, credit_type, amount, enabled)
 VALUES
@@ -41,7 +37,6 @@ VALUES
   ('saved_search_create', 'search'::public.mushin_credit_type, 1, true),
   ('email_send',          'email'::public.mushin_credit_type,  1, true)
 ON CONFLICT (action) DO NOTHING;
-
 -- 2) Helper: fetch pricing row
 CREATE OR REPLACE FUNCTION public.get_credit_cost(p_action text)
 RETURNS TABLE(credit_type public.mushin_credit_type, amount integer, enabled boolean)
@@ -54,7 +49,6 @@ AS $$
   WHERE c.action = p_action
   LIMIT 1;
 $$;
-
 -- 3) Helper: debit credits for current auth user (trigger-safe)
 CREATE OR REPLACE FUNCTION public.debit_current_user_for_action(
   p_workspace_id uuid,
@@ -103,7 +97,6 @@ BEGIN
   RETURN v_result;
 END;
 $$;
-
 -- 5) Triggers
 
 -- Campaign creation cost
@@ -122,12 +115,10 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 DROP TRIGGER IF EXISTS trg_campaign_create_debit ON public.campaigns;
 CREATE TRIGGER trg_campaign_create_debit
   AFTER INSERT ON public.campaigns
   FOR EACH ROW EXECUTE FUNCTION public.trg_debit_on_campaign_create();
-
 -- Saved search creation cost
 CREATE OR REPLACE FUNCTION public.trg_debit_on_saved_search_create()
 RETURNS trigger
@@ -144,12 +135,10 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 DROP TRIGGER IF EXISTS trg_saved_search_create_debit ON public.saved_searches;
 CREATE TRIGGER trg_saved_search_create_debit
   AFTER INSERT ON public.saved_searches
   FOR EACH ROW EXECUTE FUNCTION public.trg_debit_on_saved_search_create();
-
 -- Email outreach cost (only when an email-like outreach is inserted)
 CREATE OR REPLACE FUNCTION public.trg_debit_on_outreach_email()
 RETURNS trigger
@@ -189,9 +178,7 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 DROP TRIGGER IF EXISTS trg_outreach_email_debit ON public.outreach_log;
 CREATE TRIGGER trg_outreach_email_debit
   AFTER INSERT ON public.outreach_log
   FOR EACH ROW EXECUTE FUNCTION public.trg_debit_on_outreach_email();
-

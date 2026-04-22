@@ -240,7 +240,6 @@ function LedgerDrawer({
         .from('admin_credit_ledger_view')
         .select('id,created_at,user_id,workspace_id,credit_type,kind,amount,balance_before,balance_after,action,metadata')
         .eq('workspace_id', workspace.workspace_id)
-        .eq('user_id', workspace.owner_id)
         .order('created_at', { ascending: false })
         .limit(50);
       if (error) throw error;
@@ -357,8 +356,8 @@ export default function AdminCredits() {
     queryKey: ['admin-credit-balances'],
     queryFn: async () => {
       const [wsRes, balRes, usersRes] = await Promise.all([
-        supabase.from('workspaces').select('id,owner_id,plan').limit(200),
-        supabase.from('user_credit_balances').select('user_id,workspace_id,credit_type,balance').limit(5000),
+        supabase.from('workspaces').select('id,owner_id,plan').limit(2000),
+        supabase.from('user_credit_balances').select('user_id,workspace_id,credit_type,balance').limit(20000),
         invokeEdgeAuthed('admin-list-users'),
       ]);
       if (wsRes.error) throw wsRes.error;
@@ -402,23 +401,27 @@ export default function AdminCredits() {
   /* ── Adjust handler ── */
   const handleAdjust = async (payload: AdjustPayload) => {
     try {
-      const { data, error } = await supabase.functions.invoke('admin-adjust-credits', {
+      const { data, error } = await invokeEdgeAuthed<any>('admin-adjust-credits', {
         body: {
           workspace_id: payload.workspaceId,
           target_user_id: payload.targetUserId,
-          credit_type:  payload.creditType,
-          mode: "adjust",
+          credit_type: payload.creditType,
+          mode: 'adjust',
           amount_delta: payload.delta,
-          reason:       payload.note,
+          reason: payload.note,
         },
       });
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (data?.error) throw new Error(String(data.error));
       toast({ title: 'Credits adjusted', description: `${payload.delta > 0 ? '+' : ''}${payload.delta} ${payload.creditType}` });
       qc.invalidateQueries({ queryKey: ['admin-credit-balances'] });
       qc.invalidateQueries({ queryKey: ['credit-ledger', payload.workspaceId] });
     } catch (err: any) {
-      toast({ title: 'Adjustment failed', description: err.message, variant: 'destructive' });
+      const msg =
+        err?.context?.body?.error ? String(err.context.body.error) :
+        err?.message ? String(err.message) :
+        'Adjustment failed';
+      toast({ title: 'Adjustment failed', description: msg, variant: 'destructive' });
     }
   };
 
@@ -506,8 +509,11 @@ export default function AdminCredits() {
                     </td>
 
                     {/* Plan */}
-                    <td className="px-4 py-3 capitalize text-white/40">
-                      {ws.plan ?? '—'}
+                    <td className="px-4 py-3">
+                      {ws.plan
+                        ? <span className="capitalize text-white/60">{ws.plan}</span>
+                        : <span className="text-white/25 text-[11px]">Not subscribed</span>
+                      }
                     </td>
 
                     {/* Credit balances */}

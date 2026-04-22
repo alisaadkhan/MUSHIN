@@ -1,3 +1,6 @@
+import { validateClientEnv } from "./env";
+validateClientEnv();
+
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
@@ -40,8 +43,9 @@ if (!root) {
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    root.innerHTML = `<div style="color:white;background:#7f1d1d;padding:2rem;font-family:monospace;min-height:100vh">
-      <strong style="font-size:1.25rem">Failed to mount</strong><br/><br/>${msg}
+    const safe = msg.replace(/[<>&]/g, (c) => ({ "<": "\u003c", ">": "\u003e", "&": "\u0026" }[c]!));
+    root.innerHTML = `<div style="color:#f5f5f5;background:#1a1a1a;padding:2rem;font-family:system-ui,sans-serif;min-height:100vh;line-height:1.5">
+      <strong style="font-size:1.125rem">Something went wrong</strong><br/><br/>${safe}
     </div>`;
     console.error("[MUSHIN] mount error:", err);
     hideLoadingScreen();

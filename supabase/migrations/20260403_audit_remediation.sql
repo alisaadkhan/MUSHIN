@@ -11,7 +11,6 @@ CREATE POLICY "Workspace members can read bot signal weights"
     SELECT 1 FROM workspace_members wm
     WHERE wm.user_id = auth.uid()
   ));
-
 -- ── 2. Restrict tracking_events INSERT to service_role only ──────────────────
 DROP POLICY IF EXISTS "Anyone can insert tracking events" ON tracking_events;
 -- Only allow inserts via edge functions (service_role)
@@ -29,18 +28,14 @@ CREATE POLICY "Authenticated users can read influencers cache"
 REVOKE SELECT ON super_admin_user_overview FROM authenticated;
 REVOKE SELECT ON super_admin_workspace_overview FROM authenticated;
 REVOKE SELECT ON super_admin_system_health FROM authenticated;
-
 GRANT SELECT ON super_admin_user_overview TO service_role;
 GRANT SELECT ON super_admin_workspace_overview TO service_role;
 GRANT SELECT ON super_admin_system_health TO service_role;
-
 -- ── 5. Revoke anon execute on admin-check functions ──────────────────────────
 REVOKE EXECUTE ON FUNCTION is_super_admin(uuid) FROM anon;
 REVOKE EXECUTE ON FUNCTION is_system_admin(uuid) FROM anon;
-
 GRANT EXECUTE ON FUNCTION is_super_admin(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION is_system_admin(uuid) TO authenticated;
-
 -- ── 6. Add foreign key constraints for data integrity ────────────────────────
 -- Only add FKs if they don't already exist (idempotent)
 DO $$
@@ -80,11 +75,9 @@ BEGIN
     END IF;
   END IF;
 END $$;
-
 -- ── 7. Add index on security_events timestamp ────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_security_events_ts
   ON security_events ("timestamp" DESC);
-
 -- ── 8. Sanitize IP addresses in anomaly_logs ─────────────────────────────────
 -- Add a check constraint to ensure IP addresses are valid format
 DO $$

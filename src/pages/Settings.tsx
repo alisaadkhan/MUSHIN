@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { User, Globe, Lock, Zap, Mail, Trash2, Camera, Monitor, Loader2, Shield, UserPlus, QrCode, CheckCircle2, AlertCircle, X } from "lucide-react";
+import { User, Globe, Lock, Zap, Mail, Trash2, Camera, Monitor, Loader2, Shield, UserPlus, QrCode, CheckCircle2, AlertCircle, X, CreditCard } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -14,8 +14,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const tabs = [
   { label: "Profile", icon: User },
-  { label: "Workspace", icon: Globe },
-  { label: "Integrations", icon: Zap },
+  { label: "Billing", icon: CreditCard },
   { label: "Security", icon: Lock },
 ];
 
@@ -43,6 +42,7 @@ export default function Settings() {
   }, [profile]);
 
   // ── Security ─────────────────────────────────────────────────────────────
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordSaving, setPasswordSaving] = useState(false);
@@ -158,6 +158,10 @@ export default function Settings() {
   };
 
   const handlePasswordUpdate = async () => {
+    if (!currentPassword) {
+      toast({ title: "Original password required", description: "Please enter your original password.", variant: "destructive" });
+      return;
+    }
     if (newPassword.length < 8) {
       toast({ title: "Weak password", description: "Password must be at least 8 characters.", variant: "destructive" });
       return;
@@ -168,14 +172,22 @@ export default function Settings() {
     }
     setPasswordSaving(true);
     try {
+      // Verify original password first
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: user!.email!,
+        password: currentPassword,
+      });
+      if (verifyError) throw verifyError;
+
       const { error } = await updatePassword(newPassword);
-      if (error) {
-        toast({ title: "Error", description: error.message, variant: "destructive" });
-      } else {
-        toast({ title: "Password updated" });
-        setNewPassword("");
-        setConfirmPassword("");
-      }
+      if (error) throw error;
+      
+      toast({ title: "Password updated" });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      toast({ title: "Update failed", description: err.message, variant: "destructive" });
     } finally {
       setPasswordSaving(false);
     }
@@ -341,194 +353,121 @@ export default function Settings() {
 
         <div className="flex-1 min-w-0">
           {activeTab === "Profile" && (
-            <div className="bg-background/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-6 md:p-8 space-y-6">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground mb-1">Public Profile</h2>
-                <p className="text-sm text-muted-foreground">This is how you appear to others on the platform.</p>
-              </div>
-
-              <div className="flex items-center gap-5 pb-2">
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt="Avatar" className="w-16 h-16 rounded-full object-cover border-2 border-primary/20" />
-                ) : (
-                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-xl font-bold text-primary border-2 border-primary/20">{initials}</div>
-                )}
-                <div>
-                  <input
-                    ref={avatarInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/gif,image/webp"
-                    className="hidden"
-                    onChange={handleAvatarFileChange}
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-lg h-8 px-3 font-medium mb-1.5"
-                    onClick={() => avatarInputRef.current?.click()}
-                    disabled={avatarUploading}
-                  >
-                    {avatarUploading ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <Camera size={14} className="mr-1.5" />}
-                    {avatarUploading ? "Uploading…" : "Upload photo"}
-                  </Button>
-                  <p className="text-xs text-muted-foreground">JPG, PNG, GIF or WebP. 1 MB max.</p>
-                </div>
-              </div>
-
-              <div className="grid sm:grid-cols-2 gap-5">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground block">First name</label>
-                  <Input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="John" className="h-10" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground block">Last name</label>
-                  <Input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Doe" className="h-10" />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground block">Email address</label>
-                <div className="relative opacity-70">
-                  <Mail size={16} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input type="email" value={user?.email || ""} disabled className="h-10 pl-9 bg-muted/50 cursor-not-allowed" />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">To change your email address, contact support.</p>
-              </div>
-
-              <div className="pt-2 border-t border-border/50">
-                <Button className="rounded-lg font-medium btn-shine shadow-sm" onClick={handleProfileSave} disabled={profileSaving}>
-                  {profileSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save Changes
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {activeTab === "Workspace" && (
-            <div className="space-y-5">
+            <>
               <div className="bg-background/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-6 md:p-8 space-y-6">
                 <div>
-                  <h2 className="text-lg font-semibold text-foreground mb-1">Company Details</h2>
-                  <p className="text-sm text-muted-foreground">Manage your workspace settings and branding.</p>
+                  <h2 className="text-lg font-semibold text-foreground mb-1">Public Profile</h2>
+                  <p className="text-sm text-muted-foreground">This is how you appear to others on the platform.</p>
+                </div>
+
+                <div className="flex items-center gap-5 pb-2">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" className="w-16 h-16 rounded-full object-cover border-2 border-primary/20" />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-xl font-bold text-primary border-2 border-primary/20">
+                      {initials}
+                    </div>
+                  )}
+                  <div>
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      className="hidden"
+                      onChange={handleAvatarFileChange}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-lg h-8 px-3 font-medium mb-1.5"
+                      onClick={() => avatarInputRef.current?.click()}
+                      disabled={avatarUploading}
+                    >
+                      {avatarUploading ? (
+                        <Loader2 size={14} className="mr-1.5 animate-spin" />
+                      ) : (
+                        <Camera size={14} className="mr-1.5" />
+                      )}
+                      {avatarUploading ? "Uploading…" : "Upload photo"}
+                    </Button>
+                    <p className="text-xs text-muted-foreground">JPG, PNG, GIF or WebP. 1 MB max.</p>
+                  </div>
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-5">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground block">Workspace name</label>
-                    <input type="text" value={workspaceData?.name || ""} disabled className="w-full h-10 px-3 rounded-lg border border-border bg-muted/50 opacity-70 cursor-not-allowed text-sm text-foreground" />
+                    <label className="text-sm font-medium text-foreground block">First name</label>
+                    <Input
+                      type="text"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="John"
+                      className="h-10"
+                    />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground block">Workspace URL slug</label>
-                    <div className="flex">
-                      <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-border bg-muted/30 text-muted-foreground text-sm">app.mushin.com/</span>
-                      <input type="text" value={workspaceData?.name?.toLowerCase().replace(/\s+/g, "-") || ""} disabled className="flex-1 min-w-0 h-10 px-3 rounded-r-lg border border-border bg-muted/50 opacity-70 cursor-not-allowed text-sm text-foreground" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-background/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl overflow-hidden">
-                <div className="p-6 md:p-8 pb-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                      <h2 className="text-lg font-semibold text-foreground mb-1">Team Members</h2>
-                      <p className="text-sm text-muted-foreground">Manage who has access to this workspace.</p>
-                    </div>
-                    <Button variant="outline" size="sm" className="rounded-lg h-9 font-medium" onClick={() => setShowInviteModal(true)}><UserPlus size={14} strokeWidth={2} className="mr-1.5" /> Invite Member</Button>
+                    <label className="text-sm font-medium text-foreground block">Last name</label>
+                    <Input
+                      type="text"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder="Doe"
+                      className="h-10"
+                    />
                   </div>
                 </div>
 
-                <div className="border-t border-border/50">
-                  <table className="w-full">
-                    <thead className="bg-muted/30">
-                      <tr>
-                        <th className="text-left text-xs font-medium text-muted-foreground px-6 md:px-8 py-3 w-full">User</th>
-                        <th className="text-left text-xs font-medium text-muted-foreground px-6 py-3 whitespace-nowrap">Role</th>
-                        <th className="text-right text-xs font-medium text-muted-foreground px-6 md:px-8 py-3 whitespace-nowrap">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/50">
-                      {(workspaceData as any)?.workspace_members?.map((member: any) => {
-                        const mp = member.profiles;
-                        const memberInitials = mp?.full_name?.split(" ").map((w: string) => w[0]).join("").toUpperCase() || "?";
-                        return (
-                          <tr key={member.id} className="hover:bg-muted/10 transition-colors">
-                            <td className="px-6 md:px-8 py-3">
-                              <div className="flex items-center gap-3">
-                                {mp?.avatar_url ? (
-                                  <img src={mp.avatar_url} alt="Avatar" className="w-8 h-8 rounded-full border border-border/50" />
-                                ) : (
-                                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">{memberInitials}</div>
-                                )}
-                                <div>
-                                  <p className="text-sm font-medium text-foreground leading-tight">{mp?.full_name || "Unknown"}</p>
-                                  {user?.id === member.user_id && <p className="text-[11px] text-muted-foreground mt-0.5">You</p>}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-3">
-                              <Badge variant="outline" className={`font-normal rounded-md px-2 py-0.5 ${member.role === 'owner' ? 'bg-primary/5 text-primary border-primary/20' : 'bg-muted/30 text-muted-foreground'}`}>
-                                {roleLabels[member.role] || member.role}
-                              </Badge>
-                            </td>
-                            <td className="px-6 md:px-8 py-3 text-right">
-                              {member.role !== "owner" && user?.id !== member.user_id && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 -mr-2"
-                                  onClick={() => { if (window.confirm("Remove this member from the workspace?")) handleRemoveMember(member.user_id); }}
-                                >
-                                  <Trash2 size={14} strokeWidth={1.5} />
-                                </Button>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div className="bg-background/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-6 md:p-8 space-y-6">
-                <div>
-                  <h2 className="text-lg font-semibold text-foreground mb-1">Email Outreach Defaults</h2>
-                  <p className="text-sm text-muted-foreground">Default settings used when sending campaigns and emails.</p>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground block">Email address</label>
+                  <div className="relative opacity-70">
+                    <Mail
+                      size={16}
+                      strokeWidth={1.5}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                    />
+                    <Input
+                      type="email"
+                      value={user?.email || ""}
+                      disabled
+                      className="h-10 pl-9 bg-muted/50 cursor-not-allowed"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">To change your email address, contact support.</p>
                 </div>
 
-                <div className="grid sm:grid-cols-2 gap-5">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground block">Default sender name</label>
-                    <Input type="text" value={defaultFromName} onChange={(e) => setDefaultFromName(e.target.value)} placeholder="Company Name" className="h-10" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground block">Default reply-to email</label>
-                    <div className="relative">
-                      <Mail size={16} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <Input type="email" value={defaultReplyTo} onChange={(e) => setDefaultReplyTo(e.target.value)} placeholder="hello@company.com" className="h-10 pl-9" />
-                    </div>
-                  </div>
-                </div>
                 <div className="pt-2 border-t border-border/50">
-                  <Button className="rounded-lg font-medium shadow-sm" onClick={handleOutreachSave} disabled={outreachSaving}>
-                    {outreachSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Save Defaults
+                  <Button
+                    className="rounded-lg font-medium btn-shine shadow-sm"
+                    onClick={handleProfileSave}
+                    disabled={profileSaving}
+                  >
+                    {profileSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save Changes
                   </Button>
                 </div>
-              </div>
-
-              <div className="bg-background/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-6 md:p-8">
-                <EmailTemplateManager />
               </div>
 
               <DataManagement />
-            </div>
+            </>
           )}
 
-          {activeTab === "Integrations" && (
-            <div className="bg-background/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-6 md:p-8">
-              <IntegrationsTab />
+          {activeTab === "Billing" && (
+            <div className="bg-background/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-6 md:p-8 space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground mb-1">Payment Methods</h2>
+                <p className="text-sm text-muted-foreground">Manage your saved credit cards and billing information.</p>
+              </div>
+              <div className="border border-border/50 rounded-xl p-6 bg-muted/10 text-center space-y-3">
+                <CreditCard className="mx-auto h-8 w-8 text-muted-foreground opacity-50" />
+                <div>
+                  <h3 className="text-sm font-medium text-foreground">No payment methods saved</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Add a payment method to easily upgrade or renew your plan.</p>
+                </div>
+                <Button variant="outline" className="mt-2 h-9 rounded-lg shadow-sm">
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Add Payment Method
+                </Button>
+              </div>
             </div>
           )}
 
@@ -538,21 +477,27 @@ export default function Settings() {
               <div className="bg-background/80 backdrop-blur-md border border-white/50 shadow-sm rounded-2xl p-6 md:p-8 space-y-6">
                 <div>
                   <h2 className="text-lg font-semibold text-foreground mb-1">Change Password</h2>
-                  <p className="text-sm text-muted-foreground">Use a strong, unique password of at least 8 characters.</p>
+                  <p className="text-sm text-muted-foreground">Type your original password, then your new password.</p>
                 </div>
 
-                <div className="grid sm:grid-cols-2 gap-5">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground block">New password</label>
-                    <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="At least 8 characters" className="h-10" />
+                <div className="space-y-5">
+                  <div className="space-y-2 max-w-sm">
+                    <label className="text-sm font-medium text-foreground block">Original password</label>
+                    <Input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Enter current password" className="h-10" />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground block">Confirm new password</label>
-                    <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repeat password" className="h-10" />
+                  <div className="grid sm:grid-cols-2 gap-5 pt-2">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground block">New password</label>
+                      <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="At least 8 characters" className="h-10" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground block">Confirm new password</label>
+                      <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repeat password" className="h-10" />
+                    </div>
                   </div>
                 </div>
                 <div className="pt-2 border-t border-border/50">
-                  <Button className="rounded-lg font-medium shadow-sm" onClick={handlePasswordUpdate} disabled={passwordSaving || newPassword.length < 8 || newPassword !== confirmPassword}>
+                  <Button className="rounded-lg font-medium shadow-sm" onClick={handlePasswordUpdate} disabled={passwordSaving || !currentPassword || newPassword.length < 8 || newPassword !== confirmPassword}>
                     {passwordSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Update Password
                   </Button>

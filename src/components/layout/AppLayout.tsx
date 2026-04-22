@@ -4,7 +4,7 @@ import { Search, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { useNavigate } from "react-router-dom";
-import { CreditLockOverlay } from "@/components/credits/CreditLockOverlay";
+import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -32,7 +32,6 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="min-h-screen flex bg-background relative overflow-hidden">
-      <CreditLockOverlay />
       {/* Purple glow blobs */}
       <div className="fixed top-0 right-0 w-[500px] h-[500px] rounded-full bg-primary opacity-[0.05] blur-[120px] -z-10 pointer-events-none" />
       <div className="fixed bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-primary opacity-[0.04] blur-[120px] -z-10 pointer-events-none" />
@@ -49,6 +48,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <AppSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+        <AnnouncementBanner />
         {/* Topbar */}
         <header className="h-14 border-b border-border bg-background/80 backdrop-blur-md flex items-center px-3 sm:px-4 gap-3 flex-shrink-0 z-20">
           <Button

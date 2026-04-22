@@ -31,14 +31,12 @@
 REVOKE SELECT ON public.super_admin_user_overview      FROM authenticated;
 REVOKE SELECT ON public.super_admin_workspace_overview FROM authenticated;
 REVOKE SELECT ON public.super_admin_system_health      FROM authenticated;
-
 -- M-03: Revoke broad authenticated access to dashboard analytics views.
 -- These contain platform-wide API usage rates, error rates, and credit burn data.
 REVOKE SELECT ON public.dashboard_requests_per_minute  FROM authenticated;
 REVOKE SELECT ON public.dashboard_error_rates          FROM authenticated;
 REVOKE SELECT ON public.dashboard_credit_burn_rate     FROM authenticated;
 REVOKE SELECT ON public.dashboard_job_queue_sizes      FROM authenticated;
-
 -- service_role retains access — used by privileged edge functions.
 -- No grant needed as service_role bypasses RLS and already has access.
 -- Explicitly confirming for documentation clarity:

@@ -12,4 +12,3 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'workspace_members wm_select fix skipped: %', SQLERRM;
 END; $$;
-

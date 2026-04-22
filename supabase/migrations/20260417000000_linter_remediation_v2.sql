@@ -28,7 +28,6 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'auth_users_exposed revoke skipped: %', SQLERRM;
 END; $$;
-
 -- ─────────────────────────────────────────────────────────────
 -- PART 2: security_definer_view — set security_invoker on ALL views
 -- (Belt-and-suspenders: covers any not handled by previous migration)
@@ -47,7 +46,6 @@ BEGIN
     END;
   END LOOP;
 END; $$;
-
 -- ─────────────────────────────────────────────────────────────
 -- PART 3: function_search_path_mutable
 -- Add SET search_path = '' to every affected function.
@@ -82,7 +80,6 @@ BEGIN
     END;
   END LOOP;
 END; $$;
-
 -- ─────────────────────────────────────────────────────────────
 -- PART 4: rls_policy_always_true
 -- Service-role policies with USING(true)/WITH CHECK(true) are
@@ -103,7 +100,6 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'admin_audit_log service policy skip: %', SQLERRM;
 END; $$;
-
 -- api_usage_logs: Service role full access api_usage
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Service role full access api_usage" ON public.api_usage_logs';
@@ -116,7 +112,6 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'api_usage_logs service policy skip: %', SQLERRM;
 END; $$;
-
 -- notification_log: Service insert notification log
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Service insert notification log" ON public.notification_log';
@@ -129,7 +124,6 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'notification_log service policy skip: %', SQLERRM;
 END; $$;
-
 -- notifications: Service role inserts notifications
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Service role inserts notifications" ON public.notifications';
@@ -143,7 +137,6 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'notifications service policy skip: %', SQLERRM;
 END; $$;
-
 -- refund_idempotency_keys: Service role full access idempotency
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Service role full access idempotency" ON public.refund_idempotency_keys';
@@ -156,7 +149,6 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'refund_idempotency_keys service policy skip: %', SQLERRM;
 END; $$;
-
 -- user_activity_logs: Service role full access user_activity
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Service role full access user_activity" ON public.user_activity_logs';
@@ -169,7 +161,6 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'user_activity_logs service policy skip: %', SQLERRM;
 END; $$;
-
 -- ─────────────────────────────────────────────────────────────
 -- PART 5a: campaign_metrics — RLS enabled but no policy
 -- ─────────────────────────────────────────────────────────────
@@ -197,7 +188,6 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'campaign_metrics policy skip: %', SQLERRM;
 END; $$;
-
 -- ─────────────────────────────────────────────────────────────
 -- PART 5b: auth_rls_initplan — remaining 80+ tables
 -- Pattern: replace auth.uid() with (SELECT auth.uid())
@@ -227,7 +217,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'outreach_log skip: %', SQLERRM; END; $$;
-
 -- email_templates
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Workspace members can manage templates" ON public.email_templates';
@@ -238,7 +227,6 @@ DO $$ BEGIN
     WITH CHECK (workspace_id IN (SELECT workspace_id FROM public.workspace_members WHERE user_id = (SELECT auth.uid())))
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'email_templates skip: %', SQLERRM; END; $$;
-
 -- user_roles
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Users can read own role" ON public.user_roles';
@@ -253,7 +241,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'user_roles skip: %', SQLERRM; END; $$;
-
 -- subscriptions
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Owner can read subscription" ON public.subscriptions';
@@ -268,7 +255,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'subscriptions skip: %', SQLERRM; END; $$;
-
 -- influencer_evaluations
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Workspace members can read evaluations" ON public.influencer_evaluations';
@@ -285,7 +271,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'influencer_evaluations skip: %', SQLERRM; END; $$;
-
 -- api_cost_log
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Workspace members can read own costs" ON public.api_cost_log';
@@ -301,7 +286,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'api_cost_log skip: %', SQLERRM; END; $$;
-
 -- behavioral_anomalies
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Admins can read anomalies" ON public.behavioral_anomalies';
@@ -317,7 +301,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'behavioral_anomalies skip: %', SQLERRM; END; $$;
-
 -- consent_log
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Users can read own consent" ON public.consent_log';
@@ -333,7 +316,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'consent_log skip: %', SQLERRM; END; $$;
-
 -- engagement_benchmarks
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Authenticated users can read benchmarks" ON public.engagement_benchmarks';
@@ -349,7 +331,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'engagement_benchmarks skip: %', SQLERRM; END; $$;
-
 -- enrichment_failures
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Admins can read failures" ON public.enrichment_failures';
@@ -365,7 +346,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'enrichment_failures skip: %', SQLERRM; END; $$;
-
 -- bot_detection_feedback
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Authenticated can submit bot feedback" ON public.bot_detection_feedback';
@@ -381,7 +361,6 @@ DO $$ BEGIN
     USING (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = (SELECT auth.uid()) AND role IN ('admin','super_admin')))
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'bot_detection_feedback skip: %', SQLERRM; END; $$;
-
 -- workspace_secrets
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Workspace owners can manage secrets" ON public.workspace_secrets';
@@ -392,7 +371,6 @@ DO $$ BEGIN
     WITH CHECK (workspace_id IN (SELECT workspace_id FROM public.workspace_members WHERE user_id = (SELECT auth.uid()) AND role = 'owner'))
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'workspace_secrets skip: %', SQLERRM; END; $$;
-
 -- tracking_links
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Workspace members can manage tracking links" ON public.tracking_links';
@@ -403,7 +381,6 @@ DO $$ BEGIN
     WITH CHECK (workspace_id IN (SELECT workspace_id FROM public.workspace_members WHERE user_id = (SELECT auth.uid())))
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'tracking_links skip: %', SQLERRM; END; $$;
-
 -- invoices
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Workspace owners can view invoices" ON public.invoices';
@@ -418,7 +395,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'invoices skip: %', SQLERRM; END; $$;
-
 -- admin_audit_log (select policy)
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "super_admin can view audit log" ON public.admin_audit_log';
@@ -428,7 +404,6 @@ DO $$ BEGIN
     USING (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = (SELECT auth.uid()) AND role = 'super_admin'))
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'admin_audit_log select skip: %', SQLERRM; END; $$;
-
 -- influencer_profiles
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Authenticated users can read profiles" ON public.influencer_profiles';
@@ -444,7 +419,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'influencer_profiles skip: %', SQLERRM; END; $$;
-
 -- influencer_posts
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Authenticated users can read posts" ON public.influencer_posts';
@@ -460,7 +434,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'influencer_posts skip: %', SQLERRM; END; $$;
-
 -- system_backup_runs
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "system_backup_runs_read_admin" ON public.system_backup_runs';
@@ -476,7 +449,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'system_backup_runs skip: %', SQLERRM; END; $$;
-
 -- user_activity_logs (admin select)
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "System admins can read user_activity" ON public.user_activity_logs';
@@ -486,7 +458,6 @@ DO $$ BEGIN
     USING (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = (SELECT auth.uid()) AND role IN ('admin','super_admin')))
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'user_activity_logs admin select skip: %', SQLERRM; END; $$;
-
 -- api_usage_logs (admin select)
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "System admins can read api_usage" ON public.api_usage_logs';
@@ -496,7 +467,6 @@ DO $$ BEGIN
     USING (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = (SELECT auth.uid()) AND role IN ('admin','super_admin')))
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'api_usage_logs admin select skip: %', SQLERRM; END; $$;
-
 -- support_tickets
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Users manage own tickets" ON public.support_tickets';
@@ -514,7 +484,6 @@ DO $$ BEGIN
     WITH CHECK (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = (SELECT auth.uid()) AND role IN ('admin','super_admin')))
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'support_tickets skip: %', SQLERRM; END; $$;
-
 -- system_audit_logs
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "system_audit_logs_select_system_admin" ON public.system_audit_logs';
@@ -530,7 +499,6 @@ DO $$ BEGIN
     TO service_role WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'system_audit_logs skip: %', SQLERRM; END; $$;
-
 -- system_restore_points
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "system_restore_points_select_admin" ON public.system_restore_points';
@@ -540,7 +508,6 @@ DO $$ BEGIN
     USING (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = (SELECT auth.uid()) AND role IN ('admin','super_admin')))
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'system_restore_points skip: %', SQLERRM; END; $$;
-
 -- system_restore_confirmations
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "system_restore_confirmations_select_admin" ON public.system_restore_confirmations';
@@ -550,7 +517,6 @@ DO $$ BEGIN
     USING (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = (SELECT auth.uid()) AND role IN ('admin','super_admin')))
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'system_restore_confirmations skip: %', SQLERRM; END; $$;
-
 -- support_ticket_replies
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Users see replies on own tickets" ON public.support_ticket_replies';
@@ -573,7 +539,6 @@ DO $$ BEGIN
     WITH CHECK (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = (SELECT auth.uid()) AND role IN ('admin','super_admin')))
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'support_ticket_replies skip: %', SQLERRM; END; $$;
-
 -- notifications (user policies)
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Users see own notifications" ON public.notifications';
@@ -589,7 +554,6 @@ DO $$ BEGIN
     USING (user_id = (SELECT auth.uid()))
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'notifications user policies skip: %', SQLERRM; END; $$;
-
 -- announcements
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Admins manage announcements" ON public.announcements';
@@ -606,7 +570,6 @@ DO $$ BEGIN
     USING (is_active = true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'announcements skip: %', SQLERRM; END; $$;
-
 -- notification_log (admin select)
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Admins see notification log" ON public.notification_log';
@@ -616,7 +579,6 @@ DO $$ BEGIN
     USING (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = (SELECT auth.uid()) AND role IN ('admin','super_admin')))
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'notification_log admin select skip: %', SQLERRM; END; $$;
-
 -- anomaly_logs
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Admins see anomaly logs" ON public.anomaly_logs';
@@ -626,7 +588,6 @@ DO $$ BEGIN
     USING (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = (SELECT auth.uid()) AND role IN ('admin','super_admin')))
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'anomaly_logs skip: %', SQLERRM; END; $$;
-
 -- follower_history
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Authenticated workspace members can read follower history" ON public.follower_history';
@@ -641,7 +602,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'follower_history skip: %', SQLERRM; END; $$;
-
 -- workspaces (existing policies — ensure (SELECT auth.uid()))
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "ws_select" ON public.workspaces';
@@ -665,7 +625,6 @@ DO $$ BEGIN
     USING (owner_id = (SELECT auth.uid()))
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'workspaces skip: %', SQLERRM; END; $$;
-
 -- workspace_members (consolidated)
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "wm_select" ON public.workspace_members';
@@ -681,7 +640,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'workspace_members skip: %', SQLERRM; END; $$;
-
 -- enrichment_jobs
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Users see own workspace jobs" ON public.enrichment_jobs';
@@ -697,7 +655,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'enrichment_jobs skip: %', SQLERRM; END; $$;
-
 -- idempotency_keys
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Users see own idempotency keys" ON public.idempotency_keys';
@@ -707,7 +664,6 @@ DO $$ BEGIN
     USING (user_id = (SELECT auth.uid()))
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'idempotency_keys skip: %', SQLERRM; END; $$;
-
 -- pipeline_stages
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Workspace members can manage pipeline stages" ON public.pipeline_stages';
@@ -726,7 +682,6 @@ DO $$ BEGIN
     ))
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'pipeline_stages skip: %', SQLERRM; END; $$;
-
 -- security_alerts
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "security_alerts_read_admin" ON public.security_alerts';
@@ -743,7 +698,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'security_alerts skip: %', SQLERRM; END; $$;
-
 -- api_rate_limits
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "api_rate_limits_service_rw" ON public.api_rate_limits';
@@ -752,7 +706,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'api_rate_limits skip: %', SQLERRM; END; $$;
-
 -- security_events
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "se_admin_select" ON public.security_events';
@@ -769,7 +722,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'security_events skip: %', SQLERRM; END; $$;
-
 -- tracking_events
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "te_owner_select" ON public.tracking_events';
@@ -783,7 +735,6 @@ DO $$ BEGIN
     WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'tracking_events skip: %', SQLERRM; END; $$;
-
 -- influencers_cache
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "ic_auth_select" ON public.influencers_cache';
@@ -797,7 +748,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'influencers_cache skip: %', SQLERRM; END; $$;
-
 -- system_constants
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "sc_service_only" ON public.system_constants';
@@ -806,7 +756,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'system_constants skip: %', SQLERRM; END; $$;
-
 -- blocked_email_domains
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "bed_service_only" ON public.blocked_email_domains';
@@ -815,7 +764,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'blocked_email_domains skip: %', SQLERRM; END; $$;
-
 -- audience_analysis
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "aa_workspace_select" ON public.audience_analysis';
@@ -829,7 +777,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'audience_analysis skip: %', SQLERRM; END; $$;
-
 -- linked_accounts
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "la_workspace_select" ON public.linked_accounts';
@@ -843,7 +790,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'linked_accounts skip: %', SQLERRM; END; $$;
-
 -- system_metrics
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "system_metrics_select_admin" ON public.system_metrics';
@@ -859,7 +805,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'system_metrics skip: %', SQLERRM; END; $$;
-
 -- api_usage_metrics
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "api_usage_metrics_select_admin" ON public.api_usage_metrics';
@@ -875,7 +820,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'api_usage_metrics skip: %', SQLERRM; END; $$;
-
 -- credit_consumption_metrics
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "credit_consumption_metrics_select_admin" ON public.credit_consumption_metrics';
@@ -891,7 +835,6 @@ DO $$ BEGIN
     USING (true) WITH CHECK (true)
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'credit_consumption_metrics skip: %', SQLERRM; END; $$;
-
 -- discovery_runs
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "discovery_runs_admin_read" ON public.discovery_runs';
@@ -901,38 +844,28 @@ DO $$ BEGIN
     USING (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = (SELECT auth.uid()) AND role IN ('admin','super_admin')))
   $q$;
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'discovery_runs skip: %', SQLERRM; END; $$;
-
 -- profiles (catch-all — drop any leftover old-name policy)
 DO $$ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Users can manage own profile" ON public.profiles';
 EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'profiles old policy cleanup skip: %', SQLERRM; END; $$;
-
 -- ─────────────────────────────────────────────────────────────
 -- PART 6: Additional performance indexes
 -- ─────────────────────────────────────────────────────────────
 
 CREATE INDEX IF NOT EXISTS idx_linter_user_roles_user_id
   ON public.user_roles(user_id);
-
 CREATE INDEX IF NOT EXISTS idx_linter_user_roles_role
   ON public.user_roles(role);
-
 CREATE INDEX IF NOT EXISTS idx_linter_campaigns_id
   ON public.campaigns(id);
-
 CREATE INDEX IF NOT EXISTS idx_linter_support_tickets_user_id
   ON public.support_tickets(user_id);
-
 CREATE INDEX IF NOT EXISTS idx_linter_enrichment_jobs_workspace_id
   ON public.enrichment_jobs(workspace_id);
-
-
 CREATE INDEX IF NOT EXISTS idx_linter_notifications_user_id
   ON public.notifications(user_id);
-
 CREATE INDEX IF NOT EXISTS idx_linter_follower_history_inflid
   ON public.follower_history(profile_id);
-
 -- ─────────────────────────────────────────────────────────────
 -- NOTE: auth_leaked_password_protection — must be enabled via
 -- Supabase Dashboard → Authentication → Password Protection.
@@ -942,4 +875,4 @@ CREATE INDEX IF NOT EXISTS idx_linter_follower_history_inflid
 -- Moving extensions out of public requires dropping and recreating
 -- dependent functions. Not safe to automate; do via Dashboard:
 -- Settings → Database → Extensions → move to 'extensions' schema.
--- ─────────────────────────────────────────────────────────────
+-- ─────────────────────────────────────────────────────────────;

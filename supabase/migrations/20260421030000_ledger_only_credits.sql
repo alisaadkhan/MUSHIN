@@ -35,7 +35,6 @@ SELECT
   MAX(created_at) AS last_event_at
 FROM public.credit_transactions
 GROUP BY user_id, workspace_id, credit_type;
-
 -- 2) RPC: get my balances for a workspace (SECURITY DEFINER)
 CREATE OR REPLACE FUNCTION public.get_my_credit_balances(p_workspace_id uuid)
 RETURNS TABLE(credit_type public.mushin_credit_type, balance integer)
@@ -52,11 +51,9 @@ AS $$
     AND b.workspace_id = p_workspace_id
   ORDER BY b.credit_type::text;
 $$;
-
 REVOKE ALL ON FUNCTION public.get_my_credit_balances(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_my_credit_balances(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_my_credit_balances(uuid) TO service_role;
-
 -- 3) Internal helper: get balance (for RPCs)
 CREATE OR REPLACE FUNCTION public.get_user_credit_balance(
   p_user_id uuid,
@@ -77,10 +74,8 @@ AS $$
     LIMIT 1
   ), 0);
 $$;
-
 REVOKE ALL ON FUNCTION public.get_user_credit_balance(uuid, uuid, public.mushin_credit_type) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_user_credit_balance(uuid, uuid, public.mushin_credit_type) TO service_role;
-
 -- 4) Rewrite consume/grant to append-only ledger
 CREATE OR REPLACE FUNCTION public.consume_user_credits(
   p_user_id         uuid,
@@ -150,7 +145,6 @@ BEGIN
   );
 END;
 $$;
-
 CREATE OR REPLACE FUNCTION public.grant_user_credits(
   p_user_id         uuid,
   p_workspace_id    uuid,
@@ -214,11 +208,8 @@ BEGIN
   );
 END;
 $$;
-
 -- Keep the same execution grants (service role only by default)
 REVOKE ALL ON FUNCTION public.consume_user_credits(uuid, uuid, public.mushin_credit_type, integer, text, text, jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.grant_user_credits(uuid, uuid, public.mushin_credit_type, integer, text, text, jsonb) FROM PUBLIC;
-
 GRANT EXECUTE ON FUNCTION public.consume_user_credits(uuid, uuid, public.mushin_credit_type, integer, text, text, jsonb) TO service_role;
 GRANT EXECUTE ON FUNCTION public.grant_user_credits(uuid, uuid, public.mushin_credit_type, integer, text, text, jsonb) TO service_role;
-

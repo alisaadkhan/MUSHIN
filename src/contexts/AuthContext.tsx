@@ -1,8 +1,9 @@
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, useCallback, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { identifyUser, resetPostHog, trackEvent } from "@/lib/analytics";
 import { logger } from "@/lib/logger";
+import { consumePasswordAuthSlot } from "@/lib/authRateLimit";
 
 interface Profile {
   id: string;
@@ -25,7 +26,15 @@ interface AuthContextType {
   profileError: boolean;
   needsEmailVerification: boolean;
   refreshProfile: () => Promise<void>;
-  signUp: (email: string, password: string, captchaToken?: string) => Promise<{ error: Error | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    opts?: {
+      captchaToken?: string;
+      termsAcceptedAt?: string;
+      privacyAcceptedAt?: string;
+    },
+  ) => Promise<{ error: Error | null; session: Session | null }>;
   signIn: (email: string, password: string, captchaToken?: string) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -43,6 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileError, setProfileError] = useState(false);
+  // Use a ref so the timeout fallback always sees the live value
+  const loadingRef = useRef(true);
 
   const needsEmailVerification = !!user && !user.email_confirmed_at;
 
@@ -62,6 +73,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       setProfileError(true);
     }
+    loadingRef.current = false;
+    setLoading(false);
   }, []);
 
   const refreshProfile = useCallback(async () => {
@@ -74,14 +87,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let lastTokenRefreshAt = 0;
 
-    // Hydrate immediately (removes "wait a few seconds then it works" on first load)
+    // Hydrate immediately — removes "wait a few seconds then it works" on first load
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
         setSession(data.session);
         setUser(data.session.user);
+        // If email confirmed, fetch profile; otherwise just stop the loading spinner
+        if (data.session.user.email_confirmed_at) {
+          fetchProfileAndWorkspace(data.session.user.id);
+        } else {
+          loadingRef.current = false;
+          setLoading(false);
+        }
+      } else {
+        loadingRef.current = false;
+        setLoading(false);
       }
+    }).catch(() => {
+      loadingRef.current = false;
       setLoading(false);
-    }).catch(() => setLoading(false));
+    });
+
+    // Hard timeout fallback — if getSession or fetchProfile never resolves, unblock the UI
+    const fallbackTimer = setTimeout(() => {
+      if (loadingRef.current) {
+        loadingRef.current = false;
+        setLoading(false);
+      }
+    }, 5000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
@@ -90,12 +123,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(null);
           setProfile(null);
           setWorkspace(null);
+          loadingRef.current = false;
           setLoading(false);
           return;
         }
 
         // Allow any email domain for Google OAuth sign-in.
-        // (Previously, consumer domains were blocked via check_email_allowed.)
 
         // Deduplicate rapid TOKEN_REFRESHED events (guard against duplicate fires within 2s)
         if (event === 'TOKEN_REFRESHED') {
@@ -113,35 +146,84 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               email_confirmed: !!newSession.user.email_confirmed_at,
             });
           }
+          // Google OAuth: persist Terms / Privacy acceptance from signup flow (sessionStorage).
+          if (event === "SIGNED_IN") {
+            try {
+              const raw = sessionStorage.getItem("oauth_legal");
+              if (raw) {
+                const j = JSON.parse(raw) as { terms?: string; privacy?: string };
+                sessionStorage.removeItem("oauth_legal");
+                if (j.terms && j.privacy) {
+                  void supabase.auth.updateUser({
+                    data: {
+                      terms_accepted_at: j.terms,
+                      privacy_accepted_at: j.privacy,
+                    },
+                  });
+                }
+              }
+            } catch {
+              sessionStorage.removeItem("oauth_legal");
+            }
+          }
           if (newSession.user.email_confirmed_at) {
             setTimeout(() => fetchProfileAndWorkspace(newSession.user.id), 0);
           }
           trackEvent("login", { method: newSession.user.app_metadata?.provider || "email" });
         }
+        loadingRef.current = false;
         setLoading(false);
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(fallbackTimer);
+    };
   }, [fetchProfileAndWorkspace]);
 
-  const signUp = async (email: string, password: string, captchaToken?: string) => {
-    const { error } = await supabase.auth.signUp({
+  const signUp = async (
+    email: string,
+    password: string,
+    opts?: { captchaToken?: string; termsAcceptedAt?: string; privacyAcceptedAt?: string },
+  ) => {
+    const gate = await consumePasswordAuthSlot();
+    if (!gate.ok) {
+      logger.warn("auth", "Signup blocked by rate limit", {});
+      return { error: new Error(gate.message), session: null };
+    }
+    const now = new Date().toISOString();
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: window.location.origin,
-        ...(captchaToken ? { captchaToken } : {}),
+        ...(opts?.captchaToken ? { captchaToken: opts.captchaToken } : {}),
+        data: {
+          terms_accepted_at: opts?.termsAcceptedAt ?? now,
+          privacy_accepted_at: opts?.privacyAcceptedAt ?? now,
+        },
       },
     });
-    if (!error) {
+    if (!error && data.session) {
       trackEvent("signup", { email_domain: email.split("@")[1] });
       logger.info("auth", "User signed up", { email });
+    } else if (!error) {
+      trackEvent("signup", { email_domain: email.split("@")[1] });
+      logger.info("auth", "User signed up (pending verification)", { email });
     }
-    return { error: error ? new Error(error.message) : null };
+    return {
+      error: error ? new Error(error.message) : null,
+      session: data.session ?? null,
+    };
   };
 
   const signIn = async (email: string, password: string, captchaToken?: string) => {
+    const gate = await consumePasswordAuthSlot();
+    if (!gate.ok) {
+      logger.warn("auth", "Sign-in blocked by rate limit", {});
+      return { error: new Error(gate.message) };
+    }
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,

@@ -50,7 +50,6 @@ BEGIN
     WHERE id = ws_id;
 END;
 $$;
-
 -- Ensure only service_role can call restore functions
 REVOKE EXECUTE ON FUNCTION public.restore_email_credit(uuid, text) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.restore_email_credit(uuid, text) FROM authenticated;

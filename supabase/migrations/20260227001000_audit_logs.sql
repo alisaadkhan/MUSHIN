@@ -24,11 +24,10 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   -- When
   created_at    timestamptz NOT NULL DEFAULT now()
 );
-
 -- RLS: append-only
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
-
 -- Super admins can insert
+DROP POLICY IF EXISTS "admin_insert_audit" ON audit_logs;
 CREATE POLICY "admin_insert_audit" ON audit_logs
   FOR INSERT
   TO authenticated
@@ -39,8 +38,8 @@ CREATE POLICY "admin_insert_audit" ON audit_logs
       AND role IN ('super_admin', 'admin', 'support')
     )
   );
-
 -- Admins + support can read
+DROP POLICY IF EXISTS "admin_read_audit" ON audit_logs;
 CREATE POLICY "admin_read_audit" ON audit_logs
   FOR SELECT
   TO authenticated
@@ -51,7 +50,6 @@ CREATE POLICY "admin_read_audit" ON audit_logs
       AND role IN ('super_admin', 'admin', 'support')
     )
   );
-
 -- Prevent DELETE via trigger (defense in depth)
 CREATE OR REPLACE FUNCTION prevent_audit_log_delete()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
@@ -59,22 +57,20 @@ BEGIN
   RAISE EXCEPTION 'Audit log records are immutable and cannot be deleted';
 END;
 $$;
-
+DROP TRIGGER IF EXISTS trg_no_delete_audit_logs ON audit_logs;
 CREATE TRIGGER trg_no_delete_audit_logs
   BEFORE DELETE ON audit_logs
   FOR EACH ROW EXECUTE FUNCTION prevent_audit_log_delete();
-
 CREATE OR REPLACE FUNCTION prevent_audit_log_update()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
   RAISE EXCEPTION 'Audit log records are immutable and cannot be modified';
 END;
 $$;
-
+DROP TRIGGER IF EXISTS trg_no_update_audit_logs ON audit_logs;
 CREATE TRIGGER trg_no_update_audit_logs
   BEFORE UPDATE ON audit_logs
   FOR EACH ROW EXECUTE FUNCTION prevent_audit_log_update();
-
 -- ── Helper: write audit log entry ────────────────────────────
 CREATE OR REPLACE FUNCTION write_audit_log(
   p_actor_id      uuid,
@@ -102,13 +98,11 @@ BEGIN
   RETURN v_id;
 END;
 $$;
-
 -- ── Indexes ───────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_audit_logs_actor       ON audit_logs (actor_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_action      ON audit_logs (action);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_resource    ON audit_logs (resource_type, resource_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at  ON audit_logs (created_at DESC);
-
 -- ── Auto-log: credit ledger mutations ─────────────────────────
 CREATE OR REPLACE FUNCTION audit_credit_ledger_insert()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
@@ -131,8 +125,7 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
+DROP TRIGGER IF EXISTS trg_audit_credit_ledger ON credit_ledger;
 CREATE TRIGGER trg_audit_credit_ledger
   AFTER INSERT ON credit_ledger
   FOR EACH ROW EXECUTE FUNCTION audit_credit_ledger_insert();
-

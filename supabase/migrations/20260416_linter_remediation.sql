@@ -38,7 +38,6 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'profiles policy fix skipped: %', SQLERRM;
 END; $$;
-
 -- ─────────────────────────────────────────────────────────────
 -- Part 1b: workspace_members — fix auth_rls_initplan
 -- ─────────────────────────────────────────────────────────────
@@ -53,7 +52,6 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'workspace_members policy fix skipped: %', SQLERRM;
 END; $$;
-
 -- ─────────────────────────────────────────────────────────────
 -- Part 1c: workspaces — fix auth_rls_initplan
 -- ─────────────────────────────────────────────────────────────
@@ -73,7 +71,6 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'workspaces policy fix skipped: %', SQLERRM;
 END; $$;
-
 -- ─────────────────────────────────────────────────────────────
 -- Part 1d: search_history — fix auth_rls_initplan
 -- (Table uses workspace_id not user_id)
@@ -104,7 +101,6 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'search_history policy fix skipped: %', SQLERRM;
 END; $$;
-
 -- ─────────────────────────────────────────────────────────────
 -- Part 1e: campaigns — fix auth_rls_initplan
 -- ─────────────────────────────────────────────────────────────
@@ -133,7 +129,6 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'campaigns policy fix skipped: %', SQLERRM;
 END; $$;
-
 -- ─────────────────────────────────────────────────────────────
 -- Part 1f: pipeline_cards — fix auth_rls_initplan
 -- ─────────────────────────────────────────────────────────────
@@ -157,7 +152,6 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'pipeline_cards policy fix skipped: %', SQLERRM;
 END; $$;
-
 -- ─────────────────────────────────────────────────────────────
 -- Part 1g: campaign_activity — fix auth_rls_initplan
 -- ─────────────────────────────────────────────────────────────
@@ -181,7 +175,6 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'campaign_activity policy fix skipped: %', SQLERRM;
 END; $$;
-
 -- ─────────────────────────────────────────────────────────────
 -- Part 1h: influencer_lists — fix auth_rls_initplan
 -- ─────────────────────────────────────────────────────────────
@@ -203,7 +196,6 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'influencer_lists policy fix skipped: %', SQLERRM;
 END; $$;
-
 -- ─────────────────────────────────────────────────────────────
 -- Part 1i: list_items — fix auth_rls_initplan
 -- ─────────────────────────────────────────────────────────────
@@ -226,7 +218,6 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'list_items policy fix skipped: %', SQLERRM;
 END; $$;
-
 -- ─────────────────────────────────────────────────────────────
 -- Part 1j: saved_searches — fix auth_rls_initplan
 -- ─────────────────────────────────────────────────────────────
@@ -248,7 +239,6 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'saved_searches policy fix skipped: %', SQLERRM;
 END; $$;
-
 -- ─────────────────────────────────────────────────────────────
 -- Part 1k: credits_usage — fix auth_rls_initplan
 -- ─────────────────────────────────────────────────────────────
@@ -268,7 +258,6 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'credits_usage policy fix skipped: %', SQLERRM;
 END; $$;
-
 -- ─────────────────────────────────────────────────────────────
 -- Part 2: Fix security_definer_view for any existing views
 -- ─────────────────────────────────────────────────────────────
@@ -293,34 +282,25 @@ BEGIN
   END LOOP;
 END;
 $$;
-
 -- ─────────────────────────────────────────────────────────────
 -- Part 3: Performance indexes for RLS subquery resolution
 -- ─────────────────────────────────────────────────────────────
 
 CREATE INDEX IF NOT EXISTS idx_linter_wm_user_id
   ON public.workspace_members(user_id);
-
 CREATE INDEX IF NOT EXISTS idx_linter_wm_workspace_id
   ON public.workspace_members(workspace_id);
-
 CREATE INDEX IF NOT EXISTS idx_linter_campaigns_workspace_id
   ON public.campaigns(workspace_id);
-
 CREATE INDEX IF NOT EXISTS idx_linter_pipeline_campaign_id
   ON public.pipeline_cards(campaign_id);
-
 CREATE INDEX IF NOT EXISTS idx_linter_list_items_list_id
   ON public.list_items(list_id);
-
 CREATE INDEX IF NOT EXISTS idx_linter_il_workspace_id
   ON public.influencer_lists(workspace_id);
-
 CREATE INDEX IF NOT EXISTS idx_linter_ca_campaign_id
   ON public.campaign_activity(campaign_id);
-
 CREATE INDEX IF NOT EXISTS idx_linter_sh_workspace_id
   ON public.search_history(workspace_id);
-
 CREATE INDEX IF NOT EXISTS idx_linter_ss_workspace_id
   ON public.saved_searches(workspace_id);

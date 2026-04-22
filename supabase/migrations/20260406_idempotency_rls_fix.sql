@@ -39,8 +39,6 @@ BEGIN
     WHERE id = ws_id;
 END;
 $$;
-
-
 CREATE OR REPLACE FUNCTION public.restore_email_credit(ws_id UUID, i_key TEXT DEFAULT NULL)
 RETURNS void
 LANGUAGE plpgsql

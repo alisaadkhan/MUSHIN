@@ -1,7 +1,13 @@
 const LOG_LEVELS = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 } as const;
 type LogLevel = keyof typeof LOG_LEVELS;
 
-const CURRENT_LEVEL: LogLevel = import.meta.env.DEV ? "DEBUG" : "WARN";
+const ENV_LEVEL = (import.meta.env.VITE_LOG_LEVEL as string | undefined)?.toUpperCase() as LogLevel | undefined;
+const CURRENT_LEVEL: LogLevel =
+  ENV_LEVEL && ENV_LEVEL in LOG_LEVELS
+    ? ENV_LEVEL
+    : import.meta.env.DEV
+      ? "DEBUG"
+      : "INFO";
 
 function formatMessage(module: string, level: LogLevel, message: string, data?: unknown): string {
   const ts = new Date().toISOString();

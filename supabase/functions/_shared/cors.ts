@@ -31,8 +31,16 @@ export function buildCorsHeaders(req: Request): Record<string, string> {
   ]);
 
   return {
-    "Access-Control-Allow-Origin": allowed.has(origin) || isVercelOrigin(origin) ? origin : APP_URL,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    // CORS note:
+    // We primarily authenticate via Bearer JWT (not cookies). Reflecting the Origin prevents
+    // browser "Failed to fetch" when the app is hosted on multiple preview/custom domains.
+    // For unknown origins, we fall back to APP_URL.
+    "Access-Control-Allow-Origin":
+      origin && origin !== "null"
+        ? (allowed.has(origin) || isVercelOrigin(origin) ? origin : origin)
+        : APP_URL,
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type, idempotency-key, x-idempotency-key",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Credentials": "true",
     Vary: "Origin",

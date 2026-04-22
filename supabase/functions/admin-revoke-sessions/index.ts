@@ -4,7 +4,7 @@ import { safeErrorResponse, validationErrorResponse } from "../_shared/errors.ts
 import { extractClientIp } from "../_shared/security.ts";
 import { buildCorsHeaders } from "../_shared/cors.ts";
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(body: unknown, corsHeaders: Record<string, string>, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -14,7 +14,7 @@ function jsonResponse(body: unknown, status = 200) {
 Deno.serve(async (req) => {
   const corsHeaders = buildCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+  if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, corsHeaders, 405);
 
   const authHeader = req.headers.get("Authorization");
   const ipAddress = extractClientIp(req.headers.get("x-forwarded-for"));
@@ -45,13 +45,13 @@ Deno.serve(async (req) => {
       metadata: { endpoint: "admin-revoke-sessions" },
     });
 
-    return jsonResponse({ success: true });
+    return jsonResponse({ success: true }, corsHeaders);
   } catch (err) {
     if (err instanceof Error && err.message === "Forbidden") {
-      return jsonResponse({ error: "Forbidden" }, 403);
+      return jsonResponse({ error: "Forbidden" }, corsHeaders, 403);
     }
     if (err instanceof Error && err.message === "Unauthorized") {
-      return jsonResponse({ error: "Unauthorized" }, 401);
+      return jsonResponse({ error: "Unauthorized" }, corsHeaders, 401);
     }
     return safeErrorResponse(err, "[admin-revoke-sessions]", corsHeaders);
   }

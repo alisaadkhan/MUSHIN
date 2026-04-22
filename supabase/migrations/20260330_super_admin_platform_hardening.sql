@@ -3,7 +3,6 @@
 -- backup metadata/bucket bootstrap, and super-admin dashboard views.
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
 -- -----------------------------------------------------------------------------
 -- Super admin helpers
 -- -----------------------------------------------------------------------------
@@ -21,9 +20,7 @@ AS $$
       AND ur.role::text = 'super_admin'
   );
 $$;
-
 GRANT EXECUTE ON FUNCTION public.is_super_admin(uuid) TO authenticated, service_role, anon;
-
 CREATE OR REPLACE FUNCTION public.is_system_admin(p_user_id uuid DEFAULT auth.uid())
 RETURNS boolean
 LANGUAGE sql
@@ -38,9 +35,7 @@ AS $$
       AND ur.role::text IN ('system_admin', 'super_admin')
   );
 $$;
-
 GRANT EXECUTE ON FUNCTION public.is_system_admin(uuid) TO authenticated, service_role, anon;
-
 CREATE OR REPLACE FUNCTION public.set_super_admin_role(
   p_actor_user_id uuid,
   p_target_user_id uuid,
@@ -108,10 +103,8 @@ BEGIN
   );
 END;
 $$;
-
 REVOKE EXECUTE ON FUNCTION public.set_super_admin_role(uuid, uuid, boolean, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.set_super_admin_role(uuid, uuid, boolean, text) TO service_role;
-
 CREATE OR REPLACE FUNCTION public.super_admin_unlimited_credits(
   p_user_id uuid DEFAULT auth.uid(),
   p_workspace_id uuid DEFAULT NULL,
@@ -147,9 +140,7 @@ BEGIN
   RETURN coalesce(v_balance, 0);
 END;
 $$;
-
 GRANT EXECUTE ON FUNCTION public.super_admin_unlimited_credits(uuid, uuid, text) TO authenticated, service_role;
-
 CREATE OR REPLACE FUNCTION public.super_admin_feature_access(
   p_user_id uuid DEFAULT auth.uid(),
   p_feature text DEFAULT 'search'
@@ -164,9 +155,7 @@ AS $$
     public.is_super_admin(p_user_id)
     AND p_feature IN ('search', 'enrichment', 'campaigns', 'automation', 'api_usage', 'analytics');
 $$;
-
 GRANT EXECUTE ON FUNCTION public.super_admin_feature_access(uuid, text) TO authenticated, service_role;
-
 -- -----------------------------------------------------------------------------
 -- Global API rate limiting state and RPC
 -- -----------------------------------------------------------------------------
@@ -183,21 +172,16 @@ CREATE TABLE IF NOT EXISTS public.api_rate_limits (
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT api_rate_limits_actor_present CHECK (user_id IS NOT NULL OR ip_address IS NOT NULL)
 );
-
 CREATE UNIQUE INDEX IF NOT EXISTS idx_api_rate_limits_window
   ON public.api_rate_limits (coalesce(user_id::text, ''), coalesce(ip_address, ''), endpoint, window_start);
-
 CREATE INDEX IF NOT EXISTS idx_api_rate_limits_backoff
   ON public.api_rate_limits (backoff_until)
   WHERE backoff_until IS NOT NULL;
-
 ALTER TABLE public.api_rate_limits ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS api_rate_limits_service_rw ON public.api_rate_limits;
 CREATE POLICY api_rate_limits_service_rw ON public.api_rate_limits
   FOR ALL USING (auth.role() = 'service_role')
   WITH CHECK (auth.role() = 'service_role');
-
 CREATE OR REPLACE FUNCTION public.check_api_rate_limit(
   p_user_id uuid DEFAULT NULL,
   p_ip_address text DEFAULT NULL,
@@ -295,10 +279,8 @@ BEGIN
   );
 END;
 $$;
-
 REVOKE EXECUTE ON FUNCTION public.check_api_rate_limit(uuid, text, text, boolean, boolean) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.check_api_rate_limit(uuid, text, text, boolean, boolean) TO service_role;
-
 -- -----------------------------------------------------------------------------
 -- Security alerts
 -- -----------------------------------------------------------------------------
@@ -313,26 +295,20 @@ CREATE TABLE IF NOT EXISTS public.security_alerts (
   dispatched_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_security_alerts_ts ON public.security_alerts("timestamp" DESC);
 CREATE INDEX IF NOT EXISTS idx_security_alerts_type ON public.security_alerts(alert_type);
 CREATE INDEX IF NOT EXISTS idx_security_alerts_pending ON public.security_alerts(dispatched, severity, "timestamp" DESC);
-
 ALTER TABLE public.security_alerts ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS security_alerts_read_admin ON public.security_alerts;
 CREATE POLICY security_alerts_read_admin ON public.security_alerts
   FOR SELECT USING (public.is_system_admin(auth.uid()));
-
 DROP POLICY IF EXISTS security_alerts_insert_service ON public.security_alerts;
 CREATE POLICY security_alerts_insert_service ON public.security_alerts
   FOR INSERT WITH CHECK (auth.role() = 'service_role');
-
 DROP POLICY IF EXISTS security_alerts_update_service ON public.security_alerts;
 CREATE POLICY security_alerts_update_service ON public.security_alerts
   FOR UPDATE USING (auth.role() = 'service_role')
   WITH CHECK (auth.role() = 'service_role');
-
 CREATE OR REPLACE FUNCTION public.create_security_alert(
   p_alert_type text,
   p_severity text,
@@ -354,10 +330,8 @@ BEGIN
   RETURN v_id;
 END;
 $$;
-
 REVOKE EXECUTE ON FUNCTION public.create_security_alert(text, text, uuid, jsonb) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.create_security_alert(text, text, uuid, jsonb) TO service_role;
-
 CREATE OR REPLACE FUNCTION public.promote_security_events_to_alerts(
   p_lookback_minutes integer DEFAULT 30,
   p_threshold integer DEFAULT 3
@@ -405,10 +379,8 @@ BEGIN
   RETURN v_created;
 END;
 $$;
-
 REVOKE EXECUTE ON FUNCTION public.promote_security_events_to_alerts(integer, integer) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.promote_security_events_to_alerts(integer, integer) TO service_role;
-
 -- -----------------------------------------------------------------------------
 -- Backup metadata and bucket bootstrap
 -- -----------------------------------------------------------------------------
@@ -422,25 +394,19 @@ CREATE TABLE IF NOT EXISTS public.system_backup_runs (
   completed_at timestamptz,
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb
 );
-
 CREATE INDEX IF NOT EXISTS idx_system_backup_runs_started ON public.system_backup_runs(started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_system_backup_runs_status ON public.system_backup_runs(status, started_at DESC);
-
 ALTER TABLE public.system_backup_runs ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS system_backup_runs_read_admin ON public.system_backup_runs;
 CREATE POLICY system_backup_runs_read_admin ON public.system_backup_runs
   FOR SELECT USING (public.is_system_admin(auth.uid()));
-
 DROP POLICY IF EXISTS system_backup_runs_service_write ON public.system_backup_runs;
 CREATE POLICY system_backup_runs_service_write ON public.system_backup_runs
   FOR ALL USING (auth.role() = 'service_role')
   WITH CHECK (auth.role() = 'service_role');
-
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('system_backups', 'system_backups', false)
 ON CONFLICT (id) DO NOTHING;
-
 CREATE OR REPLACE FUNCTION public.list_recent_backups(p_limit integer DEFAULT 30)
 RETURNS SETOF public.system_backup_runs
 LANGUAGE sql
@@ -452,9 +418,7 @@ AS $$
   ORDER BY started_at DESC
   LIMIT greatest(1, least(200, p_limit));
 $$;
-
 GRANT EXECUTE ON FUNCTION public.list_recent_backups(integer) TO authenticated, service_role;
-
 -- -----------------------------------------------------------------------------
 -- Super admin platform views
 -- -----------------------------------------------------------------------------
@@ -474,7 +438,6 @@ LEFT JOIN public.user_roles ur ON ur.user_id = au.id
 LEFT JOIN public.workspace_members wm ON wm.user_id = au.id
 LEFT JOIN public.security_events se ON se.user_id = au.id
 GROUP BY au.id, au.email, p.full_name, p.created_at, au.created_at;
-
 CREATE OR REPLACE VIEW public.super_admin_workspace_overview AS
 SELECT
   w.id AS workspace_id,
@@ -492,7 +455,6 @@ FROM public.workspaces w
 LEFT JOIN public.workspace_members wm ON wm.workspace_id = w.id
 LEFT JOIN public.credit_consumption_metrics ccm ON ccm.workspace_id = w.id
 GROUP BY w.id, w.name, w.plan, w.owner_id, w.created_at, w.search_credits_remaining, w.ai_credits_remaining, w.email_sends_remaining, w.enrichment_credits_remaining;
-
 CREATE OR REPLACE VIEW public.super_admin_system_health AS
 SELECT
   now() AS observed_at,
@@ -503,7 +465,6 @@ SELECT
   (SELECT count(*)::bigint FROM public.security_events WHERE "timestamp" >= now() - interval '24 hours') AS security_events_24h,
   (SELECT coalesce(sum(abs(delta)), 0)::bigint FROM public.credit_consumption_metrics WHERE "timestamp" >= now() - interval '24 hours') AS credits_burned_24h,
   (SELECT coalesce(avg(metric_value), 0) FROM public.system_metrics WHERE metric_name = 'security_monitor_events_generated' AND "timestamp" >= now() - interval '24 hours') AS avg_security_events_generated_24h;
-
 GRANT SELECT ON public.super_admin_user_overview TO authenticated, service_role;
 GRANT SELECT ON public.super_admin_workspace_overview TO authenticated, service_role;
 GRANT SELECT ON public.super_admin_system_health TO authenticated, service_role;

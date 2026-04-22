@@ -1,11 +1,19 @@
 import { getServiceRoleKey, isSuperAdmin, performPrivilegedWrite } from "../_shared/privileged_gateway.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Redis } from "https://esm.sh/@upstash/redis";
-import { checkRateLimit, corsHeaders } from "../_shared/rate_limit.ts";
+import { checkRateLimit } from "../_shared/rate_limit.ts";
 import { extractCityFromBio } from "../_shared/geo.ts";
 import { computeQuickBotScore } from "../_shared/bot_signals.ts";
+import { buildCorsHeaders } from "../_shared/cors.ts";
 // ── Shared Utilities ───────────────────────────────────────────────────────────
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+function json(corsHeaders: Record<string, string>, body: unknown, status = 200) {
+    return new Response(JSON.stringify(body), {
+        status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+}
+
 function extractLinkedHandles(bio: string, currentPlatform: string): Array<{ platform: string; username: string }> {
     const out: Array<{ platform: string; username: string }> = [];
     const ig = bio.match(/instagram\.com\/([a-zA-Z0-9_.]+)/i) || (currentPlatform !== "instagram" ? bio.match(/\big:\s*@?([a-zA-Z0-9_.]{3,30})/i) : null);
@@ -291,6 +299,7 @@ if (Deno.env.get("UPSTASH_REDIS_REST_URL") && Deno.env.get("UPSTASH_REDIS_REST_T
 // ΓöÇΓöÇ Main handler ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 // ΓöÇΓöÇ Main handler ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 Deno.serve(async (req: Request) => {
+    const corsHeaders = buildCorsHeaders(req);
     if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
     const t0 = performance.now();
     const ip = req.headers.get('x-forwarded-for') ?? 'unknown';

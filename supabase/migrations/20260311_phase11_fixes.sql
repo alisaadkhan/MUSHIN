@@ -100,9 +100,9 @@ ALTER TABLE public.influencer_profiles
 -- L-1: Original DROP lacked arg types — could silently no-op or error.
 -- M-4: Cosine distance on NULL embedding crashes or drops rows silently.
 -- ─────────────────────────────────────────────────────────────────────────────
-DROP FUNCTION IF EXISTS public.match_influencers(vector(1536), float, int, text);
+DROP FUNCTION IF EXISTS public.match_influencers(extensions.vector(1536), float, int, text);
 CREATE OR REPLACE FUNCTION public.match_influencers(
-  query_embedding vector(1536),
+  query_embedding extensions.vector(1536),
   match_threshold float,
   match_count int,
   filter_platform text DEFAULT NULL
@@ -120,7 +120,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 BEGIN
   RETURN QUERY

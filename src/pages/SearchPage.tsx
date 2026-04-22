@@ -24,6 +24,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { invokeEdgeAuthed } from "@/lib/edge";
 import { useInfluencerLists } from "@/hooks/useInfluencerLists";
 import { useSavedSearches } from "@/hooks/useSavedSearches";
 import { useWorkspaceCredits } from "@/hooks/useWorkspaceCredits";
@@ -281,10 +282,17 @@ export default function SearchPage() {
     if (!input) return "";
     return input.replace(/[<>]/g, "").slice(0, maxLength);
   };
+  const parsePlatformsParam = (raw: string | null): string[] => {
+    if (!raw) return [];
+    return raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  };
   const [query, setQuery] = useState(() => sanitizeInput(searchParams.get("q")));
   const [isAiSearch, setIsAiSearch] = useState(searchParams.get("ai") === "1");
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(
-    searchParams.get("platform") ? [searchParams.get("platform")!] : []
+    parsePlatformsParam(searchParams.get("platform"))
   );
   const [selectedCity, setSelectedCity] = useState(searchParams.get("city") || "All Pakistan");
   const [followerRange, setFollowerRange] = useState(searchParams.get("range") || "any");
@@ -332,7 +340,7 @@ export default function SearchPage() {
     const next: Record<string, string> = {};
     if (query) next.q = query;
     if (isAiSearch) next.ai = "1";
-    if (selectedPlatforms[0]) next.platform = selectedPlatforms[0];
+    if (selectedPlatforms.length) next.platform = selectedPlatforms.join(",");
     if (selectedCity !== "All Pakistan") next.city = selectedCity;
     if (followerRange !== "any") next.range = followerRange;
     setSearchParams({ ...next, ...overrides }, { replace: true });
@@ -343,11 +351,24 @@ export default function SearchPage() {
 
   // Auto-run once on load — restore from session cache first (no credit burn on back-nav)
   useEffect(() => {
+    // If user navigated away and came back with no params, restore last search URL.
+    if (!searchParams.get("q")) {
+      try {
+        const last = sessionStorage.getItem("mushin_last_search_url");
+        if (last && last.startsWith("?")) {
+          setSearchParams(last.slice(1), { replace: true });
+        }
+      } catch {
+        /* ignore */
+      }
+    }
     if (searchParams.get("q") && !hasAutoSearched.current && !searched) {
       hasAutoSearched.current = true;
       const cacheKey = buildCacheKey(
         searchParams.get("q") || "",
-        searchParams.get("platform") || "instagram",
+        parsePlatformsParam(searchParams.get("platform")).length
+          ? parsePlatformsParam(searchParams.get("platform"))
+          : (searchParams.get("platform") || "instagram"),
         searchParams.get("city") || "All Pakistan",
         searchParams.get("range") || "any",
       );
@@ -380,19 +401,36 @@ export default function SearchPage() {
     setLoading(true);
     setSearched(true);
     setSearchError(null);
-    setVisibleCount(12);
+    setVisibleCount(28);
     syncParams();
 
-    const platforms = selectedPlatforms.length > 0
+    const rawPlatforms = selectedPlatforms.length > 0
       ? selectedPlatforms.map(p => p.toLowerCase())
       : ["instagram"];
+    const supported = ["instagram", "tiktok", "youtube"];
+    const platforms = rawPlatforms.filter((p) => supported.includes(p));
+    if (rawPlatforms.includes("twitch")) {
+      toast({
+        title: "Twitch not supported",
+        description: "Discovery currently supports Instagram, TikTok, and YouTube only.",
+      });
+    }
+    if (platforms.length === 0) {
+      toast({
+        title: "Platform required",
+        description: "Please select Instagram, TikTok, or YouTube to run discovery.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
 
     try {
       let sortedResults: SearchResult[] = [];
 
       // Phase 2: single Intelligence Engine — discover-creators (live Serper+Apify)
       const minFollowersFromRange: Record<string, number> = {
-        any: 10_000,
+        any: 1_000,
         "1k-10k": 1_000,
         "10k-50k": 10_000,
         "50k-100k": 50_000,
@@ -400,14 +438,27 @@ export default function SearchPage() {
         "500k+": 500_000,
       };
       const minFollowers = minFollowersFromRange[followerRange] ?? 10_000;
+      const exKey = `${buildCacheKey(query.trim(), platforms, selectedCity, followerRange)}:ex`;
+      let exclude_handles: string[] = [];
+      try {
+        const raw = sessionStorage.getItem(exKey);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) exclude_handles = parsed.map((s) => String(s)).slice(0, 120);
+        }
+      } catch {
+        exclude_handles = [];
+      }
+
       const body = {
         query: query.trim(),
         platforms,
         cities: selectedCity !== "All Pakistan" ? [selectedCity] : [],
         minFollowers,
+        exclude_handles,
       };
 
-      const { data, error } = await supabase.functions.invoke("discover-creators", { body });
+      const { data, error } = await invokeEdgeAuthed<Record<string, unknown>>("discover-creators", { body });
       if (error) {
         if (isInsufficientCreditsError(error)) {
           showInsufficientCredits();
@@ -452,6 +503,17 @@ export default function SearchPage() {
 
       setResults(sortedResults);
 
+      try {
+        const handleKeys = sortedResults.map((r) => {
+          const pl = (r.platform || "instagram").toLowerCase();
+          const h = String(r.username || "").replace(/^@/, "").toLowerCase();
+          return `${pl}:${h}`;
+        });
+        sessionStorage.setItem(exKey, JSON.stringify(handleKeys.slice(0, 80)));
+      } catch {
+        /* ignore */
+      }
+
       const cacheKey = buildCacheKey(query.trim(), platforms, selectedCity, followerRange);
       try {
         sessionStorage.setItem(cacheKey, JSON.stringify({
@@ -460,7 +522,7 @@ export default function SearchPage() {
         }));
         const urlParams = new URLSearchParams();
         urlParams.set("q", query.trim());
-        if (selectedPlatforms[0]) urlParams.set("platform", selectedPlatforms[0]);
+        if (selectedPlatforms.length) urlParams.set("platform", selectedPlatforms.join(","));
         if (selectedCity !== "All Pakistan") urlParams.set("city", selectedCity);
         if (followerRange !== "any") urlParams.set("range", followerRange);
         sessionStorage.setItem("mushin_last_search_url", `?${urlParams.toString()}`);

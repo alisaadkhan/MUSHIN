@@ -14,28 +14,28 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-outreach-email]
-verify_jwt = true
+verify_jwt = false
 
 [functions.ai-insights]
-verify_jwt = true
+verify_jwt = false
 
 [functions.ai-analytics]
-verify_jwt = true
+verify_jwt = false
 
 [functions.create-checkout]
-verify_jwt = true
+verify_jwt = false
 
 [functions.customer-portal]
-verify_jwt = true
+verify_jwt = false
 
 [functions.check-subscription]
 verify_jwt = false
 
 [functions.sync-hubspot]
-verify_jwt = true
+verify_jwt = false
 
 [functions.delete-account]
-verify_jwt = true
+verify_jwt = false
 
 [functions.admin-list-users]
 verify_jwt = false
@@ -58,35 +58,81 @@ verify_jwt = false
 [functions.admin-force-password-reset]
 verify_jwt = false
 
+[functions.admin-get-audit-log]
+verify_jwt = false
+
+[functions.admin-get-activity-log]
+verify_jwt = false
+
+[functions.admin-send-notification]
+verify_jwt = false
+
+[functions.admin-list-subscriptions]
+verify_jwt = false
+
+[functions.admin-set-user-plan]
+verify_jwt = false
+
+[functions.admin-create-support-staff]
+verify_jwt = false
+
+[functions.admin-create-user]
+verify_jwt = false
+
 [functions.enrich-influencer]
-verify_jwt = true
+verify_jwt = false
 
 [functions.detect-bot-entendre]
-verify_jwt = true
+verify_jwt = false
 
 [functions.export-user-data]
-verify_jwt = true
+verify_jwt = false
 
 [functions.find-lookalikes]
-verify_jwt = true
+verify_jwt = false
 
 [functions.classify-niche]
-verify_jwt = true
+verify_jwt = false
 
 [functions.generate-embeddings]
-verify_jwt = true
+verify_jwt = false
 
 [functions.generate-invoice]
-verify_jwt = true
+verify_jwt = false
 
 [functions.extract-brand-mentions]
-verify_jwt = true
+verify_jwt = false
 
 [functions.fetch-campaign-metrics]
-verify_jwt = true
+verify_jwt = false
 
 [functions.generate-tracking-link]
-verify_jwt = true
+verify_jwt = false
 
 [functions.generate-public-profile]
 verify_jwt = false
+
+[functions.support-create-ticket]
+verify_jwt = false
+
+[functions.support-impersonate-user]
+verify_jwt = false
+
+# Anonymous: IP-based rate limit before password sign-in / sign-up
+[functions.auth-password-rate]
+verify_jwt = false
+
+[functions.admin-get-sessions]
+enabled = true
+verify_jwt = false
+import_map = "./functions/admin-get-sessions/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/admin-get-sessions/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/admin-get-sessions/*.html" ]
+
+[functions.discover-creators]
+verify_jwt = false
+

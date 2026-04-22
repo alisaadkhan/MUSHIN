@@ -570,7 +570,7 @@ export default function InfluencerProfilePage() {
       {platform !== "youtube" && (
         <div className="bg-blue-50/50 border border-blue-200/50 text-blue-800 rounded-lg p-3 text-sm flex items-start gap-2 backdrop-blur-sm">
           <Info className="h-4 w-4 mt-0.5 shrink-0 text-blue-600" />
-          <p>Instagram and TikTok data is sourced via Apify. YouTube data comes directly from official YouTube data sources.</p>
+          {/* Removed per request: implementation detail */}
         </div>
       )}
 

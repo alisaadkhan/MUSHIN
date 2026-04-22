@@ -3,12 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { generateText, extractJsonFromText } from "../_shared/huggingface.ts";
 import { enforceRateLimit } from "../_shared/rate-limit.ts";
 import { enforceBudgetKillSwitch } from "../_shared/budget-guard.ts";
-const ALLOWED_ORIGIN = Deno.env.get("APP_URL") || "https://mushin.app";
-const corsHeaders = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+import { buildCorsHeaders } from "../_shared/cors.ts";
 
 // ─── Prompt builders (HuggingFace / Mistral-7B compatible) ───────────────────
 // Each builder returns { system, user } strings for generateText().
@@ -48,6 +43,7 @@ Return ONLY the JSON. Engagement benchmarks: Instagram 1-3%, TikTok 3-6%, YouTub
 
 
 Deno.serve(async (req) => {
+  const corsHeaders = buildCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {

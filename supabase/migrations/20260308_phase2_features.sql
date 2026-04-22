@@ -1,16 +1,34 @@
 -- Phase 2 Feature Migrations
 
 -- 1. Add vector extension if not present, embedding column, and HNSW index
-CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
-ALTER TABLE public.influencer_profiles ADD COLUMN IF NOT EXISTS embedding vector(1536);
+CREATE EXTENSION IF NOT EXISTS vector;
+ALTER TABLE public.influencer_profiles ADD COLUMN IF NOT EXISTS embedding extensions.vector(1536);
 -- Create HNSW index for efficient similarity search
-CREATE INDEX IF NOT EXISTS influencer_profiles_embedding_idx 
-ON public.influencer_profiles USING hnsw (embedding vector_cosine_ops)
-WITH (m = 16, ef_construction = 64);
+DO $$
+BEGIN
+  BEGIN
+    EXECUTE $q$
+      CREATE INDEX IF NOT EXISTS influencer_profiles_embedding_idx
+      ON public.influencer_profiles USING hnsw (embedding extensions.vector_cosine_ops)
+      WITH (m = 16, ef_construction = 64)
+    $q$;
+  EXCEPTION WHEN undefined_object THEN
+    BEGIN
+      EXECUTE $q$
+        CREATE INDEX IF NOT EXISTS influencer_profiles_embedding_idx
+        ON public.influencer_profiles USING hnsw (embedding vector_cosine_ops)
+        WITH (m = 16, ef_construction = 64)
+      $q$;
+    EXCEPTION WHEN undefined_object THEN
+      NULL;
+    END;
+  END;
+END;
+$$;
 -- 2. Create/update match_influencers RPC
 DROP FUNCTION IF EXISTS public.match_influencers;
 CREATE OR REPLACE FUNCTION public.match_influencers(
-  query_embedding vector(1536),
+  query_embedding extensions.vector(1536),
   match_threshold float,
   match_count int,
   filter_platform text DEFAULT NULL
@@ -28,7 +46,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 BEGIN
   RETURN QUERY

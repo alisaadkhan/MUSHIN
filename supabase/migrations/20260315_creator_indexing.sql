@@ -118,6 +118,6 @@ AS $$
     ip.follower_count DESC
   LIMIT p_limit;
 $$;
-COMMENT ON FUNCTION public.tag_match_influencers IS
+COMMENT ON FUNCTION public.tag_match_influencers(TEXT, TEXT[], TEXT, BIGINT, BIGINT, FLOAT, TEXT, INT) IS
   'DB-first search: returns creators matching tags/niche/city from the local index. '
   'Used before calling Serper to reduce external API usage. last_seen_at added 2026-03-15.';

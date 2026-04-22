@@ -14,28 +14,25 @@
 -- ============================================================
 
 ALTER TABLE IF EXISTS public.user_roles ENABLE ROW LEVEL SECURITY;
-
 DO $$
 DECLARE
   p record;
 BEGIN
   -- Drop ALL existing policies on user_roles to eliminate recursion.
   FOR p IN
-    SELECT polname
+    SELECT policyname
     FROM pg_policies
     WHERE schemaname = 'public' AND tablename = 'user_roles'
   LOOP
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.user_roles', p.polname);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.user_roles', p.policyname);
   END LOOP;
 END $$;
-
 -- Self-read only
 CREATE POLICY ur_self_select
   ON public.user_roles
   FOR SELECT
   TO authenticated
   USING (user_id = auth.uid());
-
 -- Service role full access
 CREATE POLICY ur_service_write
   ON public.user_roles
@@ -43,4 +40,3 @@ CREATE POLICY ur_service_write
   TO service_role
   USING (true)
   WITH CHECK (true);
-

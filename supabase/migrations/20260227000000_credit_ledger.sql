@@ -27,11 +27,10 @@ CREATE TABLE IF NOT EXISTS credit_ledger (
   metadata        jsonb       DEFAULT '{}',
   created_at      timestamptz NOT NULL DEFAULT now()
 );
-
 -- Enforce append-only: no UPDATE or DELETE allowed via RLS
 ALTER TABLE credit_ledger ENABLE ROW LEVEL SECURITY;
-
 -- Admins can INSERT (append)
+DROP POLICY IF EXISTS "admin_insert_ledger" ON credit_ledger;
 CREATE POLICY "admin_insert_ledger" ON credit_ledger
   FOR INSERT
   TO authenticated
@@ -42,8 +41,8 @@ CREATE POLICY "admin_insert_ledger" ON credit_ledger
       AND role IN ('super_admin', 'admin')
     )
   );
-
 -- Anyone in a workspace can read their own ledger
+DROP POLICY IF EXISTS "workspace_read_ledger" ON credit_ledger;
 CREATE POLICY "workspace_read_ledger" ON credit_ledger
   FOR SELECT
   TO authenticated
@@ -57,7 +56,6 @@ CREATE POLICY "workspace_read_ledger" ON credit_ledger
       AND role IN ('super_admin', 'admin', 'support')
     )
   );
-
 -- No UPDATE or DELETE policies — effectively append-only
 -- (No policies means the action is denied by default)
 
@@ -73,7 +71,6 @@ SELECT
   MAX(created_at)                               AS last_event_at
 FROM credit_ledger
 GROUP BY workspace_id, credit_type;
-
 -- ── 3. Balance constraint enforcement via trigger ─────────────
 -- Prevents negative balance at insert time
 CREATE OR REPLACE FUNCTION enforce_credit_balance()
@@ -102,11 +99,10 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
+DROP TRIGGER IF EXISTS trg_enforce_credit_balance ON credit_ledger;
 CREATE TRIGGER trg_enforce_credit_balance
   BEFORE INSERT ON credit_ledger
   FOR EACH ROW EXECUTE FUNCTION enforce_credit_balance();
-
 -- ── 4. Helper function: debit credits (called from edge functions) ─
 CREATE OR REPLACE FUNCTION debit_credits(
   p_workspace_id  uuid,
@@ -140,7 +136,6 @@ BEGIN
   RETURN jsonb_build_object('success', true, 'balance', v_balance - p_amount, 'ledger_id', v_row.id);
 END;
 $$;
-
 -- ── 5. Helper function: allocate credits (subscriptions/admin) ─
 CREATE OR REPLACE FUNCTION allocate_credits(
   p_workspace_id  uuid,
@@ -169,17 +164,13 @@ BEGIN
   RETURN jsonb_build_object('success', true, 'balance', v_balance + p_amount, 'ledger_id', v_row.id);
 END;
 $$;
-
 -- ── 6. Indexes ─────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_credit_ledger_workspace_type
   ON credit_ledger (workspace_id, credit_type);
-
 CREATE INDEX IF NOT EXISTS idx_credit_ledger_created_at
   ON credit_ledger (created_at DESC);
-
 CREATE INDEX IF NOT EXISTS idx_credit_ledger_actor
   ON credit_ledger (actor_user_id);
-
 -- ── 7. Migrate existing balance data ─────────────────────────
 -- Run this ONCE after applying the migration to seed the ledger
 -- from the existing workspaces.search_credits_remaining etc.
@@ -215,4 +206,3 @@ BEGIN
   END LOOP;
 END;
 $$;
-

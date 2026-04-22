@@ -87,11 +87,13 @@ export default function AdminAnnouncements() {
     }
     setPublishing(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase.from("announcements").insert({
         title: title.trim(),
         body: body.trim(),
         type,
         is_active: true,
+        admin_user_id: user?.id,
       });
       if (error) throw error;
       qc.invalidateQueries({ queryKey: ["admin-announcements"] });
@@ -116,15 +118,18 @@ export default function AdminAnnouncements() {
     }
     setSendingNotif(true);
     try {
-      const { error } = await supabase.rpc("admin_send_notification", {
-        p_title: title.trim(),
-        p_body: body.trim(),
-        p_type: type,
-        p_link: link.trim() || null,
-        p_target_type: targetType,
-        p_target_value: targetValue.trim() || null,
+      const { data, error } = await supabase.functions.invoke("admin-send-notification", {
+        body: {
+          p_title: title.trim(),
+          p_body: body.trim(),
+          p_type: type,
+          p_link: link.trim() || null,
+          p_target_type: targetType,
+          p_target_value: targetValue.trim() || null,
+        },
       });
       if (error) throw error;
+      if ((data as any)?.error) throw new Error(String((data as any).error));
       qc.invalidateQueries({ queryKey: ["admin-notification-log"] });
       toast({ title: "In-app notifications sent" });
     } catch (err: any) {

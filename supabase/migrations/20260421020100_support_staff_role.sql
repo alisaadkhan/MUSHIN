@@ -13,7 +13,6 @@ BEGIN
     END IF;
   END IF;
 END $$;
-
 -- Optional support staff table for additional fields
 CREATE TABLE IF NOT EXISTS public.support_staff (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -23,13 +22,10 @@ CREATE TABLE IF NOT EXISTS public.support_staff (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 ALTER TABLE public.support_staff ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS support_staff_view_own ON public.support_staff;
 CREATE POLICY support_staff_view_own ON public.support_staff
   FOR SELECT USING (auth.uid() = id);
-
 DROP POLICY IF EXISTS support_staff_view_all ON public.support_staff;
 CREATE POLICY support_staff_view_all ON public.support_staff
   FOR SELECT USING (
@@ -40,6 +36,4 @@ CREATE POLICY support_staff_view_all ON public.support_staff
         AND (revoked_at IS NULL OR revoked_at IS NULL)
     )
   );
-
 CREATE INDEX IF NOT EXISTS idx_support_staff_dept ON public.support_staff(department);
-
