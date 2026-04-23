@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO, startOfMonth, startOfWeek } from "date-fns";
-import { supabase } from "@/integrations/supabase/client";
 import { invokeEdgeAuthed } from "@/lib/edge";
 import { BarChart2, Search, Users, CreditCard, RefreshCw } from "lucide-react";
 import {
@@ -37,52 +36,11 @@ export default function AdminAnalytics() {
     const { data, isLoading } = useQuery({
         queryKey: ["admin-analytics", signupBucket],
         queryFn: async () => {
-            const since = new Date(Date.now() - 120 * 864e5).toISOString();
-            const [searches, users, paddleSubs, userList, profilesTs] = await Promise.all([
-                supabase.from("search_history").select("id,created_at", { count: "exact" }),
-                supabase.from("profiles").select("id,created_at", { count: "exact" }),
-                supabase
-                    .from("paddle_subscriptions")
-                    .select("user_id,plan_name,status,current_period_end,cancel_at_period_end")
-                    .order("updated_at", { ascending: false }),
-                invokeEdgeAuthed("admin-list-users"),
-                supabase.from("profiles").select("created_at").gte("created_at", since).limit(8000),
-            ]);
-
-            const emailByUser: Record<string, string> = {};
-            for (const u of userList.data?.users ?? []) {
-                if (u?.id && u?.email) emailByUser[u.id] = u.email;
-            }
-
-            const adminUserCount = Array.isArray(userList.data?.users) ? userList.data.users.length : null;
-
-            const planCounts: Record<string, number> = {};
-            (paddleSubs.data || []).forEach((s: { plan_name?: string }) => {
-                const k = s.plan_name || "unknown";
-                planCounts[k] = (planCounts[k] || 0) + 1;
-            });
-
-            const signupMap: Record<string, number> = {};
-            for (const row of profilesTs.data ?? []) {
-                const iso = (row as { created_at?: string }).created_at;
-                if (!iso) continue;
-                const k = bucketLabel(iso, signupBucket);
-                signupMap[k] = (signupMap[k] || 0) + 1;
-            }
-            const signupSeries = Object.entries(signupMap)
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([period, signups]) => ({ period, signups }));
-
-            return {
-                totalSearches: searches.count ?? 0,
-                totalUsers: adminUserCount ?? users.count ?? 0,
-                planCounts,
-                signupSeries,
-                subscriptions: (paddleSubs.data ?? []).map((s: PaddleSub) => ({
-                    ...s,
-                    email: emailByUser[s.user_id] ?? null,
-                })),
-            };
+            const { data, error } = await invokeEdgeAuthed("admin-analytics", {
+                body: { signup_bucket: signupBucket },
+            } as any);
+            if (error) throw error;
+            return data as any;
         },
         staleTime: 20_000,
         refetchInterval: 20_000,

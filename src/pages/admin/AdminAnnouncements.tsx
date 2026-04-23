@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeEdgeAuthed } from "@/lib/edge";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,25 +57,22 @@ export default function AdminAnnouncements() {
   const { data: announcements = [], isLoading } = useQuery<Announcement[]>({
     queryKey: ["admin-announcements"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("announcements")
-        .select("*")
-        .order("created_at", { ascending: false });
+      const { data, error } = await invokeEdgeAuthed<{ announcements: Announcement[] }>("admin-announcements-control", {
+        body: { action: "list_announcements" },
+      } as any);
       if (error) throw error;
-      return data as Announcement[];
+      return ((data as any)?.announcements ?? []) as Announcement[];
     },
   });
 
   const { data: notifLog = [] } = useQuery<NotifLog[]>({
     queryKey: ["admin-notification-log"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("notification_log")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50);
+      const { data, error } = await invokeEdgeAuthed<{ log: NotifLog[] }>("admin-announcements-control", {
+        body: { action: "list_notification_log", limit: 50 },
+      } as any);
       if (error) throw error;
-      return data as NotifLog[];
+      return ((data as any)?.log ?? []) as NotifLog[];
     },
     enabled: tab === "history",
   });
@@ -87,14 +84,9 @@ export default function AdminAnnouncements() {
     }
     setPublishing(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from("announcements").insert({
-        title: title.trim(),
-        body: body.trim(),
-        type,
-        is_active: true,
-        admin_user_id: user?.id,
-      });
+      const { error } = await invokeEdgeAuthed("admin-announcements-control", {
+        body: { action: "create_announcement", title: title.trim(), body: body.trim(), type },
+      } as any);
       if (error) throw error;
       qc.invalidateQueries({ queryKey: ["admin-announcements"] });
       toast({ title: "Announcement published" });
@@ -118,7 +110,7 @@ export default function AdminAnnouncements() {
     }
     setSendingNotif(true);
     try {
-      const { data, error } = await supabase.functions.invoke("admin-send-notification", {
+      const { data, error } = await invokeEdgeAuthed<{ success: true }>("admin-send-notification", {
         body: {
           p_title: title.trim(),
           p_body: body.trim(),
@@ -127,7 +119,7 @@ export default function AdminAnnouncements() {
           p_target_type: targetType,
           p_target_value: targetValue.trim() || null,
         },
-      });
+      } as any);
       if (error) throw error;
       if ((data as any)?.error) throw new Error(String((data as any).error));
       qc.invalidateQueries({ queryKey: ["admin-notification-log"] });
@@ -140,13 +132,15 @@ export default function AdminAnnouncements() {
   };
 
   const handleDeactivate = async (id: string) => {
-    await supabase.from("announcements").update({ is_active: false }).eq("id", id);
+    const { error } = await invokeEdgeAuthed("admin-announcements-control", { body: { action: "deactivate", id } } as any);
+    if (error) throw error;
     qc.invalidateQueries({ queryKey: ["admin-announcements"] });
     toast({ title: "Announcement deactivated" });
   };
 
   const handleDelete = async (id: string) => {
-    await supabase.from("announcements").delete().eq("id", id);
+    const { error } = await invokeEdgeAuthed("admin-announcements-control", { body: { action: "delete", id } } as any);
+    if (error) throw error;
     qc.invalidateQueries({ queryKey: ["admin-announcements"] });
     toast({ title: "Announcement deleted" });
   };

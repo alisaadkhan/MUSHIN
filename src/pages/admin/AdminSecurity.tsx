@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeEdgeAuthed } from "@/lib/edge";
 import { AlertTriangle, RefreshCw, Loader2, Search } from "lucide-react";
 
 type Severity = "low" | "medium" | "high" | "critical";
@@ -38,14 +38,11 @@ export default function AdminSecurity() {
   const { data: alerts = [], isLoading, refetch } = useQuery<SecurityAlertRow[]>({
     queryKey: ["admin-security-alerts"],
     queryFn: async () => {
-      let query = supabase
-        .from("security_alerts")
-        .select("id,created_at,severity,category,user_id,workspace_id,ip_address,metadata")
-        .order("created_at", { ascending: false })
-        .limit(200);
-      const { data, error } = await query;
+      const { data, error } = await invokeEdgeAuthed<{ alerts: SecurityAlertRow[] }>("admin-security-alerts", {
+        body: { limit: 200 },
+      } as any);
       if (error) throw error;
-      return (data ?? []) as SecurityAlertRow[];
+      return ((data as any)?.alerts ?? []) as SecurityAlertRow[];
     },
     staleTime: 10_000,
   });

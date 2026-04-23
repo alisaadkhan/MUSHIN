@@ -8,6 +8,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect } from "react";
+import { invokeEdgeAuthed } from "@/lib/edge";
 
 function Input({ className, type, ...props }: React.ComponentProps<"input">) {
   return (
@@ -68,15 +69,14 @@ export default function SupportLogin() {
         return;
       }
 
-      // Verify the user has support, admin, or super_admin role
-      const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", (await supabase.auth.getUser()).data.user?.id ?? "")
-        .in("role", ["support", "admin", "super_admin"])
-        .single();
+      // Verify the user has support access (server-side). Avoid any direct DB query from the client.
+      const { data: perms, error: permErr } = await invokeEdgeAuthed<{ permissions: { tier: string | null } }>(
+        "support-permissions",
+        { body: {} } as any,
+      );
+      if (permErr) throw permErr;
 
-      if (!roleData) {
+      if (!perms?.permissions?.tier) {
         toast({
           title: "Access Denied",
           description: "This account does not have support staff access.",

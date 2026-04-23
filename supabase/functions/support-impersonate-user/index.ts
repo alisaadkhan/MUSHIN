@@ -53,9 +53,24 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Create an impersonation session record (15 minutes).
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    const { data: sessionRow, error: sessErr } = await serviceClient
+      .from("impersonation_sessions")
+      .insert({
+        support_user_id: supportUserId,
+        target_user_id: targetUserId,
+        reason,
+        expires_at: expiresAt,
+      })
+      .select("id,expires_at")
+      .single();
+    if (sessErr) throw sessErr;
+
     // Create a magic link. WARNING: following it will change the session in the same browser profile.
     // Use a separate browser profile/incognito to avoid losing the support session.
-    const redirectTo = `${getAppUrl()}/dashboard?impersonated=1`;
+    const redirectTo =
+      `${getAppUrl()}/dashboard?impersonation_session_id=${encodeURIComponent(String(sessionRow.id))}`;
 
     const { data: linkData, error: linkError } = await serviceClient.auth.admin.generateLink({
       type: "magiclink",
@@ -86,12 +101,21 @@ Deno.serve(async (req) => {
       actionDescription: "Support staff generated user impersonation link (magiclink)",
       ipAddress,
       userAgent,
-      metadata: { reason, redirect_to: redirectTo },
+      metadata: { reason, redirect_to: redirectTo, impersonation_session_id: sessionRow.id, expires_at: sessionRow.expires_at },
     });
 
-    return new Response(JSON.stringify({ success: true, action_link: actionLink, redirect_to: redirectTo }), {
+    return new Response(
+      JSON.stringify({
+        success: true,
+        action_link: actionLink,
+        redirect_to: redirectTo,
+        impersonation_session_id: sessionRow.id,
+        expires_at: sessionRow.expires_at,
+      }),
+      {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+      },
+    );
   } catch (err: any) {
     return safeErrorResponse(err, "[support-impersonate-user]", corsHeaders);
   }

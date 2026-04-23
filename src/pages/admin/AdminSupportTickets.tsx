@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
+import { invokeEdgeAuthed } from "@/lib/edge";
 import {
   LifeBuoy, MessageSquare, Clock, CheckCircle2, AlertCircle,
   ChevronDown, ChevronUp, Send, Loader2, XCircle, Search, Filter
@@ -69,18 +69,11 @@ export default function AdminSupportTickets() {
   const { data: tickets = [], isLoading } = useQuery<Ticket[]>({
     queryKey: ["admin-support-tickets", filterStatus],
     queryFn: async () => {
-      let q = supabase
-        .from("support_tickets")
-        .select("*, profiles!user_id(full_name, avatar_url)")
-        .order("created_at", { ascending: false });
-
-      if (filterStatus !== "all") {
-        q = q.eq("status", filterStatus);
-      }
-
-      const { data, error } = await q;
+      const { data, error } = await invokeEdgeAuthed<{ tickets: Ticket[] }>("admin-support-tickets", {
+        body: { action: "list_tickets", status: filterStatus === "all" ? null : filterStatus, limit: 200 },
+      } as any);
       if (error) throw error;
-      return data as Ticket[];
+      return ((data as any)?.tickets ?? []) as Ticket[];
     },
     refetchInterval: 60_000,
   });
@@ -88,21 +81,12 @@ export default function AdminSupportTickets() {
   const { data: staff = [] } = useQuery<{ id: string; full_name: string | null }[]>({
     queryKey: ["admin-support-staff"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("user_id, role")
-        .in("role", ["support", "admin", "super_admin"]);
+      const { data, error } = await invokeEdgeAuthed<{ staff: Array<{ id: string; full_name: string | null }> }>(
+        "admin-support-tickets",
+        { body: { action: "list_staff" } } as any,
+      );
       if (error) throw error;
-
-      const ids = Array.from(new Set((data ?? []).map((r: any) => r.user_id).filter(Boolean)));
-      if (ids.length === 0) return [];
-
-      const { data: profiles, error: pErr } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("id", ids);
-      if (pErr) throw pErr;
-      return (profiles ?? []) as any;
+      return ((data as any)?.staff ?? []) as any;
     },
     staleTime: 60_000,
   });
@@ -110,13 +94,11 @@ export default function AdminSupportTickets() {
   const { data: replies = [] } = useQuery<TicketReply[]>({
     queryKey: ["admin-ticket-replies", expandedTicket],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("support_ticket_replies")
-        .select("*")
-        .eq("ticket_id", expandedTicket!)
-        .order("created_at", { ascending: true });
+      const { data, error } = await invokeEdgeAuthed<{ replies: TicketReply[] }>("admin-support-tickets", {
+        body: { action: "list_replies", ticket_id: expandedTicket! },
+      } as any);
       if (error) throw error;
-      return data as TicketReply[];
+      return ((data as any)?.replies ?? []) as TicketReply[];
     },
     enabled: !!expandedTicket,
   });
@@ -131,7 +113,9 @@ export default function AdminSupportTickets() {
       if (adminNotes.trim()) {
         updates.admin_notes = adminNotes.trim();
       }
-      const { error } = await supabase.from("support_tickets").update(updates).eq("id", ticketId);
+      const { error } = await invokeEdgeAuthed("admin-support-tickets", {
+        body: { action: "update_ticket", ticket_id: ticketId, updates },
+      } as any);
       if (error) throw error;
       toast({ title: `Ticket marked as ${status.replace("_", " ")}` });
       qc.invalidateQueries({ queryKey: ["admin-support-tickets"] });
@@ -147,18 +131,17 @@ export default function AdminSupportTickets() {
     setSendingReply(true);
     try {
       if (!user) throw new Error("Not authenticated");
-      const { error } = await supabase.from("support_ticket_replies").insert({
-        ticket_id: ticketId,
-        author_id: user!.id,
-        body: replyText.trim(),
-        is_admin: true,
-      });
+      const { error } = await invokeEdgeAuthed("admin-support-tickets", {
+        body: { action: "post_reply", ticket_id: ticketId, body: replyText.trim() },
+      } as any);
       if (error) throw error;
 
       // Auto-progress status to in_progress if it was open
       const ticket = tickets.find((t) => t.id === ticketId);
       if (ticket?.status === "open") {
-        await supabase.from("support_tickets").update({ status: "in_progress" }).eq("id", ticketId);
+        await invokeEdgeAuthed("admin-support-tickets", {
+          body: { action: "update_ticket", ticket_id: ticketId, updates: { status: "in_progress" } },
+        } as any);
       }
 
       setReplyText("");
@@ -174,10 +157,9 @@ export default function AdminSupportTickets() {
 
   const handleAssign = async (ticketId: string, assigneeId: string | null) => {
     try {
-      const { error } = await supabase
-        .from("support_tickets")
-        .update({ assigned_to: assigneeId, assigned_at: assigneeId ? new Date().toISOString() : null })
-        .eq("id", ticketId);
+      const { error } = await invokeEdgeAuthed("admin-support-tickets", {
+        body: { action: "assign", ticket_id: ticketId, assigned_to: assigneeId },
+      } as any);
       if (error) throw error;
       toast({ title: assigneeId ? "Ticket assigned" : "Assignment cleared" });
       qc.invalidateQueries({ queryKey: ["admin-support-tickets"] });

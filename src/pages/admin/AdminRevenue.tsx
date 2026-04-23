@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { invokeEdgeAuthed } from "@/lib/edge";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
@@ -21,45 +20,9 @@ export default function AdminRevenue() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["admin-revenue"],
     queryFn: async () => {
-      const [subsRes, userList] = await Promise.all([
-        supabase
-          .from("paddle_subscriptions")
-          .select("user_id,plan_name,status,current_period_end")
-          .order("updated_at", { ascending: false }),
-        invokeEdgeAuthed<{ users: Array<{ id: string; email: string | null }> }>("admin-list-users"),
-      ]);
-
-      if (subsRes.error) throw subsRes.error;
-      if (userList.error) throw userList.error;
-
-      const emailByUser: Record<string, string> = {};
-      for (const u of userList.data?.users ?? []) {
-        if (u?.id && u?.email) emailByUser[u.id] = u.email;
-      }
-
-      const subs = (subsRes.data ?? []) as PaddleSubRow[];
-      const active = subs.filter((s) => String(s.status).toLowerCase() === "active");
-
-      const byPlan: Record<string, number> = {};
-      for (const s of active) {
-        const k = String(s.plan_name ?? "unknown").toLowerCase();
-        byPlan[k] = (byPlan[k] ?? 0) + 1;
-      }
-
-      const mrrPkr = Object.entries(byPlan).reduce((sum, [plan, count]) => {
-        const price = PLAN_PRICE_PKR[plan] ?? 0;
-        return sum + price * count;
-      }, 0);
-
-      return {
-        activeCount: active.length,
-        byPlan,
-        mrrPkr,
-        subs: active.map((s) => ({
-          ...s,
-          email: emailByUser[s.user_id] ?? null,
-        })),
-      };
+      const { data, error } = await invokeEdgeAuthed("admin-revenue", { body: {} } as any);
+      if (error) throw error;
+      return data as any;
     },
     staleTime: 20_000,
     refetchInterval: 20_000,

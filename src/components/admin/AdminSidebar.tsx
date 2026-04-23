@@ -3,7 +3,7 @@ import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import {
   LayoutDashboard, Users, CreditCard, BarChart2,
   Settings, ScrollText, Megaphone, ShieldCheck,
-  ArrowLeft, LifeBuoy, Coins, ShieldAlert, UserCog, Key
+  ArrowLeft, LifeBuoy, Coins, ShieldAlert, UserCog, Key, Shield, Lock
 } from 'lucide-react';
 import { MushInLogo } from '@/components/ui/MushInLogo';
 
@@ -50,6 +50,18 @@ export function AdminSidebar() {
         { icon: ShieldAlert, label: 'Security',    path: '/admin/security' },
         { icon: ShieldCheck, label: 'Permissions', path: '/admin/permissions' },
         { icon: Settings,    label: 'Config',      path: '/admin/config' },
+      ],
+    },
+    {
+      label: 'Super Admin',
+      show: perms.isSuperAdmin,
+      items: [
+        { icon: Shield, label: 'RBAC',            path: '/admin/rbac' },
+        { icon: Settings, label: 'System Settings', path: '/admin/system-settings' },
+        { icon: Key, label: 'API Keys',           path: '/admin/api-keys' },
+        { icon: Lock, label: 'Impersonation',     path: '/admin/impersonation' },
+        { icon: ShieldAlert, label: 'Security Flags', path: '/admin/security/flags' },
+        { icon: Lock, label: 'Support Oversight', path: '/admin/security/support-activity' },
       ],
     },
   ];

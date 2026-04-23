@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { invokeEdgeAuthed } from '@/lib/edge';
 import { Search, RefreshCw, Loader2, Download } from 'lucide-react';
+import { useLocation } from "react-router-dom";
 
 /* ── Types ─────────────────────────────────────────────────── */
 interface AuditEntry {
@@ -91,11 +92,20 @@ const ACTION_CATEGORIES = ['all', 'credits', 'user', 'session', 'role', 'system'
 
 export default function AdminAuditLog() {
   const { session } = useAuth();
+  const location = useLocation();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<string>('all');
   const [detail, setDetail] = useState<AuditEntry | null>(null);
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
+
+  // Initialize search filter from URL once (supports deep links from flags UI).
+  useEffect(() => {
+    const sp = new URLSearchParams(location.search);
+    const s = sp.get("search");
+    if (s) setSearch(s);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['audit-log', page, category],

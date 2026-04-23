@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useToast } from '@/hooks/use-toast';
 import { invokeEdgeAuthed } from '@/lib/edge';
@@ -355,13 +354,11 @@ export default function AdminCredits() {
   const { data: workspaces = [], isLoading, refetch } = useQuery<WorkspaceBalance[]>({
     queryKey: ['admin-credit-balances'],
     queryFn: async () => {
-      const [wsRes, balRes, usersRes] = await Promise.all([
-        supabase.from('workspaces').select('id,owner_id,plan').limit(2000),
-        supabase.from('user_credit_balances').select('user_id,workspace_id,credit_type,balance').limit(20000),
+      const [creditRes, usersRes] = await Promise.all([
+        invokeEdgeAuthed('admin-credits-data', { body: { action: 'list_balances', limit_workspaces: 2000, limit_balances: 20000 } } as any),
         invokeEdgeAuthed('admin-list-users'),
       ]);
-      if (wsRes.error) throw wsRes.error;
-      if (balRes.error) throw balRes.error;
+      if (creditRes.error) throw creditRes.error;
 
       const userMap: Record<string, { email: string | null; full_name: string | null }> = {};
       for (const u of usersRes.data?.users ?? []) {
@@ -370,7 +367,7 @@ export default function AdminCredits() {
 
       // Group balances by workspace
       const balMap: Record<string, Record<string, Record<CreditType, number>>> = {};
-      for (const row of balRes.data ?? []) {
+      for (const row of ((creditRes.data as any)?.balances ?? [])) {
         const wsId = row.workspace_id as string;
         const uId = row.user_id as string;
         if (!balMap[wsId]) balMap[wsId] = {};
@@ -378,7 +375,7 @@ export default function AdminCredits() {
         balMap[wsId][uId][row.credit_type as CreditType] = (row.balance ?? 0) as number;
       }
 
-      return (wsRes.data ?? []).map(ws => {
+      return (((creditRes.data as any)?.workspaces ?? []) as any[]).map(ws => {
         const owner = userMap[ws.owner_id] ?? { email: null, full_name: null };
         return {
           workspace_id: ws.id,

@@ -403,63 +403,41 @@ export default function SupportDashboard() {
   const { data: selectedTickets = [], isLoading: selectedTicketsLoading } = useQuery<any[]>({
     queryKey: ["support-selected-user-tickets", selected?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("support_tickets")
-        .select("id,ticket_number,subject,status,priority,created_at,updated_at")
-        .eq("user_id", selected!.id)
-        .order("created_at", { ascending: false })
-        .limit(50);
+      const { data, error } = await invokeEdgeAuthed<{ tickets: any[] }>("support-tickets", {
+        body: { action: "list_by_user", user_id: selected!.id, limit: 50 },
+      } as any);
       if (error) throw error;
-      return data ?? [];
+      return ((data as any)?.tickets ?? []) as any[];
     },
     enabled: !!selected?.id && !!supportPerms?.canViewTickets,
     staleTime: 15_000,
     retry: false,
   });
 
-  const { data: selectedActivity = [], isLoading: selectedActivityLoading, error: selectedActivityError } = useQuery<ActivityRow[]>({
-    queryKey: ["support-selected-user-activity", selected?.id],
+  const { data: diagnostics, isLoading: diagLoading, error: diagError } = useQuery<any>({
+    queryKey: ["support-selected-user-diagnostics", selected?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("support_get_user_activity_logs", {
-        p_user_id: selected!.id,
-        p_limit: 200,
-      });
+      const { data, error } = await invokeEdgeAuthed("support-diagnostics", {
+        body: { target_user_id: selected!.id, limit: 250 },
+      } as any);
       if (error) throw error;
-      return (data ?? []) as ActivityRow[];
+      return data;
     },
     enabled: !!selected?.id && !!supportPerms?.canViewActivityLogs,
     staleTime: 15_000,
     retry: false,
   });
 
-  const { data: selectedSessions = [], isLoading: selectedSessionsLoading, error: selectedSessionsError } = useQuery<SessionRow[]>({
-    queryKey: ["support-selected-user-sessions", selected?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("support_get_user_sessions", {
-        p_user_id: selected!.id,
-      });
-      if (error) throw error;
-      return (data ?? []) as SessionRow[];
-    },
-    enabled: !!selected?.id && !!supportPerms?.canViewSessions,
-    staleTime: 15_000,
-    retry: false,
-  });
-
-  const { data: billingSummary, isLoading: billingLoading, error: billingError } = useQuery<BillingSummary>({
-    queryKey: ["support-selected-user-billing", selected?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("support_get_user_billing_summary", {
-        p_user_id: selected!.id,
-        p_limit_invoices: 20,
-      });
-      if (error) throw error;
-      return (data ?? { workspaces: [], subscriptions: [], paddle_subscriptions: [], invoices: [] }) as BillingSummary;
-    },
-    enabled: !!selected?.id && !!supportPerms?.canViewBilling,
-    staleTime: 30_000,
-    retry: false,
-  });
+  const selectedActivity = ((diagnostics as any)?.activity_timeline ?? []) as ActivityRow[];
+  const selectedSessions = ((diagnostics as any)?.sessions ?? []) as SessionRow[];
+  const billingSummary = ((diagnostics as any)?.billing ??
+    { workspaces: [], subscriptions: [], paddle_subscriptions: [], invoices: [] }) as BillingSummary;
+  const selectedActivityLoading = diagLoading;
+  const selectedSessionsLoading = diagLoading;
+  const billingLoading = diagLoading;
+  const selectedActivityError = diagError;
+  const selectedSessionsError = diagError;
+  const billingError = diagError;
 
   return (
     <div className="min-h-screen bg-[#060608] text-white">
@@ -772,6 +750,36 @@ export default function SupportDashboard() {
 
         {mode === "lookup" && (
           <>
+            <div className="app-card p-4 mb-4">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <div className="text-[13px] font-medium">Support permissions</div>
+                  <div className="text-[11px] text-white/35">Server-computed permissions for this staff account.</div>
+                </div>
+                <div className="mono text-[11px] text-white/35">tier: {supportPerms?.tier ?? "—"}</div>
+              </div>
+              <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
+                {[
+                  ["User lookup", Boolean(supportPerms?.canUserLookup)],
+                  ["Tickets", Boolean(supportPerms?.canViewTickets)],
+                  ["Assign tickets", Boolean(supportPerms?.canAssignTickets)],
+                  ["Internal notes", Boolean(supportPerms?.canWriteInternalNotes)],
+                  ["Activity logs", Boolean(supportPerms?.canViewActivityLogs)],
+                  ["Sessions", Boolean(supportPerms?.canViewSessions)],
+                  ["Billing", Boolean(supportPerms?.canViewBilling)],
+                  ["Impersonate", Boolean(supportPerms?.canImpersonate)],
+                ].map(([label, ok]) => (
+                  <div
+                    key={String(label)}
+                    className="rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2 flex items-center justify-between"
+                  >
+                    <span className="text-white/45">{label as string}</span>
+                    <span className={`mono ${ok ? "text-emerald-300" : "text-red-300"}`}>{ok ? "allowed" : "restricted"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Search section */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
           <div>

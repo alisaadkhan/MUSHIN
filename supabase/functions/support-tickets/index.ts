@@ -6,6 +6,7 @@ import { checkRateLimit, corsHeaders as fixedCorsHeaders } from "../_shared/rate
 import { extractClientIp } from "../_shared/security.ts";
 
 type ListBody = { action: "list"; status?: string | null; limit?: number };
+type ListByUserBody = { action: "list_by_user"; user_id: string; limit?: number };
 type MessagesBody = { action: "messages"; ticket_id: string };
 type UpdateBody = { action: "update"; ticket_id: string; updates: Record<string, unknown>; reason?: string };
 type PostMessageBody = {
@@ -15,7 +16,7 @@ type PostMessageBody = {
   body: string;
 };
 
-type Body = ListBody | MessagesBody | UpdateBody | PostMessageBody;
+type Body = ListBody | ListByUserBody | MessagesBody | UpdateBody | PostMessageBody;
 
 function json(body: unknown, status = 200, headers: Record<string, string>) {
   return new Response(JSON.stringify(body), { status, headers: { ...headers, "Content-Type": "application/json" } });
@@ -57,7 +58,9 @@ Deno.serve(async (req) => {
 
       let q = authedPriv
         .from("support_tickets")
-        .select("id,ticket_number,user_id,subject,description,category,priority,status,assigned_to,assigned_at,created_at,updated_at")
+        .select(
+          "id,ticket_number,user_id,subject,description,category,priority,status,admin_notes,assigned_to,assigned_at,created_at,updated_at,profiles!user_id(full_name,avatar_url)",
+        )
         .order("created_at", { ascending: false })
         .limit(limit);
       if (status && status !== "all") q = q.eq("status", status);
@@ -72,6 +75,34 @@ Deno.serve(async (req) => {
         ipAddress,
         userAgent,
         metadata: { status, limit, count: Array.isArray(data) ? data.length : 0 },
+      });
+
+      return json({ success: true, tickets: data ?? [] }, 200, cors);
+    }
+
+    if (body.action === "list_by_user") {
+      if (!canViewTickets) return json({ error: "Forbidden" }, 403, cors);
+      const userId = asString((body as any).user_id).trim();
+      if (!userId) return validationErrorResponse("user_id required", cors);
+      const limit = Math.max(1, Math.min(Number((body as any).limit ?? 50), 200));
+
+      const { data, error } = await authedPriv
+        .from("support_tickets")
+        .select(
+          "id,ticket_number,user_id,subject,description,category,priority,status,admin_notes,assigned_to,assigned_at,created_at,updated_at,profiles!user_id(full_name,avatar_url)",
+        )
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+
+      await logUserAction({
+        actorUserId,
+        actionType: "support:tickets:list_by_user",
+        actionDescription: "Support listed tickets for a target user via support panel API",
+        ipAddress,
+        userAgent,
+        metadata: { user_id: userId, limit, count: Array.isArray(data) ? data.length : 0 },
       });
 
       return json({ success: true, tickets: data ?? [] }, 200, cors);

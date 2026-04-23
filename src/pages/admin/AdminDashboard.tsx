@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { invokeEdgeAuthed } from '@/lib/edge';
 import {
   Users, CreditCard, Activity, AlertTriangle,
@@ -89,43 +88,9 @@ export default function AdminDashboard() {
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ['admin-dashboard-v2'],
     queryFn: async () => {
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
-      const startIso = startOfDay.toISOString();
-
-      const [usersRes, subsRes, wsRes, auditRes, suspendedRes, creditTodayRes] = await Promise.all([
-        invokeEdgeAuthed('admin-list-users'),
-        supabase.from('subscriptions').select('id,plan,status', { count: 'exact' }),
-        supabase.from('workspaces').select('id', { count: 'exact', head: true }),
-        supabase
-          .from('system_audit_logs')
-          .select('id,timestamp,action_type,action_description,actor_user_id')
-          .order('timestamp', { ascending: false })
-          .limit(8),
-        supabase
-          .from('user_suspensions')
-          .select('id', { count: 'exact', head: true })
-          .is('lifted_at', null),
-        supabase
-          .from('credit_transactions')
-          .select('id', { count: 'exact', head: true })
-          .gte('created_at', startIso),
-      ]);
-
-      const activeSubs = (subsRes.data ?? []).filter(s => s.status === 'active').length;
-      const totalUsers = Array.isArray((usersRes as any)?.data?.users) ? (usersRes as any).data.users.length : 0;
-
-      return {
-        totalUsers,
-        activeUsers7d:     0,                           // needs active_at column
-        activeSubs,
-        totalSubs:         subsRes.count      ?? 0,
-        totalWorkspaces:   wsRes.count        ?? 0,
-        recentAuditActions: (auditRes.data    ?? []) as AuditRow[],
-        suspendedUsers:    suspendedRes.count ?? 0,
-        creditEventsToday: creditTodayRes.count ?? 0,
-        lastUpdatedAt: new Date().toISOString(),
-      };
+      const { data, error } = await invokeEdgeAuthed<DashboardStats>('admin-dashboard', { body: {} } as any);
+      if (error) throw error;
+      return data as any;
     },
     staleTime: 30_000,
     refetchInterval: 10_000,

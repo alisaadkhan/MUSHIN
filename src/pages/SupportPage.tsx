@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -75,16 +74,11 @@ export default function SupportPage() {
     queryKey: ["support-tickets", user?.id],
     queryFn: async () => {
       if (!user) throw new Error("No user");
-      const { data, error } = await supabase
-        .from("support_tickets")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-      if (error) {
-        if (error.code === "42P01") return [];
-        throw error;
-      }
-      return data as Ticket[];
+      const { data, error } = await invokeEdgeAuthed<{ tickets: Ticket[] }>("support-tickets", {
+        body: { action: "list", status: null, limit: 100 },
+      } as any);
+      if (error) throw error;
+      return ((data as any)?.tickets ?? []) as Ticket[];
     },
     enabled: !!user,
   });
@@ -93,16 +87,18 @@ export default function SupportPage() {
     queryKey: ["ticket-replies", expandedTicket],
     queryFn: async () => {
       if (!expandedTicket) return [];
-      const { data, error } = await supabase
-        .from("support_ticket_replies")
-        .select("*")
-        .eq("ticket_id", expandedTicket)
-        .order("created_at", { ascending: true });
-      if (error) {
-        if (error.code === "42P01") return [];
-        throw error;
-      }
-      return data as TicketReply[];
+      const { data, error } = await invokeEdgeAuthed<{ messages: any[] }>("support-tickets", {
+        body: { action: "messages", ticket_id: expandedTicket },
+      } as any);
+      if (error) throw error;
+      return (((data as any)?.messages ?? []) as any[]).map((m) => ({
+        id: m.id,
+        ticket_id: m.ticket_id,
+        author_id: m.author_id,
+        is_admin: Boolean(m.is_admin),
+        body: m.body,
+        created_at: m.created_at,
+      })) as TicketReply[];
     },
     enabled: !!expandedTicket,
   });
@@ -143,12 +139,9 @@ export default function SupportPage() {
     if (!replyText.trim() || !expandedTicket) return;
     setSendingReply(true);
     try {
-      const { error } = await supabase.from("support_ticket_replies").insert({
-        ticket_id: expandedTicket,
-        author_id: user!.id,
-        body: replyText.trim(),
-        is_admin: false,
-      });
+      const { error } = await invokeEdgeAuthed("support-tickets", {
+        body: { action: "post_message", ticket_id: expandedTicket, body: replyText.trim(), visibility: "user" },
+      } as any);
       if (error) throw error;
       setReplyText("");
       qc.invalidateQueries({ queryKey: ["ticket-replies", expandedTicket] });

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { useNavigate } from "react-router-dom";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
+import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -49,6 +50,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         <AnnouncementBanner />
+        <ImpersonationBanner />
         {/* Topbar */}
         <header className="h-14 border-b border-border bg-background/80 backdrop-blur-md flex items-center px-3 sm:px-4 gap-3 flex-shrink-0 z-20">
           <Button

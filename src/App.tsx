@@ -53,6 +53,8 @@ const NotFound             = lazy(() => import("./pages/NotFound"));
 const ServerError          = lazy(() => import("./pages/ServerError"));
 const SupportDashboard  = lazy(() => import("./pages/SupportDashboard"));
 const SupportPage       = lazy(() => import("./pages/SupportPage"));
+const SupportActivity   = lazy(() => import("./pages/SupportActivity"));
+const SupportDiagnostics = lazy(() => import("./pages/SupportDiagnostics"));
 
 // Admin pages — heavy, rarely accessed, loaded on demand
 const AdminDashboard       = lazy(() => import("./pages/admin/AdminDashboard"));
@@ -69,6 +71,12 @@ const AdminSupportTickets  = lazy(() => import("./pages/admin/AdminSupportTicket
 const AdminCredits         = lazy(() => import("./pages/admin/AdminCredits"));
 const AdminSecurity        = lazy(() => import("./pages/admin/AdminSecurity"));
 const AdminRevenue         = lazy(() => import("./pages/admin/AdminRevenue"));
+const AdminRbacGovernance  = lazy(() => import("./pages/admin/AdminRbacGovernance"));
+const AdminSystemSettings  = lazy(() => import("./pages/admin/AdminSystemSettings"));
+const AdminApiKeys         = lazy(() => import("./pages/admin/AdminApiKeys"));
+const AdminSecurityFlags   = lazy(() => import("./pages/admin/AdminSecurityFlags"));
+const AdminSupportActivity = lazy(() => import("./pages/admin/AdminSupportActivity"));
+const AdminImpersonation   = lazy(() => import("./pages/admin/AdminImpersonation"));
 
 // Fallback while a lazy chunk loads — flat background, no flash of empty chrome
 const PageShell = () => (
@@ -175,9 +183,17 @@ const App = () => {
                   <Route path="/admin/config" element={<AdminRoute requiredPermission="canEditConfig"><AdminConfig /></AdminRoute>} />
                   <Route path="/admin/audit-log" element={<AdminRoute requiredPermission="canViewAuditLog"><AdminAuditLog /></AdminRoute>} />
                   <Route path="/admin/security" element={<AdminRoute requiredPermission="canViewAuditLog"><AdminSecurity /></AdminRoute>} />
+                  <Route path="/admin/security/flags" element={<AdminRoute requiredPermission="canEditConfig"><AdminSecurityFlags /></AdminRoute>} />
+                  <Route path="/admin/security/support-activity" element={<AdminRoute requiredPermission="canEditConfig"><AdminSupportActivity /></AdminRoute>} />
                   <Route path="/admin/announcements" element={<AdminRoute requiredPermission="canManageAnnouncements"><AdminAnnouncements /></AdminRoute>} />
                   <Route path="/admin/permissions" element={<AdminRoute requiredPermission="canEditConfig"><AdminPermissions /></AdminRoute>} />
+                  <Route path="/admin/rbac" element={<AdminRoute requiredPermission="canEditConfig"><AdminRbacGovernance /></AdminRoute>} />
+                  <Route path="/admin/system-settings" element={<AdminRoute requiredPermission="canEditConfig"><AdminSystemSettings /></AdminRoute>} />
+                  <Route path="/admin/api-keys" element={<AdminRoute requiredPermission="canEditConfig"><AdminApiKeys /></AdminRoute>} />
+                  <Route path="/admin/impersonation" element={<AdminRoute requiredPermission="canEditConfig"><AdminImpersonation /></AdminRoute>} />
                   <Route path="/support/dashboard" element={<SupportRoute><SupportDashboard /></SupportRoute>} />
+                  <Route path="/support/activity" element={<SupportRoute><SupportActivity /></SupportRoute>} />
+                  <Route path="/support/diagnostics" element={<SupportRoute><SupportDiagnostics /></SupportRoute>} />
                   <Route path="/support" element={<ProtectedPage><SupportPage /></ProtectedPage>} />
                   <Route path="/admin/support" element={<AdminRoute requiredPermission="canManageUsers"><AdminSupportTickets /></AdminRoute>} />
                   <Route path="/admin/credits" element={<AdminRoute requiredPermission="canManageUsers"><AdminCredits /></AdminRoute>} />
